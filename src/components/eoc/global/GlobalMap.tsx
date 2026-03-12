@@ -173,33 +173,32 @@ export function GlobalMap({ activeLayers, flights, earthquakes, fires, news, fly
   // Flight markers - rendered as HTML markers for rotation support
   const flightMarkers = useMemo(() => {
     if (!flights) return [];
-    const markers: { key: string; lat: number; lng: number; heading: number; color: string; label: string; alt: number }[] = [];
+    const markers: { key: string; lat: number; lng: number; heading: number; color: string; label: string; alt: number; speed: number; model: string }[] = [];
 
     if (activeLayers.military && flights.military) {
       for (const f of flights.military) {
         if (inView(f.lat, f.lng)) {
-          markers.push({ key: `mil-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: 'yellow', label: f.callsign || f.icao24, alt: f.alt });
+          markers.push({ key: `mil-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: 'yellow', label: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model });
         }
       }
     }
     if (activeLayers.flights && flights.commercial) {
-      // Sample commercial flights for performance (max 2000 markers)
       const sample = flights.commercial.length > 2000
-        ? flights.commercial.filter((_, i) => i % Math.ceil(flights.commercial.length / 2000) === 0)
+        ? flights.commercial.filter((_: any, i: number) => i % Math.ceil(flights.commercial.length / 2000) === 0)
         : flights.commercial;
       for (const f of sample) {
         if (inView(f.lat, f.lng)) {
-          markers.push({ key: `com-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: 'cyan', label: f.callsign || f.icao24, alt: f.alt });
+          markers.push({ key: `com-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: 'cyan', label: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model });
         }
       }
     }
     if (activeLayers.private && flights.private) {
       const sample = flights.private.length > 1000
-        ? flights.private.filter((_, i) => i % Math.ceil(flights.private.length / 1000) === 0)
+        ? flights.private.filter((_: any, i: number) => i % Math.ceil(flights.private.length / 1000) === 0)
         : flights.private;
       for (const f of sample) {
         if (inView(f.lat, f.lng)) {
-          markers.push({ key: `prv-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: '#FF8C00', label: f.callsign || f.icao24, alt: f.alt });
+          markers.push({ key: `prv-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: '#FF8C00', label: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model });
         }
       }
     }
@@ -377,22 +376,35 @@ export function GlobalMap({ activeLayers, flights, earthquakes, fires, news, fly
         </Source>
 
         {/* Flight markers via HTML markers for rotation */}
-        {flightMarkers.slice(0, 3000).map(m => (
-          <Marker
-            key={m.key}
-            longitude={m.lng}
-            latitude={m.lat}
-            anchor="center"
-            rotation={m.heading}
-          >
-            <img
-              src={svgPlane(m.color, m.color === 'yellow' ? 16 : 12)}
-              alt=""
-              style={{ width: m.color === 'yellow' ? 16 : 12, height: m.color === 'yellow' ? 16 : 12 }}
-              title={`${m.label} · ${Math.round(m.alt)} ft`}
-            />
-          </Marker>
-        ))}
+        {flightMarkers.slice(0, 3000).map(m => {
+          const isMil = m.color === 'yellow';
+          const size = isMil ? 16 : 12;
+          return (
+            <Marker
+              key={m.key}
+              longitude={m.lng}
+              latitude={m.lat}
+              anchor="center"
+              rotation={m.heading}
+            >
+              <img
+                src={svgPlane(m.color, size)}
+                alt=""
+                style={{ width: size, height: size, cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const typeLabel = isMil ? 'MILITARY' : m.color === '#FF8C00' ? 'PRIVATE' : 'COMMERCIAL';
+                  setPopup({
+                    lat: m.lat,
+                    lng: m.lng,
+                    content: `${typeLabel} · ${m.label || 'Unknown'}${m.model ? ` (${m.model})` : ''} · ${Math.round(m.alt).toLocaleString()} ft · ${Math.round(m.speed)} kts`,
+                  });
+                }}
+                title={`${m.label} · ${Math.round(m.alt).toLocaleString()} ft`}
+              />
+            </Marker>
+          );
+        })}
 
         {/* Popup */}
         {popup && (
@@ -403,8 +415,11 @@ export function GlobalMap({ activeLayers, flights, earthquakes, fires, news, fly
             closeButton
             closeOnClick={false}
             className="global-map-popup"
+            offset={12}
           >
-            <div className="text-xs text-white max-w-[200px]">{popup.content}</div>
+            <div className="text-[11px] text-white max-w-[250px] font-mono leading-relaxed">
+              {popup.content}
+            </div>
           </Popup>
         )}
       </Map>
