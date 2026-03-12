@@ -6,25 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { computeNightPolygon } from '@/lib/solarTerminator';
 import type { ActiveLayers } from './GlobalLayerPanel';
 
-// Carto dark basemap (free, no key)
-const MAP_STYLE = {
-  version: 8 as const,
-  glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-  sources: {
-    'carto-dark': {
-      type: 'raster' as const,
-      tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-      ],
-      tileSize: 256,
-    },
-  },
-  layers: [
-    { id: 'carto-dark-layer', type: 'raster' as const, source: 'carto-dark', minzoom: 0, maxzoom: 22 },
-  ],
-};
+import { getMapStyle, type MapStyleId } from './GlobalMapStyleSwitcher';
 
 // SVG plane icon as data URI
 const svgPlane = (color: string, size = 14) =>
@@ -130,6 +112,7 @@ interface Props {
   kiwisdr?: KiwiSDRData[];
   frontlines?: any; // GeoJSON
   gdeltIncidents?: GDELTIncident[];
+  mapStyle?: MapStyleId;
   flyToLocation?: { lat: number; lng: number } | null;
   onMouseCoords?: (lat: number, lng: number) => void;
   onContextMenu?: (lat: number, lng: number) => void;
@@ -140,7 +123,7 @@ const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', feature
 export function GlobalMap({
   activeLayers, flights, earthquakes, fires, news,
   satellites, carriers, cctv, kiwisdr, frontlines, gdeltIncidents,
-  flyToLocation, onMouseCoords, onContextMenu,
+  mapStyle = 'dark', flyToLocation, onMouseCoords, onContextMenu,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -422,7 +405,7 @@ export function GlobalMap({
         }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
-        mapStyle={MAP_STYLE as any}
+        mapStyle={getMapStyle(mapStyle) as any}
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
         maxZoom={18}

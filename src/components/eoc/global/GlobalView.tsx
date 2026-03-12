@@ -12,6 +12,8 @@ import { GlobalLocateBar } from './GlobalLocateBar';
 import { GlobalMarketsTicker } from './GlobalMarketsTicker';
 import { GlobalRadioPanel } from './GlobalRadioPanel';
 import { GlobalDossierPanel } from './GlobalDossierPanel';
+import { GlobalMapLegend } from './GlobalMapLegend';
+import { GlobalMapStyleSwitcher, type MapStyleId } from './GlobalMapStyleSwitcher';
 
 // Dynamic import to avoid SSR issues with MapLibre
 const GlobalMap = dynamic(() => import('./GlobalMap').then(m => ({ default: m.GlobalMap })), {
@@ -42,6 +44,7 @@ export function GlobalView() {
 
   // Region dossier
   const [dossierCoords, setDossierCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapStyleId, setMapStyleId] = useState<MapStyleId>('dark');
 
   // Data stores
   const [flights, setFlights] = useState<any>(null);
@@ -317,6 +320,7 @@ export function GlobalView() {
           kiwisdr={kiwisdr}
           frontlines={frontlines}
           gdeltIncidents={gdeltIncidents}
+          mapStyle={mapStyleId}
           flyToLocation={flyToLocation}
           onContextMenu={handleContextMenu}
         />
@@ -387,6 +391,12 @@ export function GlobalView() {
             onClose={() => setDossierCoords(null)}
           />
         )}
+
+        {/* Bottom-left: Legend + Map Style */}
+        <div className="absolute bottom-12 left-4 z-10 flex flex-col gap-2">
+          <GlobalMapLegend />
+          <GlobalMapStyleSwitcher current={mapStyleId} onChange={setMapStyleId} />
+        </div>
 
         {/* Bottom bar: status + markets ticker */}
         <div className="absolute bottom-0 left-0 right-0 h-9 bg-gradient-to-t from-black/70 to-transparent flex items-end justify-between px-4 pb-1.5 pointer-events-none z-10">
