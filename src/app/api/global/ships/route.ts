@@ -49,42 +49,44 @@ export async function GET() {
     // Method 1: Danish Maritime Authority's free AIS feed (public, no key)
     const vessels: any[] = [];
 
-    // Use aisstream.io REST snapshot if API key available
+    // Use aisstream.io REST API if key available
+    // Note: stream.aisstream.io/v0/stream is a WebSocket endpoint, not REST.
+    // Use the REST snapshot endpoint instead.
     const aisKey = process.env.AIS_API_KEY;
     if (aisKey) {
       try {
-        const res = await fetch('https://stream.aisstream.io/v0/stream', {
+        const res = await fetch('https://api.aisstream.io/v0/ships', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             APIKey: aisKey,
             BoundingBoxes: [[[-90, -180], [90, 180]]],
-            FilterMessageTypes: ['PositionReport'],
           }),
+          signal: AbortSignal.timeout(15000),
         });
         if (res.ok) {
           const data = await res.json();
-          // Process AIS data
-          if (Array.isArray(data)) {
-            for (const msg of data.slice(0, 500)) {
-              const meta = msg.MetaData || {};
-              const report = msg.Message?.PositionReport || {};
-              if (report.Latitude && report.Longitude) {
-                vessels.push({
-                  mmsi: meta.MMSI,
-                  name: (meta.ShipName || 'UNKNOWN').trim(),
-                  type: classifyVessel(meta.ShipType || 0),
-                  lat: report.Latitude,
-                  lng: report.Longitude,
-                  heading: report.TrueHeading !== 511 ? report.TrueHeading : report.Cog || 0,
-                  sog: report.Sog || 0,
-                  country: getCountryFromMMSI(meta.MMSI || 0),
-                });
-              }
+          const items = Array.isArray(data) ? data : data?.data || [];
+          for (const msg of items.slice(0, 500)) {
+            const meta = msg.MetaData || msg;
+            const report = msg.Message?.PositionReport || msg;
+            const lat = report.Latitude ?? meta.lat;
+            const lng = report.Longitude ?? meta.lng ?? meta.lon;
+            if (lat && lng) {
+              vessels.push({
+                mmsi: meta.MMSI ?? meta.mmsi,
+                name: (meta.ShipName || meta.name || 'UNKNOWN').trim(),
+                type: classifyVessel(meta.ShipType ?? meta.ship_type ?? 0),
+                lat,
+                lng,
+                heading: (report.TrueHeading !== 511 ? report.TrueHeading : report.Cog) ?? meta.heading ?? 0,
+                sog: report.Sog ?? meta.sog ?? 0,
+                country: getCountryFromMMSI(meta.MMSI ?? meta.mmsi ?? 0),
+              });
             }
           }
         }
-      } catch { /* AIS stream not available */ }
+      } catch { /* AIS API not available */ }
     }
 
     // Fallback: known major shipping lanes with simulated traffic
@@ -141,8 +143,9 @@ export async function GET() {
       }
     }
 
+    const isSimulated = vessels.length > 0 && vessels[0].country === 'Various';
     cache = { data: vessels, ts: Date.now() };
-    return NextResponse.json({ vessels, total: vessels.length });
+    return NextResponse.json({ vessels, total: vessels.length, simulated: isSimulated });
   } catch {
     return NextResponse.json({ vessels: [], total: 0 });
   }

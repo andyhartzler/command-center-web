@@ -49,7 +49,7 @@ async function fetchCountryData(code: string): Promise<any> {
 
 async function fetchWikidataLeader(countryName: string): Promise<{ leader: string; governmentType: string }> {
   if (!countryName) return { leader: 'Unknown', governmentType: 'Unknown' };
-  const safeName = countryName.replace(/"/g, '\\"');
+  const safeName = countryName.replace(/[\\"{}()\n\r\t]/g, c => `\\${c}`);
   const sparql = `SELECT ?leaderLabel ?govTypeLabel WHERE {
     ?country wdt:P31 wd:Q6256 ; rdfs:label "${safeName}"@en .
     OPTIONAL { ?country wdt:P35 ?leader . }

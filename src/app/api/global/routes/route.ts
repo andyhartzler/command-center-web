@@ -43,11 +43,18 @@ export async function GET(req: Request) {
       };
       cache.set(callsign, { ...result, ts: Date.now() });
 
-      // Clean old cache entries
-      if (cache.size > 5000) {
+      // Clean old cache entries - hard limit at 2000
+      if (cache.size > 2000) {
         const now = Date.now();
         for (const [k, v] of cache) {
           if (now - v.ts > TTL) cache.delete(k);
+        }
+        // If still over limit, remove oldest entries
+        if (cache.size > 2000) {
+          const entries = [...cache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+          for (let i = 0; i < entries.length - 1000; i++) {
+            cache.delete(entries[i][0]);
+          }
         }
       }
 

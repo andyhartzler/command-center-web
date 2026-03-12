@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { Search, MapPin, X } from 'lucide-react';
 
 interface Props {
-  onFlyTo: (lat: number, lng: number, name: string) => void;
+  onFlyTo: (lat: number, lng: number, name?: string) => void;
 }
 
 interface SearchResult {

@@ -160,8 +160,7 @@ interface Props {
   gibsOpacity?: number;
   measurePoints?: MeasurePoint[];
   measureActive?: boolean;
-  bloomEnabled?: boolean;
-  sharpenValue?: number;
+  maxFlightMarkers?: number;
   mapStyle?: MapStyleId;
   flyToLocation?: { lat: number; lng: number } | null;
   onMouseCoords?: (lat: number, lng: number) => void;
@@ -201,7 +200,7 @@ export function GlobalMap({
   activeLayers, flights, earthquakes, fires, news,
   satellites, carriers, cctv, kiwisdr, frontlines, gdeltIncidents,
   ships, liveuamapEvents, outages, dataCenters, gibsDate, gibsOpacity = 0.6,
-  measurePoints, measureActive, bloomEnabled, sharpenValue = 0,
+  measurePoints, measureActive, maxFlightMarkers = 3000,
   mapStyle = 'dark', flyToLocation, onMouseCoords, onContextMenu, onMeasureClick, onViewChange,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
@@ -269,19 +268,18 @@ export function GlobalMap({
     };
   }, [activeLayers.earthquakes, earthquakes]);
 
-  // Fires GeoJSON - clustered
+  // Fires GeoJSON - clustered (MapLibre handles viewport culling)
   const firesGeoJSON = useMemo(() => {
     if (!activeLayers.fires || !fires?.length) return EMPTY_FC;
-    const visible = fires.filter(f => inView(f.lat, f.lng));
     return {
       type: 'FeatureCollection' as const,
-      features: visible.map((f, i) => ({
+      features: fires.map((f, i) => ({
         type: 'Feature' as const,
         properties: { id: i, frp: f.frp, confidence: f.confidence },
         geometry: { type: 'Point' as const, coordinates: [f.lng, f.lat] },
       })),
     };
-  }, [activeLayers.fires, fires, inView]);
+  }, [activeLayers.fires, fires]);
 
   // News markers GeoJSON
   const newsGeoJSON = useMemo(() => {
@@ -301,16 +299,15 @@ export function GlobalMap({
   // Satellites GeoJSON
   const satelliteGeoJSON = useMemo(() => {
     if (!activeLayers.satellites || !satellites?.length) return EMPTY_FC;
-    const visible = satellites.filter(s => inView(s.lat, s.lng));
     return {
       type: 'FeatureCollection' as const,
-      features: visible.map((s, i) => ({
+      features: satellites.map((s, i) => ({
         type: 'Feature' as const,
         properties: { id: i, name: s.name, alt: s.alt, type: s.type },
         geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
       })),
     };
-  }, [activeLayers.satellites, satellites, inView]);
+  }, [activeLayers.satellites, satellites]);
 
   // CCTV GeoJSON - clustered
   const cctvGeoJSON = useMemo(() => {
@@ -362,16 +359,15 @@ export function GlobalMap({
   // Ships GeoJSON
   const shipsGeoJSON = useMemo(() => {
     if (!activeLayers.ships || !ships?.length) return EMPTY_FC;
-    const visible = ships.filter(s => inView(s.lat, s.lng));
     return {
       type: 'FeatureCollection' as const,
-      features: visible.map((s, i) => ({
+      features: ships.map((s, i) => ({
         type: 'Feature' as const,
         properties: { id: i, name: s.name, type: s.type, sog: s.sog, heading: s.heading, country: s.country, mmsi: s.mmsi },
         geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
       })),
     };
-  }, [activeLayers.ships, ships, inView]);
+  }, [activeLayers.ships, ships]);
 
   // LiveUAMap events GeoJSON
   const liveuamapGeoJSON = useMemo(() => {
@@ -402,16 +398,15 @@ export function GlobalMap({
   // Data centers GeoJSON
   const dataCentersGeoJSON = useMemo(() => {
     if (!activeLayers.data_centers || !dataCenters?.length) return EMPTY_FC;
-    const visible = dataCenters.filter(d => inView(d.lat, d.lng));
     return {
       type: 'FeatureCollection' as const,
-      features: visible.map((d, i) => ({
+      features: dataCenters.map((d, i) => ({
         type: 'Feature' as const,
         properties: { id: i, name: d.name, city: d.city, country: d.country },
         geometry: { type: 'Point' as const, coordinates: [d.lng, d.lat] },
       })),
     };
-  }, [activeLayers.data_centers, dataCenters, inView]);
+  }, [activeLayers.data_centers, dataCenters]);
 
   // Measure line GeoJSON
   const measureGeoJSON = useMemo(() => {
@@ -522,7 +517,7 @@ export function GlobalMap({
       'earthquakes-circle', 'news-circle', 'satellites-circle',
       'cctv-clusters', 'cctv-unclustered', 'kiwisdr-clusters', 'kiwisdr-unclustered',
       'gdelt-circle', 'liveuamap-circle', 'ships-circle',
-      'outages-circle', 'datacenters-circle', 'datacenters-unclustered',
+      'outages-circle', 'datacenters-clusters', 'datacenters-unclustered',
     ];
     const features = map.queryRenderedFeatures(e.point, { layers: queryLayers });
     if (features.length > 0) {
@@ -560,14 +555,8 @@ export function GlobalMap({
     }
   }, [onContextMenu]);
 
-  // Build CSS filter string for bloom/sharpen
-  const cssFilters: string[] = [];
-  if (bloomEnabled) cssFilters.push('brightness(1.1) contrast(1.05)');
-  if (sharpenValue > 0) cssFilters.push(`contrast(${1 + sharpenValue * 0.002})`);
-  const filterStyle = cssFilters.length > 0 ? cssFilters.join(' ') : undefined;
-
   return (
-    <div className={`w-full h-full relative ${measureActive ? 'cursor-crosshair' : ''}`} style={filterStyle ? { filter: filterStyle } : undefined}>
+    <div className={`w-full h-full relative ${measureActive ? 'cursor-crosshair' : ''}`}>
       <Map
         ref={mapRef}
         {...viewState}
@@ -1077,7 +1066,7 @@ export function GlobalMap({
               paint={{
                 'raster-opacity': gibsOpacity,
               }}
-              beforeId="night-fill"
+              {...(activeLayers.day_night ? { beforeId: 'night-fill' } : {})}
             />
           </Source>
         )}
@@ -1097,7 +1086,7 @@ export function GlobalMap({
               paint={{
                 'raster-opacity': 0.85,
               }}
-              beforeId="night-fill"
+              {...(activeLayers.day_night ? { beforeId: 'night-fill' } : {})}
             />
           </Source>
         )}
@@ -1169,16 +1158,6 @@ export function GlobalMap({
               'circle-opacity': 0.5,
             }}
           />
-          <Layer
-            id="datacenters-circle"
-            type="circle"
-            filter={['!', ['has', 'point_count']]}
-            paint={{
-              'circle-radius': 4,
-              'circle-color': '#818cf8',
-              'circle-opacity': 0,
-            }}
-          />
         </Source>
 
         {/* Carrier Strike Group markers */}
@@ -1212,7 +1191,7 @@ export function GlobalMap({
         ))}
 
         {/* Flight markers via HTML markers for rotation */}
-        {flightMarkers.slice(0, 3000).map(m => {
+        {flightMarkers.slice(0, maxFlightMarkers).map(m => {
           const isMil = m.color === 'yellow';
           const size = isMil ? 16 : 12;
           return (

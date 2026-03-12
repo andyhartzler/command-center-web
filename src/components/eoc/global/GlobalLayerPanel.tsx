@@ -191,9 +191,9 @@ export function GlobalLayerPanel({ activeLayers, setActiveLayers, counts, lastUp
             </div>
           </div>
           <div className="p-2 space-y-1">
-            {potusFleet.map((ac, i) => (
+            {potusFleet.map((ac) => (
               <button
-                key={i}
+                key={ac.callsign}
                 onClick={() => onFlyTo?.(ac.lat, ac.lng)}
                 className="w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-pink-500/10 transition-colors group"
               >

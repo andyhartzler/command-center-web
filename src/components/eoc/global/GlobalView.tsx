@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Monitor, ShieldAlert, Wifi, WifiOff, Globe, Satellite, Anchor, Camera, Star, Ship, Settings, Filter, Ruler, Shield } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
@@ -39,10 +39,11 @@ const SCOPE_LABELS: Record<EOCScope, string> = {
   global: 'Global',
 };
 
-// Polling intervals
-const FAST_POLL = 60_000;  // 1 min: flights, earthquakes
-const SLOW_POLL = 180_000; // 3 min: fires, news, satellites, carriers
-const GLACIAL_POLL = 600_000; // 10 min: cctv, kiwisdr
+// Base polling intervals - scaled by settingsConfig.refreshRate
+const POLL_MULTIPLIER = { fast: 0.5, normal: 1, slow: 2 } as const;
+const BASE_FAST_POLL = 60_000;  // 1 min: flights, earthquakes
+const BASE_SLOW_POLL = 180_000; // 3 min: fires, news, satellites, carriers
+const BASE_GLACIAL_POLL = 600_000; // 10 min: cctv, kiwisdr
 
 export function GlobalView() {
   const { eocScope, setEocScope, setAppMode } = useAppState();
@@ -74,6 +75,12 @@ export function GlobalView() {
   const [mapZoom, setMapZoom] = useState(2.2);
   const [mapLat, setMapLat] = useState(25);
 
+  // Computed poll intervals from settings
+  const pollScale = POLL_MULTIPLIER[settingsConfig.refreshRate];
+  const FAST_POLL = BASE_FAST_POLL * pollScale;
+  const SLOW_POLL = BASE_SLOW_POLL * pollScale;
+  const GLACIAL_POLL = BASE_GLACIAL_POLL * pollScale;
+
   // Measure mode
   const [measureActive, setMeasureActive] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<MeasurePoint[]>([]);
@@ -94,9 +101,6 @@ export function GlobalView() {
   const [liveuamapEvents, setLiveuamapEvents] = useState<any[]>([]);
   const [outages, setOutages] = useState<any[]>([]);
   const [dataCenters, setDataCenters] = useState<any[]>([]);
-
-  // Previous flight positions for smooth interpolation
-  const prevFlightsRef = useRef<Map<string, { lat: number; lng: number; ts: number }>>(new Map());
 
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [utcTime, setUtcTime] = useState(new Date().toISOString().slice(11, 19));
@@ -169,6 +173,7 @@ export function GlobalView() {
         } catch {}
       })(),
       (async () => {
+        if (!activeLayers.news_markers) return;
         try {
           const res = await fetch('/api/global/news');
           if (res.ok) setNews(await res.json());
@@ -252,7 +257,7 @@ export function GlobalView() {
         } catch {}
       })(),
     ]);
-  }, [activeLayers.fires, activeLayers.satellites, activeLayers.carriers, activeLayers.frontlines, activeLayers.gdelt_incidents, activeLayers.ships, activeLayers.liveuamap, activeLayers.internet_outages, activeLayers.data_centers]);
+  }, [activeLayers.fires, activeLayers.news_markers, activeLayers.satellites, activeLayers.carriers, activeLayers.frontlines, activeLayers.gdelt_incidents, activeLayers.ships, activeLayers.liveuamap, activeLayers.internet_outages, activeLayers.data_centers]);
 
   // Glacial fetcher (cctv + kiwisdr)
   const fetchGlacial = useCallback(async () => {
@@ -297,19 +302,19 @@ export function GlobalView() {
   useEffect(() => {
     const id = setInterval(fetchFast, FAST_POLL);
     return () => clearInterval(id);
-  }, [fetchFast]);
+  }, [fetchFast, FAST_POLL]);
 
   // Slow poll
   useEffect(() => {
     const id = setInterval(fetchSlow, SLOW_POLL);
     return () => clearInterval(id);
-  }, [fetchSlow]);
+  }, [fetchSlow, SLOW_POLL]);
 
   // Glacial poll
   useEffect(() => {
     const id = setInterval(fetchGlacial, GLACIAL_POLL);
     return () => clearInterval(id);
-  }, [fetchGlacial]);
+  }, [fetchGlacial, GLACIAL_POLL]);
 
   const handleNewsFlyTo = useCallback((lat: number, lng: number) => {
     setFlyToLocation({ lat, lng });
@@ -387,6 +392,36 @@ export function GlobalView() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
+
+  // Apply advanced filters to data
+  const filteredFlights = React.useMemo(() => {
+    if (!flights || !activeFilters.aircraft_type?.length) return flights;
+    const types = new Set(activeFilters.aircraft_type.map(t => t.toLowerCase()));
+    const f = { ...flights };
+    if (!types.has('commercial')) f.commercial = [];
+    if (!types.has('military')) f.military = [];
+    if (!types.has('private jet') && !types.has('helicopter') && !types.has('cargo')) f.private = [];
+    if (!types.has('potus fleet')) f.tracked = [];
+    return f;
+  }, [flights, activeFilters.aircraft_type]);
+
+  const filteredShips = React.useMemo(() => {
+    if (!activeFilters.vessel_type?.length) return ships;
+    const types = new Set(activeFilters.vessel_type.map(t => t.toLowerCase()));
+    return ships.filter(s => types.has((s.type || 'other').toLowerCase()));
+  }, [ships, activeFilters.vessel_type]);
+
+  const filteredEvents = React.useMemo(() => {
+    if (!activeFilters.event_type?.length) return { earthquakes, fires, gdeltIncidents, liveuamapEvents, news };
+    const types = new Set(activeFilters.event_type.map(t => t.toLowerCase()));
+    return {
+      earthquakes: types.has('earthquake') ? earthquakes : [],
+      fires: types.has('fire') ? fires : [],
+      gdeltIncidents: types.has('military incident') || types.has('conflict') ? gdeltIncidents : [],
+      liveuamapEvents: types.has('liveuamap') || types.has('conflict') ? liveuamapEvents : [],
+      news: types.has('news') ? news : [],
+    };
+  }, [earthquakes, fires, gdeltIncidents, liveuamapEvents, news, activeFilters.event_type]);
 
   // Build CSS filter for bloom + sharpen effects on the map container
   const mapFilters: string[] = [];
@@ -496,30 +531,29 @@ export function GlobalView() {
         <GlobalErrorBoundary>
         <GlobalMap
           activeLayers={activeLayers}
-          flights={flights}
-          earthquakes={earthquakes}
-          fires={fires}
-          news={news}
+          flights={filteredFlights}
+          earthquakes={filteredEvents.earthquakes}
+          fires={filteredEvents.fires}
+          news={filteredEvents.news}
           satellites={satellites}
           carriers={carriers}
           cctv={cctv}
           kiwisdr={kiwisdr}
           frontlines={frontlines}
-          gdeltIncidents={gdeltIncidents}
-          ships={ships}
-          liveuamapEvents={liveuamapEvents}
+          gdeltIncidents={filteredEvents.gdeltIncidents}
+          ships={filteredShips}
+          liveuamapEvents={filteredEvents.liveuamapEvents}
           outages={outages}
           dataCenters={dataCenters}
           gibsDate={activeLayers.gibs_imagery ? gibsDate : undefined}
           gibsOpacity={gibsOpacity}
-          bloomEnabled={settingsConfig.bloomEnabled}
-          sharpenValue={settingsConfig.sharpenAmount}
+          maxFlightMarkers={settingsConfig.maxFlightMarkers}
           measurePoints={measurePoints}
           measureActive={measureActive}
           mapStyle={mapStyleId}
           flyToLocation={flyToLocation}
           onContextMenu={handleContextMenu}
-          onViewChange={(zoom: number, lat: number) => { setMapZoom(zoom); setMapLat(lat); }}
+          onViewChange={(zoom: number, lat: number, _lng: number) => { setMapZoom(zoom); setMapLat(lat); }}
           onMeasureClick={handleMeasureClick}
         />
         </GlobalErrorBoundary>
@@ -692,7 +726,7 @@ export function GlobalView() {
         </div>
 
         {/* Bottom bar: status + markets ticker */}
-        <div className={`absolute bottom-0 left-0 right-0 h-9 bg-gradient-to-t from-black/70 to-transparent flex items-end justify-between px-4 pb-1.5 pointer-events-none z-10 transition-opacity ${tactical ? 'opacity-0' : ''}`}>
+        <div className={`absolute bottom-0 left-0 right-0 h-9 bg-gradient-to-t from-black/70 to-transparent flex items-end justify-between px-4 pb-1.5 pointer-events-none z-10 transition-opacity ${tactical || !settingsConfig.showBottomBar ? 'opacity-0 pointer-events-none' : ''}`}>
           <div className="flex items-center gap-4 text-[9px] font-mono text-white/25">
             <span className="text-cyan-500/50">REC</span>
             <span className="text-white/40">{utcTime} UTC</span>

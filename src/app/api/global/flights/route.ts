@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { POTUS_FLEET, lookupIcaoHex } from '@/lib/trackedAircraft';
 
 // adsb.lol - free global ADS-B data, no auth
 const ADSB_MIL_URL = 'https://api.adsb.lol/v2/mil';
@@ -17,13 +18,13 @@ const REGIONS = [
   { name: 'Oceania', url: 'https://api.adsb.lol/v2/point/-25/135/500' },
 ];
 
-// POTUS Fleet ICAO hex overrides (from Shadowbroker data_fetcher.py)
-const POTUS_HEX: Record<string, string> = {
-  'ae4a54': 'AF1 (VC-25A)', 'ae4a55': 'AF1 (VC-25A)',
-  'ae222c': 'AF2 (C-32A)', 'ae2229': 'AF2 (C-32A)', 'ae222a': 'AF2 (C-32A)', 'ae222b': 'AF2 (C-32A)',
-  'ae0441': 'Marine One', 'ae0442': 'Marine One', 'ae0443': 'Marine One', 'ae0444': 'Marine One',
-  'ae01cb': 'E-4B Nightwatch', 'ae01cc': 'E-4B Nightwatch', 'ae01cd': 'E-4B Nightwatch', 'ae01ce': 'E-4B Nightwatch',
-};
+// Build POTUS hex lookup from canonical trackedAircraft.ts
+const POTUS_HEX: Record<string, string> = {};
+for (const ac of POTUS_FLEET) {
+  for (const hex of ac.icao_hex) {
+    POTUS_HEX[hex.toLowerCase()] = ac.designation ? `${ac.designation} (${ac.name.split(' (')[0]})` : ac.name;
+  }
+}
 
 // Private jet ICAO type designators (from Shadowbroker data_fetcher.py)
 const PRIVATE_JET_TYPES = new Set([
@@ -50,9 +51,6 @@ const HELI_TYPES = new Set([
 let flightCache: { data: any; ts: number } | null = null;
 const TTL = 55_000;
 
-// GPS jamming tracking from NACp values
-const gpsJammingGrid: Record<string, { count: number; avgNacp: number }> = {};
-
 function classifyFlight(ac: any): 'commercial' | 'military' | 'private' | 'tracked' | null {
   if (!ac.lat || !ac.lon) return null;
   const hex = (ac.hex || '').toLowerCase();
@@ -66,14 +64,18 @@ function classifyFlight(ac: any): 'commercial' | 'military' | 'private' | 'track
   // Military
   if (dbFlags & 1) return 'military';
 
+  // Commercial pattern: 3-letter ICAO code + digits (check before type codes to avoid
+  // misclassifying B737/A319 commercial flights as private jets)
+  if (flight.match(/^[A-Z]{3}\d/)) return 'commercial';
+
   // Private jet by type code
   if (PRIVATE_JET_TYPES.has(typeCode)) return 'private';
 
-  // Helicopter
-  if (HELI_TYPES.has(typeCode)) return 'private';
-
-  // Commercial pattern: 3-letter ICAO code + digits
-  if (flight.match(/^[A-Z]{3}\d/)) return 'commercial';
+  // Helicopter - military helis classified as military
+  if (HELI_TYPES.has(typeCode)) {
+    const milHelis = new Set(['UH60', 'AH64', 'CH47', 'V22', 'MH60', 'UH1']);
+    return milHelis.has(typeCode) ? 'military' : 'private';
+  }
 
   return 'private';
 }
@@ -100,17 +102,17 @@ function toItem(ac: any) {
   };
 }
 
-function updateGPSJamming(ac: any) {
+function updateGPSJamming(ac: any, grid: Record<string, { count: number; avgNacp: number }>) {
   const nacp = ac.nac_p;
   if (nacp == null || nacp >= 8) return; // Normal NACp is 8-11, low values indicate jamming
   if (!ac.lat || !ac.lon) return;
 
   // Grid to 1° × 1° squares
   const gridKey = `${Math.floor(ac.lat)}_${Math.floor(ac.lon)}`;
-  if (!gpsJammingGrid[gridKey]) {
-    gpsJammingGrid[gridKey] = { count: 0, avgNacp: 0 };
+  if (!grid[gridKey]) {
+    grid[gridKey] = { count: 0, avgNacp: 0 };
   }
-  const g = gpsJammingGrid[gridKey];
+  const g = grid[gridKey];
   g.avgNacp = (g.avgNacp * g.count + nacp) / (g.count + 1);
   g.count++;
 }
@@ -137,11 +139,7 @@ export async function GET() {
   const commercial: any[] = [];
   const privateFl: any[] = [];
   const tracked: any[] = [];
-
-  // Reset jamming grid each fetch
-  for (const key of Object.keys(gpsJammingGrid)) {
-    delete gpsJammingGrid[key];
-  }
+  const gpsJammingGrid: Record<string, { count: number; avgNacp: number }> = {};
 
   // Fetch military + LADD + PIA in parallel
   const [milData, laddData, piaData] = await Promise.all([
@@ -157,7 +155,7 @@ export async function GET() {
       const hex = (ac.hex || '').toLowerCase();
       if (seenHex.has(hex)) continue;
       seenHex.add(hex);
-      updateGPSJamming(ac);
+      updateGPSJamming(ac, gpsJammingGrid);
 
       if (POTUS_HEX[hex]) {
         tracked.push({ ...toItem(ac), country: ac.cou || '', category: 'potus' });
@@ -201,7 +199,7 @@ export async function GET() {
       const hex = (ac.hex || '').toLowerCase();
       if (seenHex.has(hex)) continue;
       seenHex.add(hex);
-      updateGPSJamming(ac);
+      updateGPSJamming(ac, gpsJammingGrid);
 
       const cls = classifyFlight(ac);
       if (cls === 'commercial') commercial.push(toItem(ac));

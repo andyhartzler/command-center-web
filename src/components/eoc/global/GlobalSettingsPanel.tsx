@@ -32,7 +32,7 @@ const DATA_SOURCES = [
   { name: 'Broadcastify', desc: 'Radio scanner feeds', status: 'active', free: true },
   { name: 'KiwiSDR', desc: 'SDR receiver network', status: 'active', free: true },
   { name: 'TfL / NYC / SGP', desc: 'CCTV cameras', status: 'active', free: true },
-  { name: 'AIS Stream', desc: 'Maritime vessel tracking', status: process.env.NEXT_PUBLIC_AIS_KEY ? 'active' : 'no key', free: false },
+  { name: 'AIS Stream', desc: 'Maritime vessel tracking', status: 'active', free: false },
   { name: 'NASA GIBS', desc: 'MODIS Terra satellite imagery', status: 'active', free: true },
   { name: 'IODA', desc: 'Internet outage detection', status: 'active', free: true },
   { name: 'DC Map', desc: 'Data center locations', status: 'active', free: true },

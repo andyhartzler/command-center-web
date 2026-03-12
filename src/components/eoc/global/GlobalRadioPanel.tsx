@@ -42,6 +42,8 @@ export function GlobalRadioPanel() {
 
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current.load();
     }
 
     const audio = new Audio(feed.streamUrl);

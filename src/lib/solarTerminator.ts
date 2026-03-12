@@ -63,10 +63,10 @@ export function computeNightPolygon(date?: Date): GeoJSON.FeatureCollection {
     polygon.push(coords[0]); // close
   } else {
     // Night is in the north - reverse terminator then close via north pole
-    polygon.push(...coords.reverse());
+    polygon.push(...[...coords].reverse());
     polygon.push([-180, darkPoleLat]);
     polygon.push([180, darkPoleLat]);
-    polygon.push(coords[coords.length - 1]); // close
+    polygon.push(polygon[0]); // close
   }
 
   return {

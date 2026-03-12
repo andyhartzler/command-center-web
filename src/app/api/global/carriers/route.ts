@@ -59,9 +59,14 @@ function matchRegion(text: string): [number, number] | null {
 function matchCarrier(text: string): string | null {
   const lower = text.toLowerCase();
   for (const c of CARRIER_REGISTRY) {
+    // Match hull number (e.g., CVN-68)
     if (lower.includes(c.hull.toLowerCase()) || lower.includes(c.hull.toLowerCase().replace('-', ''))) return c.hull;
+    // Match full ship name with "USS" context to reduce false positives
     const lastName = c.name.split(' ').pop()?.toLowerCase() || '';
-    if (lastName.length > 3 && lower.includes(lastName)) return c.hull;
+    if (lastName.length > 4 && lower.includes('uss') && lower.includes(lastName)) return c.hull;
+    // Match full carrier name
+    const fullName = c.name.toLowerCase();
+    if (fullName.length > 8 && lower.includes(fullName)) return c.hull;
   }
   return null;
 }

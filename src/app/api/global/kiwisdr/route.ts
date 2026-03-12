@@ -25,7 +25,7 @@ export async function GET() {
   }
 
   try {
-    const res = await fetch('http://kiwisdr.com/.public/', {
+    const res = await fetch('https://kiwisdr.com/.public/', {
       signal: AbortSignal.timeout(20000),
       headers: { 'User-Agent': 'CommandCenter/1.0' },
     });

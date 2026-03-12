@@ -36,7 +36,7 @@ function GlobalScaleBar({ zoom, latitude }: GlobalScaleBarProps) {
   }, [zoom, latitude, unit]);
 
   return (
-    <div className="absolute bottom-4 left-4 select-none">
+    <div className="select-none">
       <div className="bg-black/50 backdrop-blur-sm rounded px-2 py-1.5 flex items-end gap-2">
         {/* Scale bar with label */}
         <div className="flex flex-col items-start">

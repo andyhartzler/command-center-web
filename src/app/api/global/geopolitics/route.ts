@@ -5,10 +5,6 @@ import { NextResponse } from 'next/server';
 let cache: { data: any; ts: number } | null = null;
 const TTL = 300_000; // 5 minutes
 
-// GDELT conflict event codes (CAMEO taxonomy)
-const CONFLICT_CODES = new Set(['14', '17', '18', '19', '20']);
-// 14=Protest, 17=Coerce, 18=Assault, 19=Fight, 20=Use unconventional mass violence
-
 async function fetchUkraineFrontlines(): Promise<any> {
   try {
     // DeepStateMap maintains GeoJSON on GitHub
@@ -51,7 +47,7 @@ async function fetchUkraineFrontlines(): Promise<any> {
 async function fetchGDELTMilitaryIncidents(): Promise<any[]> {
   try {
     // GDELT 2.0 exports are updated every 15 minutes
-    const listRes = await fetch('http://data.gdeltproject.org/gdeltv2/lastupdate.txt', {
+    const listRes = await fetch('https://data.gdeltproject.org/gdeltv2/lastupdate.txt', {
       signal: AbortSignal.timeout(8000),
     });
     if (!listRes.ok) return [];
