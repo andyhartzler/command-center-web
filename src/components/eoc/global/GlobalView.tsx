@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Monitor, ShieldAlert, Wifi, WifiOff, Globe, Satellite, Anchor, Camera, Star, Ship, Settings, Filter, Ruler, Shield } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
@@ -24,7 +24,7 @@ import GlobalScaleBar from './GlobalScaleBar';
 import { GlobalErrorBoundary } from './GlobalErrorBoundary';
 
 // Dynamic import to avoid SSR issues with MapLibre
-const GlobalMap = dynamic(() => import('./GlobalMap').then(m => ({ default: m.GlobalMap })), {
+const GlobalMap = dynamic<React.ComponentProps<typeof import('./GlobalMap')['default']>>(() => import('./GlobalMap'), {
   ssr: false,
   loading: () => (
     <div className="w-full h-full flex items-center justify-center bg-[#0a0e1a]">
@@ -32,6 +32,16 @@ const GlobalMap = dynamic(() => import('./GlobalMap').then(m => ({ default: m.Gl
     </div>
   ),
 });
+
+// Isolated UTC clock component to avoid re-rendering the entire GlobalView every second
+function UtcClock() {
+  const [utcTime, setUtcTime] = useState(new Date().toISOString().slice(11, 19));
+  useEffect(() => {
+    const id = setInterval(() => setUtcTime(new Date().toISOString().slice(11, 19)), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="text-white/40">{utcTime} UTC</span>;
+}
 
 const SCOPE_LABELS: Record<EOCScope, string> = {
   kc: 'KC',
@@ -103,11 +113,10 @@ export function GlobalView() {
   const [dataCenters, setDataCenters] = useState<any[]>([]);
 
   const [lastUpdated, setLastUpdated] = useState<string>('');
-  const [utcTime, setUtcTime] = useState(new Date().toISOString().slice(11, 19));
   const [freshness, setFreshness] = useState<Record<string, number>>({});
 
-  // Counts for layer panel
-  const counts: Record<string, number> = {
+  // Counts for layer panel (memoized to avoid recompute every render)
+  const counts = useMemo<Record<string, number>>(() => ({
     flights: (flights?.commercial?.length || 0),
     military: (flights?.military?.length || 0),
     private: (flights?.private?.length || 0),
@@ -128,13 +137,18 @@ export function GlobalView() {
     data_centers: dataCenters.length,
     gibs_imagery: activeLayers.gibs_imagery ? 1 : 0,
     esri_satellite: activeLayers.esri_satellite ? 1 : 0,
-  };
+  }), [flights, earthquakes, fires, news, satellites, carriers, cctv, kiwisdr, frontlines, gdeltIncidents, ships, liveuamapEvents, outages, dataCenters, activeLayers.gibs_imagery, activeLayers.esri_satellite]);
 
-  // Fast data fetcher (flights + earthquakes)
+  // Refs for layer state so fetch callbacks don't need layer deps
+  const layersRef = useRef(activeLayers);
+  layersRef.current = activeLayers;
+
+  // Fast data fetcher (flights + earthquakes) - stable callback via refs
   const fetchFast = useCallback(async () => {
+    const layers = layersRef.current;
     await Promise.allSettled([
       (async () => {
-        if (!activeLayers.flights && !activeLayers.military && !activeLayers.private && !activeLayers.tracked && !activeLayers.gps_jamming) return;
+        if (!layers.flights && !layers.military && !layers.private && !layers.tracked && !layers.gps_jamming) return;
         try {
           const res = await fetch('/api/global/flights');
           if (res.ok) {
@@ -147,7 +161,7 @@ export function GlobalView() {
         } catch { setIsConnected(false); }
       })(),
       (async () => {
-        if (!activeLayers.earthquakes) return;
+        if (!layers.earthquakes) return;
         try {
           const res = await fetch('/api/global/earthquakes');
           if (res.ok) {
@@ -160,20 +174,21 @@ export function GlobalView() {
       })(),
     ]);
     setLastUpdated(new Date().toISOString());
-  }, [activeLayers.flights, activeLayers.military, activeLayers.private, activeLayers.tracked, activeLayers.gps_jamming, activeLayers.earthquakes]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Slow data fetcher (fires + news + space weather + satellites + carriers + geopolitics)
+  // Slow data fetcher - stable callback via refs
   const fetchSlow = useCallback(async () => {
+    const layers = layersRef.current;
     await Promise.allSettled([
       (async () => {
-        if (!activeLayers.fires) return;
+        if (!layers.fires) return;
         try {
           const res = await fetch('/api/global/fires');
           if (res.ok) setFires(await res.json());
         } catch {}
       })(),
       (async () => {
-        if (!activeLayers.news_markers) return;
+        if (!layers.news_markers) return;
         try {
           const res = await fetch('/api/global/news');
           if (res.ok) setNews(await res.json());
@@ -186,7 +201,7 @@ export function GlobalView() {
         } catch {}
       })(),
       (async () => {
-        if (!activeLayers.satellites) return;
+        if (!layers.satellites) return;
         try {
           const res = await fetch('/api/global/satellites');
           if (res.ok) {
@@ -196,14 +211,14 @@ export function GlobalView() {
         } catch {}
       })(),
       (async () => {
-        if (!activeLayers.carriers) return;
+        if (!layers.carriers) return;
         try {
           const res = await fetch('/api/global/carriers');
           if (res.ok) setCarriers(await res.json());
         } catch {}
       })(),
       (async () => {
-        if (!activeLayers.frontlines && !activeLayers.gdelt_incidents) return;
+        if (!layers.frontlines && !layers.gdelt_incidents) return;
         try {
           const res = await fetch('/api/global/geopolitics');
           if (res.ok) {
@@ -214,7 +229,7 @@ export function GlobalView() {
         } catch {}
       })(),
       (async () => {
-        if (!activeLayers.ships) return;
+        if (!layers.ships) return;
         try {
           const res = await fetch('/api/global/ships');
           if (res.ok) {
@@ -224,7 +239,7 @@ export function GlobalView() {
         } catch {}
       })(),
       (async () => {
-        if (!activeLayers.liveuamap) return;
+        if (!layers.liveuamap) return;
         try {
           const res = await fetch('/api/global/liveuamap');
           if (res.ok) {
@@ -235,7 +250,7 @@ export function GlobalView() {
         } catch {}
       })(),
       (async () => {
-        if (!activeLayers.internet_outages) return;
+        if (!layers.internet_outages) return;
         try {
           const res = await fetch('/api/global/outages');
           if (res.ok) {
@@ -246,7 +261,7 @@ export function GlobalView() {
         } catch {}
       })(),
       (async () => {
-        if (!activeLayers.data_centers) return;
+        if (!layers.data_centers) return;
         try {
           const res = await fetch('/api/global/datacenters');
           if (res.ok) {
@@ -257,13 +272,14 @@ export function GlobalView() {
         } catch {}
       })(),
     ]);
-  }, [activeLayers.fires, activeLayers.news_markers, activeLayers.satellites, activeLayers.carriers, activeLayers.frontlines, activeLayers.gdelt_incidents, activeLayers.ships, activeLayers.liveuamap, activeLayers.internet_outages, activeLayers.data_centers]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Glacial fetcher (cctv + kiwisdr)
+  // Glacial fetcher - stable callback via refs
   const fetchGlacial = useCallback(async () => {
+    const layers = layersRef.current;
     await Promise.allSettled([
       (async () => {
-        if (!activeLayers.cctv) return;
+        if (!layers.cctv) return;
         try {
           const res = await fetch('/api/global/cctv');
           if (res.ok) {
@@ -273,7 +289,7 @@ export function GlobalView() {
         } catch {}
       })(),
       (async () => {
-        if (!activeLayers.kiwisdr) return;
+        if (!layers.kiwisdr) return;
         try {
           const res = await fetch('/api/global/kiwisdr');
           if (res.ok) {
@@ -283,13 +299,7 @@ export function GlobalView() {
         } catch {}
       })(),
     ]);
-  }, [activeLayers.cctv, activeLayers.kiwisdr]);
-
-  // UTC clock
-  useEffect(() => {
-    const id = setInterval(() => setUtcTime(new Date().toISOString().slice(11, 19)), 1000);
-    return () => clearInterval(id);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial fetch
   useEffect(() => {
@@ -298,23 +308,26 @@ export function GlobalView() {
     fetchGlacial();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fast poll
+  // Polling intervals (fetchFast/Slow/Glacial are stable, only reschedule on poll scale change)
   useEffect(() => {
     const id = setInterval(fetchFast, FAST_POLL);
     return () => clearInterval(id);
   }, [fetchFast, FAST_POLL]);
 
-  // Slow poll
   useEffect(() => {
     const id = setInterval(fetchSlow, SLOW_POLL);
     return () => clearInterval(id);
   }, [fetchSlow, SLOW_POLL]);
 
-  // Glacial poll
   useEffect(() => {
     const id = setInterval(fetchGlacial, GLACIAL_POLL);
     return () => clearInterval(id);
   }, [fetchGlacial, GLACIAL_POLL]);
+
+  const handleViewChange = useCallback((zoom: number, lat: number, _lng: number) => {
+    setMapZoom(zoom);
+    setMapLat(lat);
+  }, []);
 
   const handleNewsFlyTo = useCallback((lat: number, lng: number) => {
     setFlyToLocation({ lat, lng });
@@ -422,6 +435,12 @@ export function GlobalView() {
       news: types.has('news') ? news : [],
     };
   }, [earthquakes, fires, gdeltIncidents, liveuamapEvents, news, activeFilters.event_type]);
+
+  // Memoized POTUS fleet for layer panel
+  const potusFleet = useMemo(() =>
+    flights?.tracked?.map((f: any) => ({ callsign: f.callsign, model: f.model, lat: f.lat, lng: f.lng, alt: f.alt })),
+    [flights?.tracked]
+  );
 
   // Build CSS filter for bloom + sharpen effects on the map container
   const mapFilters: string[] = [];
@@ -553,7 +572,7 @@ export function GlobalView() {
           mapStyle={mapStyleId}
           flyToLocation={flyToLocation}
           onContextMenu={handleContextMenu}
-          onViewChange={(zoom: number, lat: number, _lng: number) => { setMapZoom(zoom); setMapLat(lat); }}
+          onViewChange={handleViewChange}
           onMeasureClick={handleMeasureClick}
         />
         </GlobalErrorBoundary>
@@ -572,7 +591,7 @@ export function GlobalView() {
             counts={counts}
             lastUpdated={lastUpdated}
             freshness={freshness}
-            potusFleet={flights?.tracked?.map((f: any) => ({ callsign: f.callsign, model: f.model, lat: f.lat, lng: f.lng, alt: f.alt }))}
+            potusFleet={potusFleet}
             onFlyTo={handleNewsFlyTo}
           />
         </div>
@@ -729,7 +748,7 @@ export function GlobalView() {
         <div className={`absolute bottom-0 left-0 right-0 h-9 bg-gradient-to-t from-black/70 to-transparent flex items-end justify-between px-4 pb-1.5 pointer-events-none z-10 transition-opacity ${tactical || !settingsConfig.showBottomBar ? 'opacity-0 pointer-events-none' : ''}`}>
           <div className="flex items-center gap-4 text-[9px] font-mono text-white/25">
             <span className="text-cyan-500/50">REC</span>
-            <span className="text-white/40">{utcTime} UTC</span>
+            <UtcClock />
             <span>·</span>
             <span>LAYERS: {Object.values(activeLayers).filter(Boolean).length} ACTIVE</span>
             <span>·</span>

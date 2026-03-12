@@ -1,16 +1,41 @@
 'use client';
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import Map, { Source, Layer, MapRef, Popup, Marker } from 'react-map-gl/maplibre';
+import Map, { Source, Layer, MapRef, Popup } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { computeNightPolygon } from '@/lib/solarTerminator';
 import type { ActiveLayers } from './GlobalLayerPanel';
 
 import { getMapStyle, type MapStyleId } from './GlobalMapStyleSwitcher';
 
-// SVG plane icon as data URI
-const svgPlane = (color: string, size = 14) =>
-  `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" stroke="black" stroke-width="0.5"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`)}`;
+// Plane SVG path for icon registration
+const PLANE_SVG_PATH = 'M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z';
+
+function makePlaneSvg(color: string, size: number) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" stroke="black" stroke-width="0.5"><path d="${PLANE_SVG_PATH}"/></svg>`;
+}
+
+function loadSvgAsImage(svg: string, w: number, h: number): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image(w, h);
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  });
+}
+
+// Carrier diamond SVG
+const CARRIER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <rect x="6" y="6" width="12" height="12" rx="2" fill="rgba(59,130,246,0.8)" stroke="rgba(147,197,253,0.6)" stroke-width="1" transform="rotate(45 12 12)"/>
+</svg>`;
+
+// Map icon names
+const PLANE_ICONS = {
+  cyan: 'plane-cyan',
+  yellow: 'plane-yellow',
+  orange: 'plane-orange',
+  pink: 'plane-pink',
+} as const;
 
 interface FlightData {
   icao24: string;
@@ -171,10 +196,6 @@ interface Props {
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
-// SVG ship icon
-const svgShip = (color: string, size = 12) =>
-  `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" stroke="black" stroke-width="0.5"><path d="M20 21c-1.39 0-2.78-.47-4-1.32-2.44 1.71-5.56 1.71-8 0C6.78 20.53 5.39 21 4 21H2v2h2c1.38 0 2.74-.35 4-.99 2.52 1.29 5.48 1.29 8 0 1.26.65 2.62.99 4 .99h2v-2h-2zM3.95 19H4c1.6 0 3.02-.88 4-2 .98 1.12 2.4 2 4 2s3.02-.88 4-2c.98 1.12 2.4 2 4 2h.05l1.89-6.68c.08-.26.06-.54-.06-.78s-.34-.42-.6-.5L20 10.62V6c0-1.1-.9-2-2-2h-3V1H9v3H6c-1.1 0-2 .9-2 2v4.62l-1.29.42c-.26.08-.48.26-.6.5s-.14.52-.05.78L3.95 19zM6 6h12v3.97L12 8 6 9.97V6z"/></svg>`)}`;
-
 // Generate great circle arc points between two coordinates
 function greatCircleArc(p1: { lat: number; lng: number }, p2: { lat: number; lng: number }, segments = 50): [number, number][] {
   const toRad = (d: number) => d * Math.PI / 180;
@@ -196,15 +217,25 @@ function greatCircleArc(p1: { lat: number; lng: number }, p2: { lat: number; lng
   return points;
 }
 
-export function GlobalMap({
+// Interactive layers for click querying
+const QUERY_LAYERS = [
+  'earthquakes-circle', 'news-circle', 'satellites-circle',
+  'cctv-clusters', 'cctv-unclustered', 'kiwisdr-clusters', 'kiwisdr-unclustered',
+  'gdelt-circle', 'liveuamap-circle', 'ships-circle',
+  'outages-circle', 'datacenters-clusters', 'datacenters-unclustered',
+  'flights-symbol', 'carriers-symbol',
+];
+
+export const GlobalMap = React.memo(function GlobalMap({
   activeLayers, flights, earthquakes, fires, news,
   satellites, carriers, cctv, kiwisdr, frontlines, gdeltIncidents,
   ships, liveuamapEvents, outages, dataCenters, gibsDate, gibsOpacity = 0.6,
-  measurePoints, measureActive, maxFlightMarkers = 3000,
+  measurePoints, measureActive, maxFlightMarkers = 5000,
   mapStyle = 'dark', flyToLocation, onMouseCoords, onContextMenu, onMeasureClick, onViewChange,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [iconsLoaded, setIconsLoaded] = useState(false);
   const [popup, setPopup] = useState<{ lat: number; lng: number; content: string } | null>(null);
   const [viewState, setViewState] = useState({
     longitude: 20,
@@ -214,23 +245,6 @@ export function GlobalMap({
     pitch: 0,
     padding: { top: 0, bottom: 0, left: 0, right: 0 } as { top: number; bottom: number; left: number; right: number },
   });
-
-  // Viewport bounds for culling
-  const [bounds, setBounds] = useState<[number, number, number, number]>([-180, -90, 180, 90]);
-
-  const updateBounds = useCallback(() => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    const b = map.getBounds();
-    const latBuf = (b.getNorth() - b.getSouth()) * 0.2;
-    const lngBuf = (b.getEast() - b.getWest()) * 0.2;
-    setBounds([b.getWest() - lngBuf, b.getSouth() - latBuf, b.getEast() + lngBuf, b.getNorth() + latBuf]);
-  }, []);
-
-  const inView = useCallback(
-    (lat: number, lng: number) => lng >= bounds[0] && lng <= bounds[2] && lat >= bounds[1] && lat <= bounds[3],
-    [bounds]
-  );
 
   // Day/night overlay
   const [nightGeoJSON, setNightGeoJSON] = useState<GeoJSON.FeatureCollection>(() => computeNightPolygon());
@@ -250,6 +264,103 @@ export function GlobalMap({
     }
   }, [flyToLocation]);
 
+  // Register plane + carrier icons on map load
+  const registerIcons = useCallback(async () => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    try {
+      const iconSize = 32;
+      const [planeCyan, planeYellow, planeOrange, planePink, carrierImg] = await Promise.all([
+        loadSvgAsImage(makePlaneSvg('cyan', iconSize), iconSize, iconSize),
+        loadSvgAsImage(makePlaneSvg('yellow', iconSize), iconSize, iconSize),
+        loadSvgAsImage(makePlaneSvg('#FF8C00', iconSize), iconSize, iconSize),
+        loadSvgAsImage(makePlaneSvg('#ec4899', iconSize), iconSize, iconSize),
+        loadSvgAsImage(CARRIER_SVG, 24, 24),
+      ]);
+
+      if (!map.hasImage(PLANE_ICONS.cyan)) map.addImage(PLANE_ICONS.cyan, planeCyan);
+      if (!map.hasImage(PLANE_ICONS.yellow)) map.addImage(PLANE_ICONS.yellow, planeYellow);
+      if (!map.hasImage(PLANE_ICONS.orange)) map.addImage(PLANE_ICONS.orange, planeOrange);
+      if (!map.hasImage(PLANE_ICONS.pink)) map.addImage(PLANE_ICONS.pink, planePink);
+      if (!map.hasImage('carrier-icon')) map.addImage('carrier-icon', carrierImg);
+
+      setIconsLoaded(true);
+    } catch (err) {
+      console.warn('Failed to load map icons:', err);
+      setIconsLoaded(true); // Continue anyway
+    }
+  }, []);
+
+  // ─── GeoJSON Source Data ───────────────────────────────────────────
+
+  // Flights GeoJSON (replaces HTML Marker approach - GPU-rendered symbol layer)
+  const flightsGeoJSON = useMemo(() => {
+    if (!flights || !iconsLoaded) return EMPTY_FC;
+    const features: GeoJSON.Feature[] = [];
+
+    if (activeLayers.tracked && flights.tracked) {
+      for (const f of flights.tracked) {
+        features.push({
+          type: 'Feature',
+          properties: { iconId: PLANE_ICONS.pink, heading: f.heading, callsign: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model, category: 'TRACKED' },
+          geometry: { type: 'Point', coordinates: [f.lng, f.lat] },
+        });
+      }
+    }
+
+    if (activeLayers.military && flights.military) {
+      for (const f of flights.military) {
+        features.push({
+          type: 'Feature',
+          properties: { iconId: PLANE_ICONS.yellow, heading: f.heading, callsign: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model, category: 'MILITARY' },
+          geometry: { type: 'Point', coordinates: [f.lng, f.lat] },
+        });
+      }
+    }
+
+    if (activeLayers.flights && flights.commercial) {
+      const src = flights.commercial;
+      const step = src.length > maxFlightMarkers ? Math.ceil(src.length / maxFlightMarkers) : 1;
+      for (let i = 0; i < src.length; i += step) {
+        const f = src[i];
+        features.push({
+          type: 'Feature',
+          properties: { iconId: PLANE_ICONS.cyan, heading: f.heading, callsign: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model, category: 'COMMERCIAL' },
+          geometry: { type: 'Point', coordinates: [f.lng, f.lat] },
+        });
+      }
+    }
+
+    if (activeLayers.private && flights.private) {
+      const src = flights.private;
+      const step = src.length > 2000 ? Math.ceil(src.length / 2000) : 1;
+      for (let i = 0; i < src.length; i += step) {
+        const f = src[i];
+        features.push({
+          type: 'Feature',
+          properties: { iconId: PLANE_ICONS.orange, heading: f.heading, callsign: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model, category: 'PRIVATE' },
+          geometry: { type: 'Point', coordinates: [f.lng, f.lat] },
+        });
+      }
+    }
+
+    return { type: 'FeatureCollection' as const, features };
+  }, [flights, activeLayers.tracked, activeLayers.military, activeLayers.flights, activeLayers.private, iconsLoaded, maxFlightMarkers]);
+
+  // Carriers GeoJSON (replaces HTML Marker approach)
+  const carriersGeoJSON = useMemo(() => {
+    if (!activeLayers.carriers || !carriers?.length) return EMPTY_FC;
+    return {
+      type: 'FeatureCollection' as const,
+      features: carriers.map((c, i) => ({
+        type: 'Feature' as const,
+        properties: { id: i, hull: c.hull, name: c.name, desc: c.desc, source: c.source, wiki: c.wiki, heading: c.heading },
+        geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
+      })),
+    };
+  }, [activeLayers.carriers, carriers]);
+
   // Earthquakes GeoJSON
   const earthquakeGeoJSON = useMemo(() => {
     if (!activeLayers.earthquakes || !earthquakes?.length) return EMPTY_FC;
@@ -257,18 +368,13 @@ export function GlobalMap({
       type: 'FeatureCollection' as const,
       features: earthquakes.map((eq, i) => ({
         type: 'Feature' as const,
-        properties: {
-          id: i,
-          mag: eq.mag,
-          place: eq.place,
-          title: eq.title || `M${eq.mag} - ${eq.place}`,
-        },
+        properties: { id: i, mag: eq.mag, place: eq.place, title: eq.title || `M${eq.mag} - ${eq.place}` },
         geometry: { type: 'Point' as const, coordinates: [eq.lng, eq.lat] },
       })),
     };
   }, [activeLayers.earthquakes, earthquakes]);
 
-  // Fires GeoJSON - clustered (MapLibre handles viewport culling)
+  // Fires GeoJSON - clustered
   const firesGeoJSON = useMemo(() => {
     if (!activeLayers.fires || !fires?.length) return EMPTY_FC;
     return {
@@ -408,6 +514,28 @@ export function GlobalMap({
     };
   }, [activeLayers.data_centers, dataCenters]);
 
+  // GPS Jamming zones GeoJSON
+  const jammingGeoJSON = useMemo(() => {
+    if (!activeLayers.gps_jamming || !flights?.jammingZones?.length) return EMPTY_FC;
+    return {
+      type: 'FeatureCollection' as const,
+      features: flights.jammingZones.map((z, i) => ({
+        type: 'Feature' as const,
+        properties: { id: i, count: z.count, avgNacp: z.avgNacp, severity: z.severity },
+        geometry: {
+          type: 'Polygon' as const,
+          coordinates: [[
+            [z.lng - 0.5, z.lat - 0.5],
+            [z.lng + 0.5, z.lat - 0.5],
+            [z.lng + 0.5, z.lat + 0.5],
+            [z.lng - 0.5, z.lat + 0.5],
+            [z.lng - 0.5, z.lat - 0.5],
+          ]],
+        },
+      })),
+    };
+  }, [activeLayers.gps_jamming, flights?.jammingZones]);
+
   // Measure line GeoJSON
   const measureGeoJSON = useMemo(() => {
     if (!measurePoints || measurePoints.length < 2) return EMPTY_FC;
@@ -437,72 +565,7 @@ export function GlobalMap({
     };
   }, [measurePoints]);
 
-  // GPS Jamming zones GeoJSON
-  const jammingGeoJSON = useMemo(() => {
-    if (!activeLayers.gps_jamming || !flights?.jammingZones?.length) return EMPTY_FC;
-    return {
-      type: 'FeatureCollection' as const,
-      features: flights.jammingZones.map((z, i) => ({
-        type: 'Feature' as const,
-        properties: { id: i, count: z.count, avgNacp: z.avgNacp, severity: z.severity },
-        geometry: {
-          type: 'Polygon' as const,
-          coordinates: [[
-            [z.lng - 0.5, z.lat - 0.5],
-            [z.lng + 0.5, z.lat - 0.5],
-            [z.lng + 0.5, z.lat + 0.5],
-            [z.lng - 0.5, z.lat + 0.5],
-            [z.lng - 0.5, z.lat - 0.5],
-          ]],
-        },
-      })),
-    };
-  }, [activeLayers.gps_jamming, flights?.jammingZones]);
-
-  // Flight markers
-  const flightMarkers = useMemo(() => {
-    if (!flights) return [];
-    const markers: { key: string; lat: number; lng: number; heading: number; color: string; label: string; alt: number; speed: number; model: string }[] = [];
-
-    // Tracked / POTUS fleet (always visible on top, bright pink)
-    if (activeLayers.tracked && flights.tracked) {
-      for (const f of flights.tracked) {
-        if (inView(f.lat, f.lng)) {
-          markers.push({ key: `trk-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: '#ec4899', label: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model });
-        }
-      }
-    }
-
-    if (activeLayers.military && flights.military) {
-      for (const f of flights.military) {
-        if (inView(f.lat, f.lng)) {
-          markers.push({ key: `mil-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: 'yellow', label: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model });
-        }
-      }
-    }
-    if (activeLayers.flights && flights.commercial) {
-      const sample = flights.commercial.length > 2000
-        ? flights.commercial.filter((_: any, i: number) => i % Math.ceil(flights.commercial.length / 2000) === 0)
-        : flights.commercial;
-      for (const f of sample) {
-        if (inView(f.lat, f.lng)) {
-          markers.push({ key: `com-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: 'cyan', label: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model });
-        }
-      }
-    }
-    if (activeLayers.private && flights.private) {
-      const sample = flights.private.length > 1000
-        ? flights.private.filter((_: any, i: number) => i % Math.ceil(flights.private.length / 1000) === 0)
-        : flights.private;
-      for (const f of sample) {
-        if (inView(f.lat, f.lng)) {
-          markers.push({ key: `prv-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: '#FF8C00', label: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model });
-        }
-      }
-    }
-
-    return markers;
-  }, [flights, activeLayers, inView]);
+  // ─── Event Handlers ────────────────────────────────────────────────
 
   const handleClick = useCallback((e: any) => {
     // Measure mode takes priority
@@ -513,32 +576,48 @@ export function GlobalMap({
 
     if (!mapRef.current) return;
     const map = mapRef.current.getMap();
-    const queryLayers = [
-      'earthquakes-circle', 'news-circle', 'satellites-circle',
-      'cctv-clusters', 'cctv-unclustered', 'kiwisdr-clusters', 'kiwisdr-unclustered',
-      'gdelt-circle', 'liveuamap-circle', 'ships-circle',
-      'outages-circle', 'datacenters-clusters', 'datacenters-unclustered',
-    ];
-    const features = map.queryRenderedFeatures(e.point, { layers: queryLayers });
+    const features = map.queryRenderedFeatures(e.point, { layers: QUERY_LAYERS });
     if (features.length > 0) {
       const f = features[0];
       const coords = (f.geometry as any).coordinates;
       const p = f.properties || {};
 
       let content = p.title || p.name || p.place || 'Unknown';
-      if (p.point_count) {
+
+      // Flight click
+      if (f.layer?.id === 'flights-symbol') {
+        content = `${p.category} · ${p.callsign || 'Unknown'}${p.model ? ` (${p.model})` : ''} · ${Math.round(p.alt).toLocaleString()} ft · ${Math.round(p.speed)} kts`;
+      }
+      // Carrier click
+      else if (f.layer?.id === 'carriers-symbol') {
+        content = `${p.name} (${p.hull})\n${p.desc}\nSource: ${p.source}`;
+      }
+      // Cluster click
+      else if (p.point_count) {
         content = `Cluster: ${p.point_count} items`;
-      } else if (p.alt !== undefined) {
+      }
+      // Satellite
+      else if (p.alt !== undefined && p.type) {
         content = `${p.name} · ${p.type} · ${p.alt} km`;
-      } else if (p.source && p.mediaUrl) {
+      }
+      // CCTV
+      else if (p.source && p.mediaUrl) {
         content = `${p.name} · ${p.source}`;
-      } else if (p.mmsi) {
+      }
+      // Ship
+      else if (p.mmsi) {
         content = `${p.name} · ${p.type} · ${p.sog} kts · ${p.country}`;
-      } else if (p.region) {
+      }
+      // LiveUA
+      else if (p.region) {
         content = `${p.title} · ${p.region}`;
-      } else if (p.score !== undefined && p.country) {
+      }
+      // Outage
+      else if (p.score !== undefined && p.country) {
         content = `Internet Outage · ${p.country} · Score: ${p.score}`;
-      } else if (p.city && p.country && !p.mmsi) {
+      }
+      // Data center
+      else if (p.city && p.country && !p.mmsi) {
         content = `${p.name} · ${p.city}, ${p.country}`;
       }
 
@@ -555,50 +634,52 @@ export function GlobalMap({
     }
   }, [onContextMenu]);
 
+  // ─── Render ────────────────────────────────────────────────────────
+
   return (
     <div className={`w-full h-full relative ${measureActive ? 'cursor-crosshair' : ''}`}>
       <Map
         ref={mapRef}
+        reuseMaps
+        fadeDuration={0}
+        maxTileCacheSize={200}
         {...viewState}
         onMove={evt => {
           setViewState({
             ...evt.viewState,
             padding: { top: 0, bottom: 0, left: 0, right: 0 },
           });
-          if (onMouseCoords) {
-            const { latitude, longitude } = evt.viewState;
-            onMouseCoords(latitude, longitude);
-          }
+        }}
+        onMoveEnd={() => {
           if (onViewChange) {
-            onViewChange(evt.viewState.zoom, evt.viewState.latitude, evt.viewState.longitude);
+            onViewChange(viewState.zoom, viewState.latitude, viewState.longitude);
           }
         }}
-        onMoveEnd={updateBounds}
         onLoad={() => {
           setMapReady(true);
-          updateBounds();
+          registerIcons();
         }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        interactiveLayerIds={QUERY_LAYERS}
         mapStyle={getMapStyle(mapStyle) as any}
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
         maxZoom={18}
         minZoom={1.5}
       >
-        {/* Day/Night overlay */}
-        {activeLayers.day_night && (
-          <Source id="night-overlay" type="geojson" data={nightGeoJSON}>
-            <Layer
-              id="night-fill"
-              type="fill"
-              paint={{
-                'fill-color': '#000020',
-                'fill-opacity': 0.35,
-              }}
-            />
-          </Source>
-        )}
+        {/* Day/Night overlay - always mounted, visibility controlled */}
+        <Source id="night-overlay" type="geojson" data={nightGeoJSON}>
+          <Layer
+            id="night-fill"
+            type="fill"
+            layout={{ visibility: activeLayers.day_night ? 'visible' : 'none' }}
+            paint={{
+              'fill-color': '#000020',
+              'fill-opacity': 0.35,
+            }}
+          />
+        </Source>
 
         {/* GPS Jamming Zones */}
         <Source id="jamming-src" type="geojson" data={jammingGeoJSON}>
@@ -1054,6 +1135,7 @@ export function GlobalMap({
         {/* NASA GIBS MODIS Terra imagery overlay */}
         {activeLayers.gibs_imagery && gibsDate && (
           <Source
+            key={`gibs-${gibsDate}`}
             id="gibs-src"
             type="raster"
             tiles={[`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${gibsDate}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`]}
@@ -1063,9 +1145,7 @@ export function GlobalMap({
             <Layer
               id="gibs-layer"
               type="raster"
-              paint={{
-                'raster-opacity': gibsOpacity,
-              }}
+              paint={{ 'raster-opacity': gibsOpacity }}
               {...(activeLayers.day_night ? { beforeId: 'night-fill' } : {})}
             />
           </Source>
@@ -1083,9 +1163,7 @@ export function GlobalMap({
             <Layer
               id="esri-sat-layer"
               type="raster"
-              paint={{
-                'raster-opacity': 0.85,
-              }}
+              paint={{ 'raster-opacity': 0.85 }}
               {...(activeLayers.day_night ? { beforeId: 'night-fill' } : {})}
             />
           </Source>
@@ -1160,66 +1238,52 @@ export function GlobalMap({
           />
         </Source>
 
-        {/* Carrier Strike Group markers */}
-        {activeLayers.carriers && carriers?.map(c => (
-          <Marker
-            key={c.hull}
-            longitude={c.lng}
-            latitude={c.lat}
-            anchor="center"
-            rotation={c.heading}
-          >
-            <div
-              className="cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPopup({
-                  lat: c.lat,
-                  lng: c.lng,
-                  content: `${c.name} (${c.hull})\n${c.desc}\nSource: ${c.source}`,
-                });
-              }}
-            >
-              <div className="relative">
-                <div className="w-4 h-4 bg-blue-500/80 border border-blue-300/60 rounded-sm rotate-45 shadow-lg shadow-blue-500/30" />
-                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] font-mono text-blue-300/80 font-bold">
-                  {c.hull}
-                </div>
-              </div>
-            </div>
-          </Marker>
-        ))}
+        {/* Carrier Strike Groups - native symbol layer */}
+        <Source id="carriers-src" type="geojson" data={carriersGeoJSON}>
+          <Layer
+            id="carriers-symbol"
+            type="symbol"
+            layout={{
+              'icon-image': 'carrier-icon',
+              'icon-size': 0.9,
+              'icon-rotate': ['get', 'heading'],
+              'icon-rotation-alignment': 'map',
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+              'text-field': ['get', 'hull'],
+              'text-size': 9,
+              'text-offset': [0, 1.8],
+              'text-font': ['Open Sans Regular'],
+              'text-allow-overlap': true,
+            }}
+            paint={{
+              'text-color': '#93c5fd',
+              'text-halo-color': '#000000',
+              'text-halo-width': 1,
+            }}
+          />
+        </Source>
 
-        {/* Flight markers via HTML markers for rotation */}
-        {flightMarkers.slice(0, maxFlightMarkers).map(m => {
-          const isMil = m.color === 'yellow';
-          const size = isMil ? 16 : 12;
-          return (
-            <Marker
-              key={m.key}
-              longitude={m.lng}
-              latitude={m.lat}
-              anchor="center"
-              rotation={m.heading}
-            >
-              <img
-                src={svgPlane(m.color, size)}
-                alt=""
-                style={{ width: size, height: size, cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const typeLabel = m.color === '#ec4899' ? 'TRACKED' : isMil ? 'MILITARY' : m.color === '#FF8C00' ? 'PRIVATE' : 'COMMERCIAL';
-                  setPopup({
-                    lat: m.lat,
-                    lng: m.lng,
-                    content: `${typeLabel} · ${m.label || 'Unknown'}${m.model ? ` (${m.model})` : ''} · ${Math.round(m.alt).toLocaleString()} ft · ${Math.round(m.speed)} kts`,
-                  });
-                }}
-                title={`${m.label} · ${Math.round(m.alt).toLocaleString()} ft`}
-              />
-            </Marker>
-          );
-        })}
+        {/* Flight markers - native symbol layer (GPU-rendered, no DOM elements) */}
+        <Source id="flights-src" type="geojson" data={flightsGeoJSON}>
+          <Layer
+            id="flights-symbol"
+            type="symbol"
+            layout={{
+              'icon-image': ['get', 'iconId'],
+              'icon-size': ['match', ['get', 'category'],
+                'TRACKED', 0.55,
+                'MILITARY', 0.55,
+                'PRIVATE', 0.4,
+                0.38,
+              ],
+              'icon-rotate': ['get', 'heading'],
+              'icon-rotation-alignment': 'map',
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+            }}
+          />
+        </Source>
 
         {/* Popup */}
         {popup && (
@@ -1250,4 +1314,6 @@ export function GlobalMap({
       </div>
     </div>
   );
-}
+});
+
+export default GlobalMap;
