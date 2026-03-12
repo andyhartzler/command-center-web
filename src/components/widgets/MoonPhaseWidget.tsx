@@ -53,7 +53,7 @@ function drawMoon(canvas: HTMLCanvasElement, phase: number, moonImg: HTMLImageEl
 
   // Draw the real moon photograph, scaled up slightly to eliminate black border
   // The photo has a black background around the moon disc - overfill to crop it out
-  const scale = 1.12;
+  const scale = 1.22;
   const offset = (size * (scale - 1)) / 2;
   ctx.drawImage(moonImg, -offset, -offset, size * scale, size * scale);
 
