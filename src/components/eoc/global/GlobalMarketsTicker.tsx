@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, Droplet } from 'lucide-react';
 
 interface TickerData {
   symbol: string;
@@ -9,9 +9,12 @@ interface TickerData {
   change: number;
 }
 
-// Use existing stocks API from the command center
+// Defense sector + commodity tickers
+const DEFENSE_TICKERS = ['RTX', 'LMT', 'NOC', 'GD', 'BA', 'PLTR'];
+
 export function GlobalMarketsTicker() {
   const [stocks, setStocks] = useState<TickerData[]>([]);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const fetchStocks = async () => {
@@ -19,7 +22,6 @@ export function GlobalMarketsTicker() {
         const res = await fetch('/api/stocks');
         if (!res.ok) return;
         const data = await res.json();
-        // The existing stocks API returns different formats depending on implementation
         if (Array.isArray(data)) {
           setStocks(data.map((s: any) => ({
             symbol: s.symbol || s.ticker,
@@ -37,20 +39,26 @@ export function GlobalMarketsTicker() {
     };
 
     fetchStocks();
-    const id = setInterval(fetchStocks, 300_000); // 5 minutes
+    const id = setInterval(fetchStocks, 300_000);
     return () => clearInterval(id);
   }, []);
 
-  // Defense sector tickers to show even if API doesn't return data
-  const DEFENSE_TICKERS = ['RTX', 'LMT', 'NOC', 'GD', 'BA', 'PLTR'];
-
   if (stocks.length === 0) return null;
+
+  // Sort: put defense tickers first
+  const sorted = [...stocks].sort((a, b) => {
+    const aDef = DEFENSE_TICKERS.includes(a.symbol) ? -1 : 0;
+    const bDef = DEFENSE_TICKERS.includes(b.symbol) ? -1 : 0;
+    return aDef - bDef;
+  });
 
   return (
     <div className="flex items-center gap-3 overflow-x-auto pointer-events-auto">
-      {stocks.slice(0, 8).map(s => (
+      {sorted.slice(0, expanded ? 20 : 8).map(s => (
         <div key={s.symbol} className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[9px] font-mono text-white/40">{s.symbol}</span>
+          <span className={`text-[9px] font-mono ${
+            DEFENSE_TICKERS.includes(s.symbol) ? 'text-cyan-400/60' : 'text-white/40'
+          }`}>{s.symbol}</span>
           <span className="text-[9px] font-mono text-white/60">${s.price.toFixed(2)}</span>
           <span className={`text-[8px] font-mono flex items-center gap-0.5 ${
             s.change >= 0 ? 'text-green-400' : 'text-red-400'
@@ -60,6 +68,14 @@ export function GlobalMarketsTicker() {
           </span>
         </div>
       ))}
+      {stocks.length > 8 && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-white/20 hover:text-white/40 transition-colors shrink-0"
+        >
+          {expanded ? <ChevronDown size={10} /> : <ChevronUp size={10} />}
+        </button>
+      )}
     </div>
   );
 }

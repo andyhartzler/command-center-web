@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Monitor, ShieldAlert, Wifi, WifiOff, Globe, Satellite, Anchor, Camera } from 'lucide-react';
+import { Monitor, ShieldAlert, Wifi, WifiOff, Globe, Satellite, Anchor, Camera, Star } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import type { EOCScope } from '@/types/dashboard';
 import { GlobalLayerPanel, DEFAULT_LAYERS } from './GlobalLayerPanel';
@@ -228,6 +228,49 @@ export function GlobalView() {
     setDossierCoords({ lat, lng });
   }, []);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      // Don't fire when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'm': // Toggle military
+          setActiveLayers(prev => ({ ...prev, military: !prev.military }));
+          break;
+        case 'c': // Toggle commercial
+          setActiveLayers(prev => ({ ...prev, flights: !prev.flights }));
+          break;
+        case 'p': // Toggle private
+          setActiveLayers(prev => ({ ...prev, private: !prev.private }));
+          break;
+        case 't': // Toggle tracked
+          setActiveLayers(prev => ({ ...prev, tracked: !prev.tracked }));
+          break;
+        case 's': // Toggle satellites
+          setActiveLayers(prev => ({ ...prev, satellites: !prev.satellites }));
+          break;
+        case 'e': // Toggle earthquakes
+          setActiveLayers(prev => ({ ...prev, earthquakes: !prev.earthquakes }));
+          break;
+        case 'f': // Toggle fires
+          setActiveLayers(prev => ({ ...prev, fires: !prev.fires }));
+          break;
+        case 'n': // Toggle night
+          setActiveLayers(prev => ({ ...prev, day_night: !prev.day_night }));
+          break;
+        case 'k': // Cycle map styles
+          setMapStyleId(prev => prev === 'dark' ? 'light' : prev === 'light' ? 'satellite' : 'dark');
+          break;
+        case 'escape':
+          setDossierCoords(null);
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
+
   return (
     <div className="w-screen h-screen flex flex-col bg-[#0a0e1a] overflow-hidden relative">
       {/* Top bar */}
@@ -277,6 +320,12 @@ export function GlobalView() {
             <div className="flex items-center gap-1">
               <Satellite size={10} className="text-purple-400/60" />
               <span className="text-[9px] text-white/30 font-mono">{satellites.length} SAT</span>
+            </div>
+          )}
+          {(flights?.tracked?.length || 0) > 0 && (
+            <div className="flex items-center gap-1">
+              <Star size={10} className="text-pink-400/60" />
+              <span className="text-[9px] text-white/30 font-mono">{flights.tracked.length} TRK</span>
             </div>
           )}
           {carriers.length > 0 && (
