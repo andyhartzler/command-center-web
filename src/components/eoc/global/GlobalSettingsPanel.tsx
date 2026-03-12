@@ -1,10 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Settings, X, ChevronDown, ChevronUp, Sun, Monitor, Gauge, Layers } from 'lucide-react';
+import { Settings, X, ChevronDown, ChevronUp, Sun, Monitor, Gauge, Layers, Sparkles, Focus, Shield } from 'lucide-react';
 
 interface SettingsConfig {
   crtEnabled: boolean;
+  bloomEnabled: boolean;
+  sharpenAmount: number; // 0-100
+  tacticalMode: boolean;
   refreshRate: 'fast' | 'normal' | 'slow';
   maxFlightMarkers: number;
   showCoordinates: boolean;
@@ -30,6 +33,10 @@ const DATA_SOURCES = [
   { name: 'KiwiSDR', desc: 'SDR receiver network', status: 'active', free: true },
   { name: 'TfL / NYC / SGP', desc: 'CCTV cameras', status: 'active', free: true },
   { name: 'AIS Stream', desc: 'Maritime vessel tracking', status: process.env.NEXT_PUBLIC_AIS_KEY ? 'active' : 'no key', free: false },
+  { name: 'NASA GIBS', desc: 'MODIS Terra satellite imagery', status: 'active', free: true },
+  { name: 'IODA', desc: 'Internet outage detection', status: 'active', free: true },
+  { name: 'DC Map', desc: 'Data center locations', status: 'active', free: true },
+  { name: 'LiveUAMap', desc: 'Conflict zone events', status: 'active', free: true },
 ];
 
 export function GlobalSettingsPanel({ isOpen, onClose, settings, onSettingsChange }: Props) {
@@ -118,6 +125,53 @@ export function GlobalSettingsPanel({ isOpen, onClose, settings, onSettingsChang
                     className={`w-10 h-5 rounded-full transition-colors relative ${settings.showBottomBar ? 'bg-cyan-500/30 border-cyan-500/50' : 'bg-white/5 border-white/10'} border`}
                   >
                     <div className={`w-3.5 h-3.5 rounded-full transition-all absolute top-0.5 ${settings.showBottomBar ? 'left-5 bg-cyan-400' : 'left-0.5 bg-white/30'}`} />
+                  </button>
+                </div>
+
+                {/* Bloom Effect */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-white/70 font-mono">Bloom Effect</span>
+                    <p className="text-[9px] text-white/30 font-mono">Glow on bright map elements</p>
+                  </div>
+                  <button
+                    onClick={() => onSettingsChange({ ...settings, bloomEnabled: !settings.bloomEnabled })}
+                    className={`w-10 h-5 rounded-full transition-colors relative ${settings.bloomEnabled ? 'bg-purple-500/30 border-purple-500/50' : 'bg-white/5 border-white/10'} border`}
+                  >
+                    <div className={`w-3.5 h-3.5 rounded-full transition-all absolute top-0.5 ${settings.bloomEnabled ? 'left-5 bg-purple-400' : 'left-0.5 bg-white/30'}`} />
+                  </button>
+                </div>
+
+                {/* Sharpen */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="text-xs text-white/70 font-mono">Sharpen</span>
+                      <p className="text-[9px] text-white/30 font-mono">Enhance map edge clarity</p>
+                    </div>
+                    <span className="text-[9px] text-white/40 font-mono">{settings.sharpenAmount}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={settings.sharpenAmount}
+                    onChange={e => onSettingsChange({ ...settings, sharpenAmount: Number(e.target.value) })}
+                    className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-cyan-500"
+                  />
+                </div>
+
+                {/* Tactical Mode */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-white/70 font-mono">Tactical Mode</span>
+                    <p className="text-[9px] text-white/30 font-mono">Hide all UI panels for focus</p>
+                  </div>
+                  <button
+                    onClick={() => onSettingsChange({ ...settings, tacticalMode: !settings.tacticalMode })}
+                    className={`w-10 h-5 rounded-full transition-colors relative ${settings.tacticalMode ? 'bg-red-500/30 border-red-500/50' : 'bg-white/5 border-white/10'} border`}
+                  >
+                    <div className={`w-3.5 h-3.5 rounded-full transition-all absolute top-0.5 ${settings.tacticalMode ? 'left-5 bg-red-400' : 'left-0.5 bg-white/30'}`} />
                   </button>
                 </div>
               </div>
@@ -221,7 +275,7 @@ export function GlobalSettingsPanel({ isOpen, onClose, settings, onSettingsChang
         {/* Footer */}
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center justify-between text-[9px] text-white/25 font-mono">
-            <span>SHADOWBROKER v2.0</span>
+            <span>SHADOWBROKER v2.1</span>
             <span>{DATA_SOURCES.filter(s => s.status === 'active').length} ACTIVE SOURCES</span>
           </div>
         </div>
@@ -233,6 +287,9 @@ export function GlobalSettingsPanel({ isOpen, onClose, settings, onSettingsChang
 // Default settings
 export const DEFAULT_SETTINGS: SettingsConfig = {
   crtEnabled: false,
+  bloomEnabled: false,
+  sharpenAmount: 0,
+  tacticalMode: false,
   refreshRate: 'normal',
   maxFlightMarkers: 3000,
   showCoordinates: true,

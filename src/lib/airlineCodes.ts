@@ -1,0 +1,212 @@
+// Airline ICAO Code Lookup Database
+// Maps 3-letter ICAO airline designators to full airline names
+
+export const AIRLINE_CODES: Record<string, string> = {
+  // ─── Major US Airlines ───
+  AAL: "American Airlines",
+  DAL: "Delta Air Lines",
+  UAL: "United Airlines",
+  SWA: "Southwest Airlines",
+  JBU: "JetBlue Airways",
+  ASA: "Alaska Airlines",
+  NKS: "Spirit Airlines",
+  FFT: "Frontier Airlines",
+  HAL: "Hawaiian Airlines",
+  AAY: "Allegiant Air",
+  SKW: "SkyWest Airlines",
+  RPA: "Republic Airways",
+  ENY: "Envoy Air",
+  PDT: "Piedmont Airlines",
+  MES: "Mesa Airlines",
+  JIA: "PSA Airlines",
+  GJS: "GoJet Airlines",
+  CPZ: "Compass Airlines",
+  TCF: "Shuttle America",
+  ASH: "Mesa Air Group",
+
+  // ─── Major European Airlines ───
+  BAW: "British Airways",
+  DLH: "Lufthansa",
+  AFR: "Air France",
+  KLM: "KLM Royal Dutch Airlines",
+  IBE: "Iberia",
+  SAS: "Scandinavian Airlines",
+  FIN: "Finnair",
+  AUA: "Austrian Airlines",
+  SWR: "Swiss International Air Lines",
+  TAP: "TAP Air Portugal",
+  AZA: "ITA Airways",
+  LOT: "LOT Polish Airlines",
+  CSA: "Czech Airlines",
+  BEL: "Brussels Airlines",
+  AEE: "Aegean Airlines",
+  ICE: "Icelandair",
+  NAX: "Norwegian Air Shuttle",
+  EIN: "Aer Lingus",
+  VLG: "Vueling Airlines",
+  RYR: "Ryanair",
+  EZY: "easyJet",
+  WZZ: "Wizz Air",
+  TOM: "TUI Airways",
+  TCX: "Thomas Cook Airlines",
+  EWG: "Eurowings",
+
+  // ─── Middle East / Africa ───
+  UAE: "Emirates",
+  ETD: "Etihad Airways",
+  QTR: "Qatar Airways",
+  THY: "Turkish Airlines",
+  MEA: "Middle East Airlines",
+  GFA: "Gulf Air",
+  OMA: "Oman Air",
+  SVA: "Saudia",
+  KAC: "Kuwait Airways",
+  RJA: "Royal Jordanian",
+  MSR: "EgyptAir",
+  ETH: "Ethiopian Airlines",
+  SAA: "South African Airways",
+  KQA: "Kenya Airways",
+  RAM: "Royal Air Maroc",
+  AAW: "Afriqiyah Airways",
+  DAH: "Air Algerie",
+  NIG: "Aero Contractors",
+  RWD: "RwandAir",
+
+  // ─── Asia / Pacific ───
+  CPA: "Cathay Pacific",
+  SIA: "Singapore Airlines",
+  ANA: "All Nippon Airways",
+  JAL: "Japan Airlines",
+  KAL: "Korean Air",
+  AAR: "Asiana Airlines",
+  THA: "Thai Airways",
+  MAS: "Malaysia Airlines",
+  GIA: "Garuda Indonesia",
+  CCA: "Air China",
+  CES: "China Eastern Airlines",
+  CSN: "China Southern Airlines",
+  HDA: "Hainan Airlines",
+  VNM: "Vietnam Airlines",
+  PAL: "Philippine Airlines",
+  EVA: "EVA Air",
+  CAL: "China Airlines",
+  CEB: "Cebu Pacific",
+  AXM: "AirAsia",
+  JST: "Jetstar Airways",
+  QFA: "Qantas",
+  ANZ: "Air New Zealand",
+  VOZ: "Virgin Australia",
+  AIC: "Air India",
+  IGO: "IndiGo",
+  SEJ: "SpiceJet",
+  APJ: "Peach Aviation",
+  SJX: "StarFlyer",
+  JJP: "Jetstar Japan",
+  TWB: "T'way Air",
+  ABL: "Air Busan",
+
+  // ─── Americas (non-US) ───
+  ACA: "Air Canada",
+  WJA: "WestJet",
+  TSC: "Air Transat",
+  AMX: "Aeromexico",
+  VIV: "VivaAerobus",
+  VOI: "Volaris",
+  AVA: "Avianca",
+  LAN: "LATAM Airlines Chile",
+  TAM: "LATAM Airlines Brazil",
+  GLO: "Gol Transportes Aereos",
+  ARG: "Aerolineas Argentinas",
+  CMP: "Copa Airlines",
+  BWA: "Caribbean Airlines",
+  AZU: "Azul Brazilian Airlines",
+  SKU: "Sky Airline",
+
+  // ─── Cargo Airlines ───
+  FDX: "FedEx Express",
+  UPS: "UPS Airlines",
+  GTI: "Atlas Air",
+  CLX: "Cargolux",
+  ABW: "AirBridgeCargo",
+  GEC: "Lufthansa Cargo",
+  KZR: "Air Astana",
+  MYW: "Maya Island Air",
+  SQC: "Singapore Airlines Cargo",
+  CAO: "Air China Cargo",
+  BOX: "AeroLogic",
+  NPT: "Northern Air Cargo",
+  POL: "Polar Air Cargo",
+  PAC: "Polar Air Cargo",
+  ABX: "ABX Air",
+  ATN: "Air Transport International",
+  KFS: "Kalitta Air",
+
+  // ─── Charter / Private ───
+  EJA: "NetJets",
+  LEA: "Learjet",
+  XOJ: "XOJET",
+  VNR: "Vistajet",
+  FLX: "Flexjet",
+  WMA: "Wheels Up",
+  XAR: "Xcel Aire",
+
+  // ─── Regional / Other ───
+  BER: "Air Berlin",
+  MXD: "Malindo Air",
+  FJI: "Fiji Airways",
+  ADR: "Adria Airways",
+  MAU: "Air Mauritius",
+  HVN: "Vietnam Airlines",
+  PIA: "Pakistan International Airlines",
+  BIA: "Binter Canarias",
+  PLM: "Pullmantur Air",
+  FDB: "flydubai",
+  AXB: "Air India Express",
+  SLK: "SilkAir",
+  TAR: "Tunisair",
+  AHY: "Azerbaijan Airlines",
+  AFL: "Aeroflot",
+  SBI: "S7 Airlines",
+  UTA: "UTair Aviation",
+  SDM: "Rossiya Airlines",
+  AUI: "Ukraine International Airlines",
+  TUA: "Turkmenistan Airlines",
+  KZR2: "SCAT Airlines",
+  UZB: "Uzbekistan Airways",
+  BTI: "Air Baltic",
+  WIF: "Wideroe",
+  ELY: "El Al Israel Airlines",
+  AEA: "Air Europa",
+  IBK: "Norwegian Air International",
+  TVF: "Transavia France",
+  BPA: "Blue Panorama Airlines",
+  LZB: "Bulgaria Air",
+  ROT: "TAROM",
+  CYP: "Cyprus Airways",
+  OHY: "Onur Air",
+  PGT: "Pegasus Airlines",
+  SXS: "SunExpress",
+  THT: "Air Tahiti Nui",
+  AIN: "African Express Airways",
+};
+
+/**
+ * Look up an airline name from a callsign.
+ * Extracts the 3-letter ICAO prefix from the callsign and returns the airline name.
+ * Returns undefined if the airline is not found.
+ *
+ * @example
+ * lookupAirline("AAL1234") // "American Airlines"
+ * lookupAirline("SWA3456") // "Southwest Airlines"
+ * lookupAirline("N12345") // undefined (general aviation)
+ */
+export function lookupAirline(callsign: string): string | undefined {
+  if (!callsign || callsign.length < 3) return undefined;
+
+  // Extract the 3-letter prefix (letters only before any digits)
+  const match = callsign.match(/^([A-Z]{3})/i);
+  if (!match) return undefined;
+
+  const prefix = match[1].toUpperCase();
+  return AIRLINE_CODES[prefix];
+}

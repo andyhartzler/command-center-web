@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import {
   Plane, AlertTriangle, Activity, Flame, Newspaper,
   Sun, ChevronDown, ChevronUp, Globe, Shield, Wifi,
-  Satellite, Anchor, Camera, Radio, MapPin, Zap, Star, AlertOctagon, Ship
+  Satellite, Anchor, Camera, Radio, MapPin, Zap, Star, AlertOctagon, Ship,
+  Image, Layers, WifiOff, Server
 } from 'lucide-react';
 
 export type LayerKey =
@@ -13,7 +14,8 @@ export type LayerKey =
   | 'day_night' | 'gps_jamming'
   | 'satellites' | 'carriers' | 'cctv'
   | 'kiwisdr' | 'frontlines' | 'gdelt_incidents'
-  | 'ships' | 'liveuamap';
+  | 'ships' | 'liveuamap'
+  | 'gibs_imagery' | 'esri_satellite' | 'internet_outages' | 'data_centers';
 
 export type ActiveLayers = Record<LayerKey, boolean>;
 
@@ -35,6 +37,10 @@ export const DEFAULT_LAYERS: ActiveLayers = {
   gdelt_incidents: true,
   ships: false,
   liveuamap: true,
+  gibs_imagery: false,
+  esri_satellite: false,
+  internet_outages: true,
+  data_centers: false,
 };
 
 interface LayerDef {
@@ -62,6 +68,10 @@ const LAYERS: LayerDef[] = [
   { id: 'kiwisdr', name: 'KiwiSDR Receivers', source: 'kiwisdr.com', icon: Radio, color: 'text-amber-500' },
   { id: 'ships', name: 'Maritime Vessels', source: 'AIS', icon: Ship, color: 'text-teal-400' },
   { id: 'liveuamap', name: 'LiveUA Map Events', source: 'liveuamap.com', icon: Zap, color: 'text-orange-300' },
+  { id: 'gibs_imagery', name: 'MODIS Terra Imagery', source: 'NASA GIBS', icon: Image, color: 'text-emerald-400' },
+  { id: 'esri_satellite', name: 'Hi-Res Satellite', source: 'Esri World Imagery', icon: Layers, color: 'text-sky-400' },
+  { id: 'internet_outages', name: 'Internet Outages', source: 'IODA / Georgia Tech', icon: WifiOff, color: 'text-rose-300' },
+  { id: 'data_centers', name: 'Data Centers', source: 'DC Map', icon: Server, color: 'text-indigo-400' },
   { id: 'day_night', name: 'Day / Night Cycle', source: 'Solar Calc', icon: Sun, color: 'text-blue-300' },
 ];
 
@@ -70,9 +80,19 @@ interface Props {
   setActiveLayers: React.Dispatch<React.SetStateAction<ActiveLayers>>;
   counts: Record<string, number>;
   lastUpdated?: string;
+  freshness?: Record<string, number>; // per-layer last-updated timestamps
+  potusFleet?: { callsign: string; model: string; lat: number; lng: number; alt: number }[];
+  onFlyTo?: (lat: number, lng: number) => void;
 }
 
-export function GlobalLayerPanel({ activeLayers, setActiveLayers, counts, lastUpdated }: Props) {
+function timeAgo(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  return `${Math.floor(diff / 3600)}h ago`;
+}
+
+export function GlobalLayerPanel({ activeLayers, setActiveLayers, counts, lastUpdated, freshness, potusFleet, onFlyTo }: Props) {
   const [minimized, setMinimized] = useState(false);
 
   const toggle = (id: LayerKey) => {
@@ -134,6 +154,9 @@ export function GlobalLayerPanel({ activeLayers, setActiveLayers, counts, lastUp
                       </span>
                       <span className="text-[9px] text-white/25 font-mono tracking-wider mt-0.5">
                         {layer.source} · {active ? 'LIVE' : 'OFF'}
+                        {active && freshness?.[layer.id] && (
+                          <span className="text-white/15"> · {timeAgo(freshness[layer.id])}</span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -157,6 +180,38 @@ export function GlobalLayerPanel({ activeLayers, setActiveLayers, counts, lastUp
           </div>
         )}
       </div>
+
+      {/* POTUS Fleet Section */}
+      {potusFleet && potusFleet.length > 0 && (
+        <div className="mt-3 bg-black/40 backdrop-blur-md border border-pink-500/20 rounded-xl overflow-hidden">
+          <div className="p-3 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <Star size={12} className="text-pink-400" />
+              <span className="text-[10px] text-pink-400/80 font-mono tracking-widest">POTUS FLEET ACTIVE ({potusFleet.length})</span>
+            </div>
+          </div>
+          <div className="p-2 space-y-1">
+            {potusFleet.map((ac, i) => (
+              <button
+                key={i}
+                onClick={() => onFlyTo?.(ac.lat, ac.lng)}
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-pink-500/10 transition-colors group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
+                  <span className="text-[10px] text-white/70 font-mono group-hover:text-pink-300 transition-colors">
+                    {ac.callsign}
+                  </span>
+                  <span className="text-[9px] text-white/25 font-mono">{ac.model}</span>
+                </div>
+                <span className="text-[9px] text-white/20 font-mono">
+                  {Math.round(ac.alt).toLocaleString()} ft
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

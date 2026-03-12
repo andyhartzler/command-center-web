@@ -26,6 +26,9 @@ export function GlobalMapLegend() {
     { color: '#2dd4bf', label: 'Maritime Vessel', shape: 'circle' },
     { color: '#ef4444', label: 'Tanker / Cargo Ship', shape: 'circle' },
     { color: '#fb923c', label: 'LiveUA Map Event', shape: 'circle' },
+    { color: '#f43f5e', label: 'Internet Outage', shape: 'circle' },
+    { color: '#818cf8', label: 'Data Center', shape: 'circle' },
+    { color: '#34d399', label: 'MODIS Satellite Imagery', shape: 'rect' },
     { color: '#000020', label: 'Night Zone (solar)', shape: 'rect' },
   ];
 

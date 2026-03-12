@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Monitor, ShieldAlert, Wifi, WifiOff, Globe, Satellite, Anchor, Camera, Star, Ship, Settings, Filter, Ruler } from 'lucide-react';
+import { Monitor, ShieldAlert, Wifi, WifiOff, Globe, Satellite, Anchor, Camera, Star, Ship, Settings, Filter, Ruler, Shield } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import type { EOCScope } from '@/types/dashboard';
 import { GlobalLayerPanel, DEFAULT_LAYERS } from './GlobalLayerPanel';
@@ -19,6 +19,9 @@ import { GlobalSettingsPanel, DEFAULT_SETTINGS, type SettingsConfig } from './Gl
 import { GlobalOnboardingModal, useOnboarding } from './GlobalOnboardingModal';
 import { GlobalMeasureTool, type MeasurePoint } from './GlobalMeasureTool';
 import { GlobalAdvancedFilter } from './GlobalAdvancedFilter';
+import GlobalChangelog, { useChangelog } from './GlobalChangelog';
+import GlobalScaleBar from './GlobalScaleBar';
+import { GlobalErrorBoundary } from './GlobalErrorBoundary';
 
 // Dynamic import to avoid SSR issues with MapLibre
 const GlobalMap = dynamic(() => import('./GlobalMap').then(m => ({ default: m.GlobalMap })), {
@@ -57,6 +60,19 @@ export function GlobalView() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
   const { showOnboarding, setShowOnboarding } = useOnboarding();
+  const { showChangelog, setShowChangelog } = useChangelog();
+
+  // GIBS imagery config
+  const [gibsDate, setGibsDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [gibsOpacity, setGibsOpacity] = useState(0.6);
+
+  // Map zoom for scale bar
+  const [mapZoom, setMapZoom] = useState(2.2);
+  const [mapLat, setMapLat] = useState(25);
 
   // Measure mode
   const [measureActive, setMeasureActive] = useState(false);
@@ -76,12 +92,15 @@ export function GlobalView() {
   const [gdeltIncidents, setGdeltIncidents] = useState<any[]>([]);
   const [ships, setShips] = useState<any[]>([]);
   const [liveuamapEvents, setLiveuamapEvents] = useState<any[]>([]);
+  const [outages, setOutages] = useState<any[]>([]);
+  const [dataCenters, setDataCenters] = useState<any[]>([]);
 
   // Previous flight positions for smooth interpolation
   const prevFlightsRef = useRef<Map<string, { lat: number; lng: number; ts: number }>>(new Map());
 
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [utcTime, setUtcTime] = useState(new Date().toISOString().slice(11, 19));
+  const [freshness, setFreshness] = useState<Record<string, number>>({});
 
   // Counts for layer panel
   const counts: Record<string, number> = {
@@ -101,6 +120,10 @@ export function GlobalView() {
     gdelt_incidents: gdeltIncidents.filter(g => g.lat != null).length,
     ships: ships.length,
     liveuamap: liveuamapEvents.length,
+    internet_outages: outages.length,
+    data_centers: dataCenters.length,
+    gibs_imagery: activeLayers.gibs_imagery ? 1 : 0,
+    esri_satellite: activeLayers.esri_satellite ? 1 : 0,
   };
 
   // Fast data fetcher (flights + earthquakes)
@@ -114,6 +137,8 @@ export function GlobalView() {
             const data = await res.json();
             setFlights(data);
             setIsConnected(true);
+            const now = Date.now();
+            setFreshness(prev => ({ ...prev, flights: now, military: now, private: now, tracked: now, gps_jamming: now }));
           }
         } catch { setIsConnected(false); }
       })(),
@@ -125,6 +150,7 @@ export function GlobalView() {
             const data = await res.json();
             setEarthquakes(data);
             setIsConnected(true);
+            setFreshness(prev => ({ ...prev, earthquakes: Date.now() }));
           }
         } catch {}
       })(),
@@ -199,11 +225,34 @@ export function GlobalView() {
           if (res.ok) {
             const data = await res.json();
             setLiveuamapEvents(data.events || []);
+            setFreshness(prev => ({ ...prev, liveuamap: Date.now() }));
+          }
+        } catch {}
+      })(),
+      (async () => {
+        if (!activeLayers.internet_outages) return;
+        try {
+          const res = await fetch('/api/global/outages');
+          if (res.ok) {
+            const data = await res.json();
+            setOutages(data || []);
+            setFreshness(prev => ({ ...prev, internet_outages: Date.now() }));
+          }
+        } catch {}
+      })(),
+      (async () => {
+        if (!activeLayers.data_centers) return;
+        try {
+          const res = await fetch('/api/global/datacenters');
+          if (res.ok) {
+            const data = await res.json();
+            setDataCenters(data || []);
+            setFreshness(prev => ({ ...prev, data_centers: Date.now() }));
           }
         } catch {}
       })(),
     ]);
-  }, [activeLayers.fires, activeLayers.satellites, activeLayers.carriers, activeLayers.frontlines, activeLayers.gdelt_incidents, activeLayers.ships, activeLayers.liveuamap]);
+  }, [activeLayers.fires, activeLayers.satellites, activeLayers.carriers, activeLayers.frontlines, activeLayers.gdelt_incidents, activeLayers.ships, activeLayers.liveuamap, activeLayers.internet_outages, activeLayers.data_centers]);
 
   // Glacial fetcher (cctv + kiwisdr)
   const fetchGlacial = useCallback(async () => {
@@ -318,6 +367,12 @@ export function GlobalView() {
             return !prev;
           });
           break;
+        case 'b': // Toggle bloom
+          setSettingsConfig(prev => ({ ...prev, bloomEnabled: !prev.bloomEnabled }));
+          break;
+        case 'x': // Toggle tactical mode
+          setSettingsConfig(prev => ({ ...prev, tacticalMode: !prev.tacticalMode }));
+          break;
         case 'g': // Open settings
           setSettingsOpen(prev => !prev);
           break;
@@ -333,10 +388,22 @@ export function GlobalView() {
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
 
+  // Build CSS filter for bloom + sharpen effects on the map container
+  const mapFilters: string[] = [];
+  if (settingsConfig.bloomEnabled) mapFilters.push('brightness(1.1) contrast(1.05)');
+  if (settingsConfig.sharpenAmount > 0) {
+    // Sharpen approximated via contrast boost (CSS doesn't have a native sharpen filter)
+    const s = 1 + settingsConfig.sharpenAmount / 200; // 0-100 maps to 1.0-1.5
+    mapFilters.push(`contrast(${s})`);
+  }
+  const mapFilterStyle = mapFilters.length > 0 ? mapFilters.join(' ') : undefined;
+
+  const tactical = settingsConfig.tacticalMode;
+
   return (
     <div className="w-screen h-screen flex flex-col bg-[#0a0e1a] overflow-hidden relative">
       {/* Top bar */}
-      <div className="shrink-0 h-11 border-b border-white/10 flex items-center justify-between px-4 bg-black/40 backdrop-blur-sm z-20">
+      <div className={`shrink-0 h-11 border-b border-white/10 flex items-center justify-between px-4 bg-black/40 backdrop-blur-sm z-20 transition-opacity ${tactical ? 'opacity-0 pointer-events-none' : ''}`}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setAppMode('dashboard')}
@@ -424,7 +491,9 @@ export function GlobalView() {
 
       {/* Main content: full-screen map with HUD overlays */}
       <div className="flex-1 relative overflow-hidden">
-        {/* Map */}
+        {/* Map (with bloom/sharpen filter) */}
+        <div className="absolute inset-0" style={mapFilterStyle ? { filter: mapFilterStyle } : undefined}>
+        <GlobalErrorBoundary>
         <GlobalMap
           activeLayers={activeLayers}
           flights={flights}
@@ -439,32 +508,49 @@ export function GlobalView() {
           gdeltIncidents={gdeltIncidents}
           ships={ships}
           liveuamapEvents={liveuamapEvents}
+          outages={outages}
+          dataCenters={dataCenters}
+          gibsDate={activeLayers.gibs_imagery ? gibsDate : undefined}
+          gibsOpacity={gibsOpacity}
+          bloomEnabled={settingsConfig.bloomEnabled}
+          sharpenValue={settingsConfig.sharpenAmount}
           measurePoints={measurePoints}
           measureActive={measureActive}
           mapStyle={mapStyleId}
           flyToLocation={flyToLocation}
           onContextMenu={handleContextMenu}
+          onViewChange={(zoom: number, lat: number) => { setMapZoom(zoom); setMapLat(lat); }}
           onMeasureClick={handleMeasureClick}
         />
+        </GlobalErrorBoundary>
+        </div>
+
+        {/* Bloom glow overlay */}
+        {settingsConfig.bloomEnabled && (
+          <div className="absolute inset-0 pointer-events-none z-[1]" style={{ boxShadow: 'inset 0 0 120px 40px rgba(0,200,255,0.03)' }} />
+        )}
 
         {/* Left HUD: Layer panel */}
-        <div className="absolute top-4 left-4 w-[260px] z-10 flex flex-col gap-3 pointer-events-none max-h-[calc(100%-2rem)]">
+        <div className={`absolute top-4 left-4 w-[260px] z-10 flex flex-col gap-3 pointer-events-none max-h-[calc(100%-2rem)] transition-opacity ${tactical ? 'opacity-0 pointer-events-none' : ''}`}>
           <GlobalLayerPanel
             activeLayers={activeLayers}
             setActiveLayers={setActiveLayers}
             counts={counts}
             lastUpdated={lastUpdated}
+            freshness={freshness}
+            potusFleet={flights?.tracked?.map((f: any) => ({ callsign: f.callsign, model: f.model, lat: f.lat, lng: f.lng, alt: f.alt }))}
+            onFlyTo={handleNewsFlyTo}
           />
         </div>
 
         {/* Right HUD: News feed + Radio */}
-        <div className="absolute top-4 right-4 w-[300px] z-10 flex flex-col pointer-events-none max-h-[calc(100%-2rem)] overflow-y-auto styled-scrollbar">
+        <div className={`absolute top-4 right-4 w-[300px] z-10 flex flex-col pointer-events-none max-h-[calc(100%-2rem)] overflow-y-auto styled-scrollbar transition-opacity ${tactical ? 'opacity-0 pointer-events-none' : ''}`}>
           <GlobalNewsFeed news={news} onFlyTo={handleNewsFlyTo} />
           <GlobalRadioPanel />
         </div>
 
         {/* Top center: Locate bar + toolbar */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
+        <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 transition-opacity ${tactical ? 'opacity-0 pointer-events-none' : ''}`}>
           <GlobalLocateBar onFlyTo={(lat, lng) => handleNewsFlyTo(lat, lng)} />
           <div className="flex items-center gap-1.5 pointer-events-auto">
             <button
@@ -502,11 +588,29 @@ export function GlobalView() {
             >
               CRT
             </button>
+            <button
+              onClick={() => setSettingsConfig(prev => ({ ...prev, bloomEnabled: !prev.bloomEnabled }))}
+              className={`bg-black/60 backdrop-blur-sm border rounded-lg px-2.5 py-1.5 hover:bg-white/5 transition-colors text-[9px] font-mono ${
+                settingsConfig.bloomEnabled ? 'border-purple-500/50 text-purple-400' : 'border-white/10 text-white/30 hover:text-white/50'
+              }`}
+              title="Bloom Effect (B)"
+            >
+              BLM
+            </button>
+            <button
+              onClick={() => setSettingsConfig(prev => ({ ...prev, tacticalMode: !prev.tacticalMode }))}
+              className={`bg-black/60 backdrop-blur-sm border rounded-lg px-2.5 py-1.5 hover:bg-white/5 transition-colors ${
+                settingsConfig.tacticalMode ? 'border-red-500/50 text-red-400' : 'border-white/10 text-white/30 hover:text-white/50'
+              }`}
+              title="Tactical Mode (X)"
+            >
+              <Shield size={12} />
+            </button>
           </div>
         </div>
 
         {/* Space weather badge (top right corner) */}
-        {spaceWeather?.scales && (
+        {spaceWeather?.scales && !tactical && (
           <div className="absolute top-4 right-[320px] z-10 pointer-events-auto mr-4">
             <div className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 text-[9px] font-mono">
               <div className="text-white/40 tracking-widest mb-1">SPACE WEATHER</div>
@@ -551,14 +655,44 @@ export function GlobalView() {
           />
         )}
 
-        {/* Bottom-left: Legend + Map Style */}
-        <div className="absolute bottom-12 left-4 z-10 flex flex-col gap-2">
+        {/* GIBS time slider (when GIBS layer is active) */}
+        {activeLayers.gibs_imagery && !tactical && (
+          <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+            <div className="bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg px-4 py-2 flex items-center gap-3">
+              <span className="text-[9px] text-emerald-400/60 font-mono tracking-widest">MODIS</span>
+              <input
+                type="date"
+                value={gibsDate}
+                max={new Date().toISOString().slice(0, 10)}
+                min={(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10); })()}
+                onChange={e => setGibsDate(e.target.value)}
+                className="bg-transparent border border-white/10 rounded px-2 py-0.5 text-[10px] text-white/70 font-mono"
+              />
+              <div className="flex items-center gap-1.5">
+                <span className="text-[8px] text-white/30 font-mono">OPACITY</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={gibsOpacity * 100}
+                  onChange={e => setGibsOpacity(Number(e.target.value) / 100)}
+                  className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-500"
+                />
+                <span className="text-[8px] text-white/40 font-mono w-6">{Math.round(gibsOpacity * 100)}%</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom-left: Legend + Map Style + Scale Bar */}
+        <div className={`absolute bottom-12 left-4 z-10 flex flex-col gap-2 transition-opacity ${tactical ? 'opacity-0 pointer-events-none' : ''}`}>
+          <GlobalScaleBar zoom={mapZoom} latitude={mapLat} />
           <GlobalMapLegend />
           <GlobalMapStyleSwitcher current={mapStyleId} onChange={setMapStyleId} />
         </div>
 
         {/* Bottom bar: status + markets ticker */}
-        <div className="absolute bottom-0 left-0 right-0 h-9 bg-gradient-to-t from-black/70 to-transparent flex items-end justify-between px-4 pb-1.5 pointer-events-none z-10">
+        <div className={`absolute bottom-0 left-0 right-0 h-9 bg-gradient-to-t from-black/70 to-transparent flex items-end justify-between px-4 pb-1.5 pointer-events-none z-10 transition-opacity ${tactical ? 'opacity-0' : ''}`}>
           <div className="flex items-center gap-4 text-[9px] font-mono text-white/25">
             <span className="text-cyan-500/50">REC</span>
             <span className="text-white/40">{utcTime} UTC</span>
@@ -581,6 +715,16 @@ export function GlobalView() {
         />
       </div>
 
+      {/* Tactical mode exit hint */}
+      {tactical && (
+        <button
+          onClick={() => setSettingsConfig(prev => ({ ...prev, tacticalMode: false }))}
+          className="fixed bottom-4 right-4 z-30 bg-black/60 backdrop-blur-sm border border-red-500/30 rounded-lg px-3 py-1.5 text-[9px] font-mono text-red-400/60 hover:text-red-400 hover:border-red-500/50 transition-all"
+        >
+          EXIT TACTICAL (X)
+        </button>
+      )}
+
       {/* CRT Scanline Overlay */}
       <GlobalCRTOverlay enabled={settingsConfig.crtEnabled} />
 
@@ -599,6 +743,12 @@ export function GlobalView() {
           onOpenSettings={() => { setShowOnboarding(false); setSettingsOpen(true); }}
         />
       )}
+
+      {/* Changelog Modal */}
+      <GlobalChangelog
+        isOpen={showChangelog}
+        onClose={() => setShowChangelog(false)}
+      />
 
       {/* Advanced Filter Modal */}
       <GlobalAdvancedFilter

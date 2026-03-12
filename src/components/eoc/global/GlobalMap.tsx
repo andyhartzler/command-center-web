@@ -120,6 +120,21 @@ interface LiveUAMapEvent {
   timestamp?: string;
 }
 
+interface OutageData {
+  country: string;
+  score: number;
+  lat: number;
+  lng: number;
+}
+
+interface DataCenterData {
+  name: string;
+  lat: number;
+  lng: number;
+  city: string;
+  country: string;
+}
+
 interface MeasurePoint {
   lat: number;
   lng: number;
@@ -139,13 +154,20 @@ interface Props {
   gdeltIncidents?: GDELTIncident[];
   ships?: ShipData[];
   liveuamapEvents?: LiveUAMapEvent[];
+  outages?: OutageData[];
+  dataCenters?: DataCenterData[];
+  gibsDate?: string; // YYYY-MM-DD for GIBS imagery
+  gibsOpacity?: number;
   measurePoints?: MeasurePoint[];
   measureActive?: boolean;
+  bloomEnabled?: boolean;
+  sharpenValue?: number;
   mapStyle?: MapStyleId;
   flyToLocation?: { lat: number; lng: number } | null;
   onMouseCoords?: (lat: number, lng: number) => void;
   onContextMenu?: (lat: number, lng: number) => void;
   onMeasureClick?: (lat: number, lng: number) => void;
+  onViewChange?: (zoom: number, lat: number, lng: number) => void;
 }
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -178,8 +200,9 @@ function greatCircleArc(p1: { lat: number; lng: number }, p2: { lat: number; lng
 export function GlobalMap({
   activeLayers, flights, earthquakes, fires, news,
   satellites, carriers, cctv, kiwisdr, frontlines, gdeltIncidents,
-  ships, liveuamapEvents, measurePoints, measureActive,
-  mapStyle = 'dark', flyToLocation, onMouseCoords, onContextMenu, onMeasureClick,
+  ships, liveuamapEvents, outages, dataCenters, gibsDate, gibsOpacity = 0.6,
+  measurePoints, measureActive, bloomEnabled, sharpenValue = 0,
+  mapStyle = 'dark', flyToLocation, onMouseCoords, onContextMenu, onMeasureClick, onViewChange,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -363,6 +386,33 @@ export function GlobalMap({
     };
   }, [activeLayers.liveuamap, liveuamapEvents]);
 
+  // Internet outages GeoJSON
+  const outagesGeoJSON = useMemo(() => {
+    if (!activeLayers.internet_outages || !outages?.length) return EMPTY_FC;
+    return {
+      type: 'FeatureCollection' as const,
+      features: outages.map((o, i) => ({
+        type: 'Feature' as const,
+        properties: { id: i, country: o.country, score: o.score },
+        geometry: { type: 'Point' as const, coordinates: [o.lng, o.lat] },
+      })),
+    };
+  }, [activeLayers.internet_outages, outages]);
+
+  // Data centers GeoJSON
+  const dataCentersGeoJSON = useMemo(() => {
+    if (!activeLayers.data_centers || !dataCenters?.length) return EMPTY_FC;
+    const visible = dataCenters.filter(d => inView(d.lat, d.lng));
+    return {
+      type: 'FeatureCollection' as const,
+      features: visible.map((d, i) => ({
+        type: 'Feature' as const,
+        properties: { id: i, name: d.name, city: d.city, country: d.country },
+        geometry: { type: 'Point' as const, coordinates: [d.lng, d.lat] },
+      })),
+    };
+  }, [activeLayers.data_centers, dataCenters, inView]);
+
   // Measure line GeoJSON
   const measureGeoJSON = useMemo(() => {
     if (!measurePoints || measurePoints.length < 2) return EMPTY_FC;
@@ -472,6 +522,7 @@ export function GlobalMap({
       'earthquakes-circle', 'news-circle', 'satellites-circle',
       'cctv-clusters', 'cctv-unclustered', 'kiwisdr-clusters', 'kiwisdr-unclustered',
       'gdelt-circle', 'liveuamap-circle', 'ships-circle',
+      'outages-circle', 'datacenters-circle', 'datacenters-unclustered',
     ];
     const features = map.queryRenderedFeatures(e.point, { layers: queryLayers });
     if (features.length > 0) {
@@ -490,6 +541,10 @@ export function GlobalMap({
         content = `${p.name} · ${p.type} · ${p.sog} kts · ${p.country}`;
       } else if (p.region) {
         content = `${p.title} · ${p.region}`;
+      } else if (p.score !== undefined && p.country) {
+        content = `Internet Outage · ${p.country} · Score: ${p.score}`;
+      } else if (p.city && p.country && !p.mmsi) {
+        content = `${p.name} · ${p.city}, ${p.country}`;
       }
 
       setPopup({ lng: coords[0], lat: coords[1], content });
@@ -505,8 +560,14 @@ export function GlobalMap({
     }
   }, [onContextMenu]);
 
+  // Build CSS filter string for bloom/sharpen
+  const cssFilters: string[] = [];
+  if (bloomEnabled) cssFilters.push('brightness(1.1) contrast(1.05)');
+  if (sharpenValue > 0) cssFilters.push(`contrast(${1 + sharpenValue * 0.002})`);
+  const filterStyle = cssFilters.length > 0 ? cssFilters.join(' ') : undefined;
+
   return (
-    <div className={`w-full h-full relative ${measureActive ? 'cursor-crosshair' : ''}`}>
+    <div className={`w-full h-full relative ${measureActive ? 'cursor-crosshair' : ''}`} style={filterStyle ? { filter: filterStyle } : undefined}>
       <Map
         ref={mapRef}
         {...viewState}
@@ -518,6 +579,9 @@ export function GlobalMap({
           if (onMouseCoords) {
             const { latitude, longitude } = evt.viewState;
             onMouseCoords(latitude, longitude);
+          }
+          if (onViewChange) {
+            onViewChange(evt.viewState.zoom, evt.viewState.latitude, evt.viewState.longitude);
           }
         }}
         onMoveEnd={updateBounds}
@@ -994,6 +1058,125 @@ export function GlobalMap({
               'circle-stroke-width': 2,
               'circle-stroke-color': '#ffffff',
               'circle-stroke-opacity': 0.6,
+            }}
+          />
+        </Source>
+
+        {/* NASA GIBS MODIS Terra imagery overlay */}
+        {activeLayers.gibs_imagery && gibsDate && (
+          <Source
+            id="gibs-src"
+            type="raster"
+            tiles={[`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${gibsDate}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`]}
+            tileSize={256}
+            maxzoom={9}
+          >
+            <Layer
+              id="gibs-layer"
+              type="raster"
+              paint={{
+                'raster-opacity': gibsOpacity,
+              }}
+              beforeId="night-fill"
+            />
+          </Source>
+        )}
+
+        {/* Esri World Imagery overlay */}
+        {activeLayers.esri_satellite && (
+          <Source
+            id="esri-sat-src"
+            type="raster"
+            tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']}
+            tileSize={256}
+            maxzoom={18}
+          >
+            <Layer
+              id="esri-sat-layer"
+              type="raster"
+              paint={{
+                'raster-opacity': 0.85,
+              }}
+              beforeId="night-fill"
+            />
+          </Source>
+        )}
+
+        {/* Internet Outages */}
+        <Source id="outages-src" type="geojson" data={outagesGeoJSON}>
+          <Layer
+            id="outages-circle"
+            type="circle"
+            paint={{
+              'circle-radius': ['interpolate', ['linear'], ['get', 'score'], 0, 6, 50, 12, 100, 20],
+              'circle-color': '#f43f5e',
+              'circle-opacity': ['interpolate', ['linear'], ['get', 'score'], 0, 0.3, 50, 0.5, 100, 0.8],
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#f43f5e',
+              'circle-stroke-opacity': 0.4,
+            }}
+          />
+          <Layer
+            id="outages-label"
+            type="symbol"
+            layout={{
+              'text-field': ['get', 'country'],
+              'text-size': 9,
+              'text-offset': [0, -1.5],
+              'text-font': ['Open Sans Regular'],
+            }}
+            paint={{
+              'text-color': '#f43f5e',
+              'text-halo-color': '#000000',
+              'text-halo-width': 1,
+              'text-opacity': 0.7,
+            }}
+          />
+        </Source>
+
+        {/* Data Centers - clustered */}
+        <Source id="datacenters-src" type="geojson" data={dataCentersGeoJSON} cluster clusterMaxZoom={10} clusterRadius={40}>
+          <Layer
+            id="datacenters-clusters"
+            type="circle"
+            filter={['has', 'point_count']}
+            paint={{
+              'circle-radius': ['step', ['get', 'point_count'], 8, 10, 12, 50, 16, 200, 22],
+              'circle-color': '#818cf8',
+              'circle-opacity': 0.5,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': 'rgba(129,140,248,0.3)',
+            }}
+          />
+          <Layer
+            id="datacenters-cluster-count"
+            type="symbol"
+            filter={['has', 'point_count']}
+            layout={{
+              'text-field': '{point_count_abbreviated}',
+              'text-size': 9,
+              'text-font': ['Open Sans Regular'],
+            }}
+            paint={{ 'text-color': '#ffffff' }}
+          />
+          <Layer
+            id="datacenters-unclustered"
+            type="circle"
+            filter={['!', ['has', 'point_count']]}
+            paint={{
+              'circle-radius': 4,
+              'circle-color': '#818cf8',
+              'circle-opacity': 0.5,
+            }}
+          />
+          <Layer
+            id="datacenters-circle"
+            type="circle"
+            filter={['!', ['has', 'point_count']]}
+            paint={{
+              'circle-radius': 4,
+              'circle-color': '#818cf8',
+              'circle-opacity': 0,
             }}
           />
         </Source>
