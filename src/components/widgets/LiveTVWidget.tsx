@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import Hls from 'hls.js';
 import { Tv, Volume2, VolumeX, Search, X, Radio } from 'lucide-react';
 import type { LiveTVConfig, WidgetStyle } from '@/types/widget';
@@ -8,12 +8,38 @@ interface Channel {
   name: string;
   url: string;
   category: string;
+  resolver?: 'kmbc' | 'wdaf'; // dynamic URL resolution
 }
 
+// All 5 KC Local channels matching Swift LiveTVWidgetView exactly
 const KC_CHANNELS: Channel[] = [
-  { name: 'KSHB 41 (NBC)', url: 'https://content.uplynk.com/channel/50d0fa1b042945a3a4f550f9b8412c83.m3u8', category: 'KC Local' },
-  { name: 'KCTV5 (CBS)', url: 'https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00312-graytelevisioni-kctv5news-vizious/playlist.m3u8', category: 'KC Local' },
-  { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'KC Local' },
+  {
+    name: 'KSHB 41 (NBC)',
+    url: 'https://content.uplynk.com/channel/50d0fa1b042945a3a4f550f9b8412c83.m3u8',
+    category: 'KC Local',
+  },
+  {
+    name: 'KMBC 9 (ABC)',
+    url: '', // resolved dynamically
+    category: 'KC Local',
+    resolver: 'kmbc',
+  },
+  {
+    name: 'KCTV5 (CBS)',
+    url: 'https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00312-graytelevisioni-kctv5news-vizious/playlist.m3u8',
+    category: 'KC Local',
+  },
+  {
+    name: 'WDAF FOX 4',
+    url: '', // resolved dynamically
+    category: 'KC Local',
+    resolver: 'wdaf',
+  },
+  {
+    name: 'KCPT PBS',
+    url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8',
+    category: 'KC Local',
+  },
 ];
 
 interface LiveTVWidgetProps {
@@ -26,14 +52,50 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   const [showGuide, setShowGuide] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
+  const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
+  const [resolving, setResolving] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Resolve dynamic channel URLs on mount
+  useEffect(() => {
+    async function resolveChannels() {
+      for (const ch of KC_CHANNELS) {
+        if (ch.resolver && !ch.url) {
+          try {
+            const res = await fetch(`/api/livetv?channel=${ch.resolver}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.url) {
+                setResolvedUrls(prev => ({ ...prev, [ch.resolver!]: data.url }));
+              }
+            }
+          } catch (err) {
+            console.error(`[LiveTV] Failed to resolve ${ch.resolver}:`, err);
+          }
+        }
+      }
+    }
+    resolveChannels();
+
+    // Re-resolve every 30 minutes (URLs can expire)
+    const interval = setInterval(resolveChannels, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Get the effective URL for a channel (static or resolved)
+  const getChannelUrl = useCallback((channel: Channel): string => {
+    if (channel.resolver) {
+      return resolvedUrls[channel.resolver] || '';
+    }
+    return channel.url;
+  }, [resolvedUrls]);
+
   // Select initial channel
   useEffect(() => {
     if (config.selectedChannelURL) {
-      const found = KC_CHANNELS.find(c => c.url === config.selectedChannelURL);
+      const found = KC_CHANNELS.find(c => c.url === config.selectedChannelURL || c.name === config.selectedChannelName);
       setCurrentChannel(found || { name: config.selectedChannelName || 'Custom', url: config.selectedChannelURL, category: 'Custom' });
     } else if (KC_CHANNELS.length > 0) {
       setCurrentChannel(KC_CHANNELS[0]);
@@ -44,6 +106,9 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !currentChannel) return;
+
+    const url = getChannelUrl(currentChannel);
+    if (!url) return; // URL not yet resolved
 
     if (hlsRef.current) {
       hlsRef.current.destroy();
@@ -56,7 +121,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
         lowLatencyMode: true,
         backBufferLength: 30,
       });
-      hls.loadSource(currentChannel.url);
+      hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.muted = isMuted;
@@ -65,7 +130,21 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            setTimeout(() => hls.startLoad(), 3000);
+            // If this is a dynamic channel, try re-resolving
+            if (currentChannel.resolver) {
+              setResolving(currentChannel.resolver);
+              fetch(`/api/livetv?channel=${currentChannel.resolver}`)
+                .then(r => r.json())
+                .then(d => {
+                  if (d.url) {
+                    setResolvedUrls(prev => ({ ...prev, [currentChannel.resolver!]: d.url }));
+                  }
+                  setResolving(null);
+                })
+                .catch(() => setResolving(null));
+            } else {
+              setTimeout(() => hls.startLoad(), 3000);
+            }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError();
           }
@@ -73,7 +152,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       });
       hlsRef.current = hls;
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = currentChannel.url;
+      video.src = url;
       video.muted = isMuted;
       video.play().catch(() => {});
     }
@@ -84,7 +163,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
         hlsRef.current = null;
       }
     };
-  }, [currentChannel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentChannel, getChannelUrl, resolvedUrls]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update mute state on video element
   useEffect(() => {
@@ -127,6 +206,9 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     );
   }
 
+  const currentUrl = getChannelUrl(currentChannel);
+  const isResolving = currentChannel.resolver && !currentUrl;
+
   return (
     <div
       ref={containerRef}
@@ -135,13 +217,20 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       onMouseLeave={() => { setShowGuide(false); setSearchQuery(''); }}
     >
       {/* Video player */}
-      <video
-        ref={videoRef}
-        className="w-full h-full object-cover"
-        playsInline
-        muted={isMuted}
-        autoPlay
-      />
+      {isResolving ? (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+          <div className="w-4 h-4 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
+          <span className="text-xs text-white/30">Loading {currentChannel.name}...</span>
+        </div>
+      ) : (
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          playsInline
+          muted={isMuted}
+          autoPlay
+        />
+      )}
 
       {/* Bottom controls bar */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
@@ -153,6 +242,9 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
           <span className="text-xs font-medium text-white/90 truncate">
             {currentChannel.name}
           </span>
+          {resolving && (
+            <span className="text-[9px] text-yellow-400/60">reconnecting...</span>
+          )}
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); setIsMuted(prev => !prev); }}
@@ -169,7 +261,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       {/* Channel guide overlay - right side panel */}
       {showGuide && (
         <div
-          className="absolute top-0 right-0 bottom-0 w-56 bg-zinc-950/95 backdrop-blur-md border-l border-white/10 flex flex-col overflow-hidden"
+          className="absolute top-0 right-0 bottom-0 w-56 bg-[#060a14]/95 backdrop-blur-xl border-l border-white/[0.08] flex flex-col overflow-hidden"
           onMouseEnter={() => setShowGuide(true)}
         >
           {/* Guide header */}
@@ -205,14 +297,17 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
                   {category}
                 </div>
                 {channels.map(channel => {
-                  const isActive = currentChannel.url === channel.url;
+                  const isActive = currentChannel.name === channel.name;
+                  const channelUrl = getChannelUrl(channel);
+                  const isUnavailable = channel.resolver && !channelUrl;
                   return (
                     <button
-                      key={channel.url}
-                      onClick={() => selectChannel(channel)}
+                      key={channel.name}
+                      onClick={() => !isUnavailable && selectChannel(channel)}
                       className={`w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-white/5 transition-colors ${
                         isActive ? 'bg-white/10' : ''
-                      }`}
+                      } ${isUnavailable ? 'opacity-40' : ''}`}
+                      disabled={!!isUnavailable}
                     >
                       <Radio
                         size={10}
@@ -226,6 +321,9 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
                         </span>
+                      )}
+                      {isUnavailable && (
+                        <span className="ml-auto text-[8px] text-white/30">loading...</span>
                       )}
                     </button>
                   );

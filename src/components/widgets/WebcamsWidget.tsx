@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
-import { Video, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Video, ChevronLeft, ChevronRight, Loader2, RotateCw, Lock } from 'lucide-react';
 import { useInterval } from '@/hooks/useInterval';
 import type { WebcamConfig, WidgetStyle } from '@/types/widget';
 
@@ -26,6 +26,7 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [isRotating, setIsRotating] = useState((config.viewMode || 'single') === 'rotate');
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
 
@@ -42,15 +43,11 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
         const data = await res.json();
         let cams: Camera[] = data.cameras || [];
 
-        // Apply filters matching Swift logic:
-        // If specific camera IDs provided, build from those
+        // Apply filters matching Swift logic
         if (!config.loadAllCameras && config.cameraIds.length > 0) {
-          // Use specific cameras - build stream file from ID like Swift does
           cams = config.cameraIds.map((id, idx) => {
-            // Try to find it in the API results first
             const found = cams.find(c => c.id === id);
             if (found) return found;
-            // Otherwise construct like Swift does
             const name = idx < (config.cameraNames?.length || 0)
               ? config.cameraNames[idx]
               : id;
@@ -65,7 +62,7 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
           });
         }
 
-        // Corridor filter - matches Swift: cam.id.hasPrefix(corridor)
+        // Corridor filter
         if (config.corridorFilter.length > 0) {
           cams = cams.filter(c =>
             config.corridorFilter.some(f => c.id.startsWith(f))
@@ -136,12 +133,10 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            // Retry with backoff, skip after 3 failures
             if (retryCount < 3) {
               setRetryCount(prev => prev + 1);
               setTimeout(() => hls.startLoad(), 3000);
             } else if (cameras.length > 1) {
-              // Skip to next camera like Swift does
               setCurrentIndex(prev => (prev + 1) % cameras.length);
             }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -164,18 +159,18 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
     };
   }, [streamUrl, cameras.length, retryCount]);
 
-  // Auto-rotate cameras
+  // Auto-rotate cameras (only when in rotate mode)
   const rotateNext = useCallback(() => {
-    if (cameras.length <= 1) return;
+    if (cameras.length <= 1 || !isRotating) return;
     setCurrentIndex(prev => (prev + 1) % cameras.length);
-  }, [cameras.length]);
+  }, [cameras.length, isRotating]);
 
   useInterval(
     rotateNext,
-    cameras.length > 1 ? (config.rotateIntervalSeconds || 15) * 1000 : null
+    isRotating && cameras.length > 1 ? (config.rotateIntervalSeconds || 15) * 1000 : null
   );
 
-  // Token refresh every 45 minutes (matches Swift: 2700s)
+  // Token refresh every 45 minutes
   useInterval(
     () => {
       if (cameras.length > 0 && cameras[currentIndex]) {
@@ -252,7 +247,22 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
         </>
       )}
 
-      {/* Bottom overlay - matches Swift: camera name in bottom-left with black bg pill */}
+      {/* Top-right: rotate/lock toggle */}
+      {cameras.length > 1 && (
+        <button
+          onClick={() => setIsRotating(prev => !prev)}
+          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+          title={isRotating ? 'Stop rotating (lock view)' : 'Start rotating cameras'}
+        >
+          {isRotating ? (
+            <RotateCw size={12} className="text-blue-400/80" />
+          ) : (
+            <Lock size={11} className="text-white/60" />
+          )}
+        </button>
+      )}
+
+      {/* Bottom overlay - camera name + counter */}
       <div className="absolute bottom-0 left-0 right-0 p-2">
         <div className="flex items-center justify-between">
           <span
@@ -261,14 +271,24 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
           >
             {currentCamera?.name || 'Camera'}
           </span>
-          {cameras.length > 1 && (
-            <span
-              className="text-[10px] text-white/40 px-1.5 py-0.5 rounded"
-              style={{ background: 'rgba(0,0,0,0.5)' }}
-            >
-              {currentIndex + 1}/{cameras.length}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {isRotating && (
+              <span
+                className="text-[8px] text-blue-400/60 px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(0,0,0,0.5)' }}
+              >
+                AUTO
+              </span>
+            )}
+            {cameras.length > 1 && (
+              <span
+                className="text-[10px] text-white/40 px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(0,0,0,0.5)' }}
+              >
+                {currentIndex + 1}/{cameras.length}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { type DashboardWidget, FAMILY_GRID_SIZE, defaultConfig, type WidgetType, type WidgetFamily } from '@/types/widget';
+import { type DashboardWidget, type WidgetConfig, FAMILY_GRID_SIZE, defaultConfig, type WidgetType, type WidgetFamily } from '@/types/widget';
 import { type DashboardPage, GRID_COLUMNS, GRID_ROWS, type AppMode, type EOCScope } from '@/types/dashboard';
 
 interface AppStateContextType {
@@ -19,7 +19,7 @@ interface AppStateContextType {
   addPage: () => void;
   deletePage: (index: number) => void;
   renamePage: (index: number, name: string) => void;
-  addWidget: (type: WidgetType, family: WidgetFamily) => void;
+  addWidget: (type: WidgetType, family: WidgetFamily, configOverride?: WidgetConfig) => void;
   deleteWidget: (id: string) => void;
   moveWidget: (id: string, to: { column: number; row: number }) => void;
   updateWidget: (id: string, updates: Partial<DashboardWidget>) => void;
@@ -205,7 +205,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const addWidget = useCallback((type: WidgetType, family: WidgetFamily) => {
+  const addWidget = useCallback((type: WidgetType, family: WidgetFamily, configOverride?: WidgetConfig) => {
     setPages(prev => {
       const next = [...prev];
       const page = { ...next[currentPageIndex] };
@@ -215,7 +215,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       const widget: DashboardWidget = {
         id: crypto.randomUUID(),
-        widgetConfig: defaultConfig(type),
+        widgetConfig: configOverride || defaultConfig(type),
         family,
         position: pos,
         size: { columns: size.columns, rows: size.rows },

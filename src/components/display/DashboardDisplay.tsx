@@ -66,7 +66,7 @@ export function DashboardDisplay() {
         onMouseLeave={() => setShowToolbar(false)}
       >
         <div className="flex items-center justify-between px-5 py-2.5"
-          style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
+          style={{ background: 'rgba(6,10,20,0.65)', backdropFilter: 'blur(24px) saturate(1.4)', WebkitBackdropFilter: 'blur(24px) saturate(1.4)', borderBottom: '1px solid rgba(148,197,255,0.06)' }}
         >
           <span className="text-[13px] font-medium text-white/60" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             CommandCenter
@@ -79,7 +79,7 @@ export function DashboardDisplay() {
           <button
             onClick={() => setDisplayMode(false)}
             className="flex items-center gap-1 px-3 py-1.5 text-white/90 rounded-lg transition-colors hover:bg-white/10"
-            style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+            style={{ background: 'rgba(59,130,246,0.1)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(59,130,246,0.15)' }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />

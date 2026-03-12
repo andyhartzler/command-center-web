@@ -101,7 +101,7 @@ export function EOCMap({ incidents, selectedId, onSelect, flyToCoord }: EOCMapPr
       case 'crime': return '#ef4444';      // red
       case 'shooting': return '#ef4444';   // red
       case 'traffic': return '#eab308';    // yellow
-      case 'hazmat': return '#a855f7';     // purple
+      case 'hazmat': return '#38bdf8';     // sky-blue
       default: return '#6b7280';           // gray
     }
   }, []);

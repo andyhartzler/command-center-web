@@ -71,22 +71,22 @@ export function PredictionMarketsWidget({ config }: PredictionMarketsWidgetProps
                   {pred.title}
                 </div>
 
-                {/* Outcome probability bars - matches Swift: thin 6px bars with indigo gradient */}
+                {/* Outcome probability bars — blue gradient */}
                 <div className="space-y-1">
                   {pred.outcomes.slice(0, 3).map((outcome, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      {/* Label - matches Swift: 9pt medium, 40px width, right-aligned */}
+                      {/* Label */}
                       <span className="text-[9px] font-medium text-white/50 w-10 text-right truncate shrink-0">
                         {outcome.name}
                       </span>
 
-                      {/* Bar - matches Swift: 6px height, indigo gradient */}
+                      {/* Bar — blue gradient */}
                       <div className="flex-1 h-1.5 rounded-sm bg-white/[0.06] overflow-hidden">
                         <div
                           className="h-full rounded-sm"
                           style={{
                             width: `${Math.max(outcome.probability, 2)}%`,
-                            background: 'linear-gradient(90deg, rgba(99,102,241,0.6), rgba(99,102,241,0.3))',
+                            background: 'linear-gradient(90deg, rgba(59,130,246,0.6), rgba(59,130,246,0.25))',
                           }}
                         />
                       </div>

@@ -110,7 +110,7 @@ export function SunWidget({ config }: Props) {
 
         {/* Sunset */}
         <div className="flex-1 flex flex-col items-center gap-[2px]">
-          <Sunset size={12} className="text-indigo-400/70" strokeWidth={1.5} />
+          <Sunset size={12} className="text-blue-400/70" strokeWidth={1.5} />
           <span className="text-xs font-light text-white/70">{sunset}</span>
         </div>
 

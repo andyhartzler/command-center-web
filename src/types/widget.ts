@@ -128,6 +128,7 @@ export interface WebcamConfig {
   corridorFilter: string[];
   loadAllCameras: boolean;
   rotateIntervalSeconds: number;
+  viewMode: 'single' | 'rotate';
 }
 
 export interface CameraConfig {
@@ -202,28 +203,28 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   defaultFamily: WidgetFamily;
   supportedFamilies: WidgetFamily[];
 }> = {
-  clock: { displayName: 'Clock', category: 'Time & Location', icon: 'clock', color: '#818cf8', defaultFamily: 'small', supportedFamilies: ['small', 'medium'] },
-  weather: { displayName: 'Weather', category: 'Time & Location', icon: 'cloud-sun', color: '#06b6d4', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
-  sun: { displayName: 'Sun & Moon', category: 'Time & Location', icon: 'sun', color: '#f59e0b', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
-  calendar: { displayName: 'Calendar', category: 'Productivity', icon: 'calendar', color: '#ef4444', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  reminders: { displayName: 'Reminders', category: 'Productivity', icon: 'list-checks', color: '#f97316', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  news: { displayName: 'KC News', category: 'Media', icon: 'newspaper', color: '#a855f7', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  worldNews: { displayName: 'World News', category: 'Media', icon: 'globe', color: '#14b8a6', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  webcams: { displayName: 'Traffic Cams', category: 'Media', icon: 'video', color: '#6b7280', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
-  camera: { displayName: 'Camera', category: 'Media', icon: 'camera', color: '#22c55e', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide', 'extraLarge'] },
-  liveTV: { displayName: 'Live TV', category: 'Media', icon: 'tv', color: '#8b5cf6', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
+  clock: { displayName: 'Clock', category: 'Time & Location', icon: 'clock', color: '#60a5fa', defaultFamily: 'small', supportedFamilies: ['small', 'medium'] },
+  weather: { displayName: 'Weather', category: 'Time & Location', icon: 'cloud-sun', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
+  sun: { displayName: 'Sun & Moon', category: 'Time & Location', icon: 'sun', color: '#fbbf24', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
+  calendar: { displayName: 'Calendar', category: 'Productivity', icon: 'calendar', color: '#f87171', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
+  reminders: { displayName: 'Reminders', category: 'Productivity', icon: 'list-checks', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
+  news: { displayName: 'KC News', category: 'Media', icon: 'newspaper', color: '#3b82f6', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
+  worldNews: { displayName: 'World News', category: 'Media', icon: 'globe', color: '#06b6d4', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
+  webcams: { displayName: 'Traffic Cams', category: 'Media', icon: 'video', color: '#64748b', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
+  camera: { displayName: 'Camera', category: 'Media', icon: 'camera', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide', 'extraLarge'] },
+  liveTV: { displayName: 'Live TV', category: 'Media', icon: 'tv', color: '#3b82f6', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
   sports: { displayName: 'Sports', category: 'Media', icon: 'trophy', color: '#eab308', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
   stocks: { displayName: 'Markets', category: 'Finance', icon: 'trending-up', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
-  crypto: { displayName: 'Crypto', category: 'Finance', icon: 'bitcoin', color: '#f59e0b', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
-  predictionMarkets: { displayName: 'Predictions', category: 'Finance', icon: 'bar-chart-3', color: '#6366f1', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
+  crypto: { displayName: 'Crypto', category: 'Finance', icon: 'bitcoin', color: '#fbbf24', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
+  predictionMarkets: { displayName: 'Predictions', category: 'Finance', icon: 'bar-chart-3', color: '#3b82f6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
   earthquakes: { displayName: 'Earthquakes', category: 'World Monitor', icon: 'activity', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  airTraffic: { displayName: 'Air Traffic', category: 'World Monitor', icon: 'plane', color: '#06b6d4', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
+  airTraffic: { displayName: 'Air Traffic', category: 'World Monitor', icon: 'plane', color: '#38bdf8', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   conflict: { displayName: 'Conflict', category: 'World Monitor', icon: 'alert-triangle', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  faaDelays: { displayName: 'FAA Delays', category: 'World Monitor', icon: 'plane-landing', color: '#f97316', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
-  wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#f97316', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#ec4899', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#22c55e', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  systemStatus: { displayName: 'System', category: 'System', icon: 'cpu', color: '#14b8a6', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
+  faaDelays: { displayName: 'FAA Delays', category: 'World Monitor', icon: 'plane-landing', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
+  wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#fb923c', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
+  health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
+  homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
+  systemStatus: { displayName: 'System', category: 'System', icon: 'cpu', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
 };
 
 export function defaultConfig(type: WidgetType): WidgetConfig {
@@ -242,7 +243,7 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'faaDelays': return { type: 'faaDelays', config: { watchedAirports: ['MCI', 'ORD', 'ATL', 'DFW', 'DEN', 'LAX', 'JFK', 'SFO'] } };
     case 'wildfires': return { type: 'wildfires', config: { region: 'us' } };
     case 'predictionMarkets': return { type: 'predictionMarkets', config: { maxEvents: 8 } };
-    case 'webcams': return { type: 'webcams', config: { cameraIds: [], cameraNames: [], corridorFilter: [], loadAllCameras: false, rotateIntervalSeconds: 15 } };
+    case 'webcams': return { type: 'webcams', config: { cameraIds: [], cameraNames: [], corridorFilter: [], loadAllCameras: false, rotateIntervalSeconds: 15, viewMode: 'single' } };
     case 'camera': return { type: 'camera', config: { url: '', label: 'Camera', isMuted: true } };
     case 'liveTV': return { type: 'liveTV', config: { selectedChannelURL: '', selectedChannelName: '', isMuted: true, showIPTV: false } };
     case 'calendar': return { type: 'calendar', config: {} };

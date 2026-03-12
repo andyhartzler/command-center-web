@@ -21,12 +21,12 @@ interface WorldNewsWidgetProps {
   style: WidgetStyle;
 }
 
-// Category colors - matches Swift: teal=world, blue=us, purple=tech, mint=finance
+// Category colors: teal=world, blue=us, blue=tech, mint=finance
 function categoryColor(cat: string): string {
   switch (cat) {
     case 'world': return 'text-teal-400/80';
     case 'us': return 'text-blue-400/80';
-    case 'tech': return 'text-purple-400/80';
+    case 'tech': return 'text-blue-400/80';
     case 'finance': return 'text-emerald-300/80';
     case 'crisis': return 'text-red-400/80';
     default: return 'text-gray-400/80';

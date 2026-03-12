@@ -228,7 +228,7 @@ export function EOCDisplay() {
     : null;
 
   return (
-    <div className="w-screen h-screen flex flex-col bg-zinc-950 overflow-hidden relative">
+    <div className="w-screen h-screen flex flex-col bg-[#060a14] overflow-hidden relative">
       {/* Critical flash border */}
       {flashBorder && (
         <div className="absolute inset-0 border-[6px] border-red-500 z-50 pointer-events-none animate-pulse" />

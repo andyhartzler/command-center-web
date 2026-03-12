@@ -4,13 +4,14 @@ import {
   Clock, CloudSun, Sun, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
   Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu,
-  PlusCircle, ChevronRight,
+  PlusCircle, ChevronRight, Shield,
 } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import {
   WIDGET_TYPE_META,
   FAMILY_DISPLAY_NAME,
   FAMILY_GRID_SIZE,
+  defaultConfig,
   type WidgetType,
   type WidgetCategory,
   type WidgetFamily,
@@ -68,9 +69,16 @@ interface QuickAdd {
 }
 
 const QUICK_ADDS: QuickAdd[] = [
-  { label: 'KC News', type: 'news', family: 'large', icon: Newspaper, color: '#a855f7' },
-  { label: 'World News', type: 'worldNews', family: 'large', icon: Globe, color: '#14b8a6' },
-  { label: 'Traffic Cams', type: 'webcams', family: 'medium', icon: Video, color: '#6b7280' },
+  { label: 'KC News', type: 'news', family: 'large', icon: Newspaper, color: '#3b82f6' },
+  { label: 'World News', type: 'worldNews', family: 'large', icon: Globe, color: '#06b6d4' },
+  { label: 'Traffic Cams', type: 'webcams', family: 'medium', icon: Video, color: '#64748b' },
+];
+
+// Grand security cameras - matching Swift DashboardEditorView
+const GRAND_CAMERAS: { label: string; url: string }[] = [
+  { label: 'Parking Lot', url: '/api/grand-cameras/1/stream.m3u8' },
+  { label: 'Grand Blvd South', url: '/api/grand-cameras/2/stream.m3u8' },
+  { label: 'Grand Blvd North', url: '/api/grand-cameras/3/stream.m3u8' },
 ];
 
 export function WidgetSidebar() {
@@ -122,6 +130,33 @@ export function WidgetSidebar() {
             </button>
           );
         })}
+      </div>
+
+      <div className="mx-4 border-t border-white/[0.06]" />
+
+      {/* Security Cameras - matching Swift editor sidebar */}
+      <div className="px-2 pb-2 pt-1">
+        <div className="px-3 py-1">
+          <span className="text-[9px] font-bold text-white/20 uppercase" style={{ letterSpacing: '1.5px' }}>
+            Security Cameras
+          </span>
+        </div>
+        {GRAND_CAMERAS.map(cam => (
+          <button
+            key={cam.label}
+            onClick={() => addWidget('camera', 'medium', {
+              type: 'camera',
+              config: { url: cam.url, label: cam.label, isMuted: true },
+            })}
+            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-left hover:bg-white/5 transition-colors group"
+          >
+            <span className="shrink-0 text-emerald-400/70"><Shield size={12} /></span>
+            <span className="text-[12px] font-medium text-white/60 group-hover:text-white/80 transition-colors flex-1">
+              {cam.label}
+            </span>
+            <PlusCircle size={13} className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+          </button>
+        ))}
       </div>
 
       <div className="mx-4 border-t border-white/[0.06]" />

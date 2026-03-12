@@ -24,7 +24,7 @@ interface NewsWidgetProps {
 // Category colors matching Swift exactly
 function categoryColor(cat: string): string {
   switch (cat) {
-    case 'local': return 'text-purple-400/80';
+    case 'local': return 'text-blue-400/80';
     case 'crime': return 'text-red-400/80';
     case 'politics': return 'text-blue-400/80';
     case 'missouri': return 'text-teal-400/80';
