@@ -1,0 +1,409 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #ededed;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* ============================================================
+   Animated background themes
+   Uses multiple layered radial-gradients with shifting positions
+   via CSS custom properties animated by @keyframes.
+   ============================================================ */
+
+.bg-theme-deep-space {
+  background: #0e0e20;
+  position: relative;
+  overflow: hidden;
+}
+.bg-theme-deep-space::before,
+.bg-theme-deep-space::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-theme-deep-space::before {
+  background:
+    radial-gradient(ellipse 60% 50% at 30% 40%, rgba(46, 32, 96, 0.6) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 70% 30%, rgba(30, 24, 64, 0.5) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 45% at 50% 70%, rgba(30, 58, 138, 0.4) 0%, transparent 60%);
+  animation: bgDrift1 24s ease-in-out infinite alternate;
+}
+.bg-theme-deep-space::after {
+  background:
+    radial-gradient(ellipse 45% 55% at 60% 55%, rgba(88, 28, 135, 0.25) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 25% 65%, rgba(42, 32, 80, 0.35) 0%, transparent 60%);
+  animation: bgDrift2 30s ease-in-out infinite alternate;
+}
+
+.bg-theme-midnight {
+  background: #06060e;
+  position: relative;
+  overflow: hidden;
+}
+.bg-theme-midnight::before,
+.bg-theme-midnight::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-theme-midnight::before {
+  background:
+    radial-gradient(ellipse 50% 50% at 35% 45%, rgba(18, 18, 32, 0.8) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 50% at 70% 60%, rgba(14, 14, 26, 0.7) 0%, transparent 65%);
+  animation: bgDrift1 28s ease-in-out infinite alternate;
+}
+.bg-theme-midnight::after {
+  background:
+    radial-gradient(ellipse 40% 50% at 50% 30%, rgba(16, 16, 28, 0.6) 0%, transparent 60%);
+  animation: bgDrift2 34s ease-in-out infinite alternate;
+}
+
+.bg-theme-aurora {
+  background: #040e0c;
+  position: relative;
+  overflow: hidden;
+}
+.bg-theme-aurora::before,
+.bg-theme-aurora::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-theme-aurora::before {
+  background:
+    radial-gradient(ellipse 60% 50% at 25% 35%, rgba(16, 185, 129, 0.25) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 55% at 75% 55%, rgba(20, 56, 48, 0.5) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 50% 75%, rgba(16, 48, 40, 0.4) 0%, transparent 60%);
+  animation: bgDrift1 22s ease-in-out infinite alternate;
+}
+.bg-theme-aurora::after {
+  background:
+    radial-gradient(ellipse 45% 50% at 60% 40%, rgba(14, 40, 36, 0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 30% 60%, rgba(18, 48, 44, 0.3) 0%, transparent 60%);
+  animation: bgDrift2 28s ease-in-out infinite alternate;
+}
+
+.bg-theme-ember {
+  background: #0e0404;
+  position: relative;
+  overflow: hidden;
+}
+.bg-theme-ember::before,
+.bg-theme-ember::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-theme-ember::before {
+  background:
+    radial-gradient(ellipse 55% 50% at 35% 50%, rgba(48, 20, 20, 0.7) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 50% at 70% 35%, rgba(40, 16, 16, 0.6) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 45% at 50% 75%, rgba(34, 14, 18, 0.5) 0%, transparent 60%);
+  animation: bgDrift1 30s ease-in-out infinite alternate;
+}
+.bg-theme-ember::after {
+  background:
+    radial-gradient(ellipse 45% 50% at 55% 50%, rgba(42, 18, 20, 0.3) 0%, transparent 60%);
+  animation: bgDrift2 36s ease-in-out infinite alternate;
+}
+
+.bg-theme-ocean {
+  background: #040a14;
+  position: relative;
+  overflow: hidden;
+}
+.bg-theme-ocean::before,
+.bg-theme-ocean::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-theme-ocean::before {
+  background:
+    radial-gradient(ellipse 55% 50% at 25% 55%, rgba(14, 40, 64, 0.6) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 55% at 75% 35%, rgba(16, 32, 56, 0.5) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 45% at 50% 80%, rgba(10, 24, 36, 0.5) 0%, transparent 60%);
+  animation: bgDrift1 26s ease-in-out infinite alternate;
+}
+.bg-theme-ocean::after {
+  background:
+    radial-gradient(ellipse 45% 55% at 60% 50%, rgba(18, 40, 60, 0.3) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 30% 70%, rgba(10, 30, 50, 0.35) 0%, transparent 60%);
+  animation: bgDrift2 32s ease-in-out infinite alternate;
+}
+
+.bg-theme-slate {
+  background: #0c0c0e;
+  position: relative;
+  overflow: hidden;
+}
+.bg-theme-slate::before,
+.bg-theme-slate::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-theme-slate::before {
+  background:
+    radial-gradient(ellipse 50% 50% at 40% 40%, rgba(34, 34, 36, 0.6) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 50% at 65% 65%, rgba(30, 30, 32, 0.5) 0%, transparent 60%);
+  animation: bgDrift1 35s ease-in-out infinite alternate;
+}
+.bg-theme-slate::after {
+  background:
+    radial-gradient(ellipse 45% 45% at 55% 45%, rgba(32, 32, 34, 0.3) 0%, transparent 55%);
+  animation: bgDrift2 40s ease-in-out infinite alternate;
+}
+
+/* Two independent drift animations that combine for organic movement */
+@keyframes bgDrift1 {
+  0%   { transform: translate(0%, 0%) rotate(0deg); }
+  25%  { transform: translate(3%, -2%) rotate(0.5deg); }
+  50%  { transform: translate(-2%, 3%) rotate(-0.3deg); }
+  75%  { transform: translate(4%, 1%) rotate(0.2deg); }
+  100% { transform: translate(-1%, -3%) rotate(-0.5deg); }
+}
+
+@keyframes bgDrift2 {
+  0%   { transform: translate(0%, 0%) rotate(0deg); }
+  33%  { transform: translate(-3%, 2%) rotate(-0.4deg); }
+  66%  { transform: translate(2%, -2%) rotate(0.3deg); }
+  100% { transform: translate(-2%, 3%) rotate(-0.2deg); }
+}
+
+/* ============================================================
+   Widget glass container (matches Swift WidgetContainerView)
+   ============================================================ */
+.widget-glass {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.015) 50%,
+    transparent 100%
+  );
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 0.5px solid transparent;
+  border-image: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.15),
+    rgba(255, 255, 255, 0.05) 40%,
+    transparent 60%,
+    rgba(255, 255, 255, 0.03)
+  ) 1;
+  border-radius: 24px;
+  overflow: hidden;
+  /* Double shadow: colored glow + dark depth */
+  box-shadow:
+    0 8px 20px -4px var(--widget-glow, rgba(120, 120, 255, 0.08)),
+    0 6px 16px -2px rgba(0, 0, 0, 0.4);
+}
+/* Re-apply border-radius since border-image breaks it. Use outline + pseudo instead. */
+.widget-glass {
+  border: none;
+}
+.widget-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 0.5px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.15),
+    rgba(255, 255, 255, 0.05) 40%,
+    transparent 60%,
+    rgba(255, 255, 255, 0.03)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.widget-glass-map {
+  position: relative;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 4px 12px -2px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(0, 0, 0, 0.2);
+}
+.widget-glass-map::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.5),
+    rgba(0, 0, 0, 0.3)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ============================================================
+   Widget grid -- absolute positioning like Swift ZStack+offset
+   ============================================================ */
+.widget-grid {
+  position: absolute;
+  inset: 0;
+  padding: 16px;
+  z-index: 1;
+}
+
+/* ============================================================
+   Display toolbar
+   ============================================================ */
+.display-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out;
+}
+.display-toolbar-zone:hover + .display-toolbar,
+.display-toolbar:hover {
+  opacity: 1;
+}
+.display-toolbar-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  z-index: 51;
+}
+
+/* ============================================================
+   Page indicator pill
+   ============================================================ */
+.page-indicator {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 9999px;
+}
+
+/* ============================================================
+   EOC flash animation
+   ============================================================ */
+@keyframes eocFlash {
+  0%, 100% { border-color: transparent; }
+  50% { border-color: rgba(239, 68, 68, 0.6); }
+}
+
+.eoc-flash {
+  animation: eocFlash 0.5s ease-in-out 3;
+}
+
+/* ============================================================
+   Hide scrollbar utility (for scrollable widget content)
+   ============================================================ */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   Scrollbar styling
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================
+   Leaflet dark mode overrides
+   ============================================================ */
+.leaflet-container {
+  background: #0a0a0a !important;
+}
+
+.leaflet-control-attribution {
+  display: none !important;
+}
+
+/* ============================================================
+   Ticker animation
+   ============================================================ */
+@keyframes ticker {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-ticker {
+  animation: ticker 30s linear infinite;
+}
