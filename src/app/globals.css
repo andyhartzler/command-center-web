@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+/* MapLibre popup overrides for global view */
+.global-map-popup .maplibregl-popup-content {
+  background: rgba(10, 14, 26, 0.9) !important;
+  border: 1px solid rgba(34, 211, 238, 0.2) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+.global-map-popup .maplibregl-popup-close-button {
+  color: rgba(255, 255, 255, 0.4) !important;
+  font-size: 16px !important;
+  right: 4px !important;
+  top: 2px !important;
+}
+.global-map-popup .maplibregl-popup-close-button:hover {
+  color: rgba(255, 255, 255, 0.8) !important;
+  background: transparent !important;
+}
+.global-map-popup .maplibregl-popup-tip {
+  border-top-color: rgba(10, 14, 26, 0.9) !important;
+}
+.maplibregl-ctrl-attrib { display: none !important; }
+
+/* Custom scrollbar for panels */
+.styled-scrollbar::-webkit-scrollbar { width: 4px; }
+.styled-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.styled-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+.styled-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
 :root {
   --background: #0c1524;
   --foreground: #e2e8f0;

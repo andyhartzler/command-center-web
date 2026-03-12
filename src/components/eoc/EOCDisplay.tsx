@@ -9,6 +9,7 @@ import { EOCMap } from './EOCMap';
 import { EOCStatsPanel } from './EOCStatsPanel';
 import { EOCIncidentDetail } from './EOCIncidentDetail';
 import { EOCTicker } from './EOCTicker';
+import { GlobalView } from './global/GlobalView';
 
 const SCOPE_LABELS: Record<EOCScope, string> = {
   kc: 'KC',
@@ -226,6 +227,11 @@ export function EOCDisplay() {
   const selectedIncident = selectedId
     ? incidents.find(i => i.id === selectedId) || null
     : null;
+
+  // Global scope renders a completely different view
+  if (eocScope === 'global') {
+    return <GlobalView />;
+  }
 
   return (
     <div className="w-screen h-screen flex flex-col bg-[#0f172a] overflow-hidden relative">
