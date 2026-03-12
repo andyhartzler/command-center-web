@@ -28,6 +28,13 @@ export function ClockWidget({ config }: Props) {
     timeZone: tz,
   }).format(time);
 
+  const seconds = config.showSeconds
+    ? new Intl.DateTimeFormat('en-US', {
+        second: '2-digit',
+        timeZone: tz,
+      }).format(time)
+    : '';
+
   const period = config.is24Hour
     ? ''
     : new Intl.DateTimeFormat('en-US', {
@@ -76,6 +83,22 @@ export function ClockWidget({ config }: Props) {
         >
           {minutes}
         </span>
+        {seconds && (
+          <>
+            <span
+              className="font-extralight text-white/30"
+              style={{ fontSize: '40px', lineHeight: 1, position: 'relative', top: '-2px' }}
+            >
+              :
+            </span>
+            <span
+              className="font-extralight text-white/60 tabular-nums"
+              style={{ fontSize: '40px', lineHeight: 1, fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            >
+              {seconds}
+            </span>
+          </>
+        )}
         {period && (
           <span
             className="font-medium text-white/25 ml-1.5"

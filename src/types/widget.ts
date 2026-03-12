@@ -56,6 +56,7 @@ export interface ClockConfig {
   timezone: string;
   label: string;
   is24Hour: boolean;
+  showSeconds: boolean;
 }
 
 export interface WeatherConfig {
@@ -203,33 +204,33 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   defaultFamily: WidgetFamily;
   supportedFamilies: WidgetFamily[];
 }> = {
-  clock: { displayName: 'Clock', category: 'Time & Location', icon: 'clock', color: '#60a5fa', defaultFamily: 'small', supportedFamilies: ['small', 'medium'] },
-  weather: { displayName: 'Weather', category: 'Time & Location', icon: 'cloud-sun', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
+  clock: { displayName: 'Clock', category: 'Time & Location', icon: 'clock', color: '#60a5fa', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'large'] },
+  weather: { displayName: 'Weather', category: 'Time & Location', icon: 'cloud-sun', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide'] },
   sun: { displayName: 'Sun & Moon', category: 'Time & Location', icon: 'sun', color: '#fbbf24', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
   calendar: { displayName: 'Calendar', category: 'Productivity', icon: 'calendar', color: '#f87171', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
   reminders: { displayName: 'Reminders', category: 'Productivity', icon: 'list-checks', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  news: { displayName: 'KC News', category: 'Media', icon: 'newspaper', color: '#3b82f6', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  worldNews: { displayName: 'World News', category: 'Media', icon: 'globe', color: '#06b6d4', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  webcams: { displayName: 'Traffic Cams', category: 'Media', icon: 'video', color: '#64748b', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
-  camera: { displayName: 'Camera', category: 'Media', icon: 'camera', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide', 'extraLarge'] },
+  news: { displayName: 'KC News', category: 'Media', icon: 'newspaper', color: '#3b82f6', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
+  worldNews: { displayName: 'World News', category: 'Media', icon: 'globe', color: '#06b6d4', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide'] },
+  webcams: { displayName: 'Traffic Cams', category: 'Media', icon: 'video', color: '#64748b', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'extraLarge'] },
+  camera: { displayName: 'Camera', category: 'Media', icon: 'camera', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
   liveTV: { displayName: 'Live TV', category: 'Media', icon: 'tv', color: '#3b82f6', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
-  sports: { displayName: 'Sports', category: 'Media', icon: 'trophy', color: '#eab308', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
+  sports: { displayName: 'Sports', category: 'Media', icon: 'trophy', color: '#eab308', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   stocks: { displayName: 'Markets', category: 'Finance', icon: 'trending-up', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
-  crypto: { displayName: 'Crypto', category: 'Finance', icon: 'bitcoin', color: '#fbbf24', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
+  crypto: { displayName: 'Crypto', category: 'Finance', icon: 'bitcoin', color: '#fbbf24', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
   predictionMarkets: { displayName: 'Predictions', category: 'Finance', icon: 'bar-chart-3', color: '#3b82f6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
   earthquakes: { displayName: 'Earthquakes', category: 'World Monitor', icon: 'activity', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   airTraffic: { displayName: 'Air Traffic', category: 'World Monitor', icon: 'plane', color: '#38bdf8', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   conflict: { displayName: 'Conflict', category: 'World Monitor', icon: 'alert-triangle', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  faaDelays: { displayName: 'FAA Delays', category: 'World Monitor', icon: 'plane-landing', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
+  faaDelays: { displayName: 'FAA Delays', category: 'World Monitor', icon: 'plane-landing', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#fb923c', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
+  health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  systemStatus: { displayName: 'System', category: 'System', icon: 'cpu', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
+  systemStatus: { displayName: 'System', category: 'System', icon: 'cpu', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
 };
 
 export function defaultConfig(type: WidgetType): WidgetConfig {
   switch (type) {
-    case 'clock': return { type: 'clock', config: { timezone: 'America/Chicago', label: 'Kansas City', is24Hour: false } };
+    case 'clock': return { type: 'clock', config: { timezone: 'America/Chicago', label: 'Kansas City', is24Hour: false, showSeconds: false } };
     case 'weather': return { type: 'weather', config: { latitude: 39.0997, longitude: -94.5786, locationName: 'Kansas City', units: 'fahrenheit' } };
     case 'news': return { type: 'news', config: { maxItems: 15, categories: ['local'] } };
     case 'worldNews': return { type: 'worldNews', config: { maxItems: 15, categories: ['world', 'us', 'tech', 'finance'] } };

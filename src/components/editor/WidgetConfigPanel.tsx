@@ -360,6 +360,11 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
               value={(cfg.is24Hour as boolean) || false}
               onChange={v => updateConfig({ is24Hour: v })}
             />
+            <ToggleRow
+              label="Show Seconds"
+              value={(cfg.showSeconds as boolean) || false}
+              onChange={v => updateConfig({ showSeconds: v })}
+            />
           </div>
         </ConfigSection>
       );
