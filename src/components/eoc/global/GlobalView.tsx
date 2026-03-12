@@ -8,6 +8,8 @@ import type { EOCScope } from '@/types/dashboard';
 import { GlobalLayerPanel, DEFAULT_LAYERS } from './GlobalLayerPanel';
 import type { ActiveLayers } from './GlobalLayerPanel';
 import { GlobalNewsFeed } from './GlobalNewsFeed';
+import { GlobalLocateBar } from './GlobalLocateBar';
+import { GlobalMarketsTicker } from './GlobalMarketsTicker';
 
 // Dynamic import to avoid SSR issues with MapLibre
 const GlobalMap = dynamic(() => import('./GlobalMap').then(m => ({ default: m.GlobalMap })), {
@@ -240,6 +242,11 @@ export function GlobalView() {
           <GlobalNewsFeed news={news} onFlyTo={handleNewsFlyTo} />
         </div>
 
+        {/* Top center: Locate bar */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+          <GlobalLocateBar onFlyTo={(lat, lng) => handleNewsFlyTo(lat, lng)} />
+        </div>
+
         {/* Space weather badge (top right corner) */}
         {spaceWeather?.scales && (
           <div className="absolute top-4 right-[320px] z-10 pointer-events-auto mr-4">
@@ -277,8 +284,8 @@ export function GlobalView() {
           </div>
         )}
 
-        {/* Bottom status bar */}
-        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/60 to-transparent flex items-end justify-center pb-1 pointer-events-none z-10">
+        {/* Bottom bar: status + markets ticker */}
+        <div className="absolute bottom-0 left-0 right-0 h-9 bg-gradient-to-t from-black/70 to-transparent flex items-end justify-between px-4 pb-1.5 pointer-events-none z-10">
           <div className="flex items-center gap-4 text-[9px] font-mono text-white/25">
             <span className="text-cyan-500/50">REC</span>
             <span className="text-white/40">{utcTime} UTC</span>
@@ -289,6 +296,7 @@ export function GlobalView() {
             <span>·</span>
             <span>MIL: {flights?.military?.length || 0} · CIV: {(flights?.commercial?.length || 0) + (flights?.private?.length || 0)}</span>
           </div>
+          <GlobalMarketsTicker />
         </div>
       </div>
     </div>
