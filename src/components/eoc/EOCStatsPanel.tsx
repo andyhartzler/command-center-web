@@ -17,7 +17,6 @@ interface EOCStatsPanelProps {
   onToggleTranscripts: () => void;
   selectedFeedFilter: string | null;
   onFeedFilterChange: (id: string | null) => void;
-  serverURL: string;
 }
 
 const TIME_FILTERS: TimeFilter[] = ['1H', '6H', '24H', '7D', 'ALL'];
@@ -79,7 +78,6 @@ export function EOCStatsPanel({
   onToggleTranscripts,
   selectedFeedFilter,
   onFeedFilterChange,
-  serverURL,
 }: EOCStatsPanelProps) {
   const [playingFeeds, setPlayingFeeds] = useState<Record<string, boolean>>({});
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});

@@ -2,9 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ShieldAlert, Wifi, WifiOff, Monitor } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import type { EOCIncident, EOCWSMessage, ScannerFeed, ScannerTranscript } from '@/types/eoc';
-import { DEFAULT_EOC_SERVER_URL } from '@/types/eoc';
+import type { EOCIncident, ScannerFeed, ScannerTranscript } from '@/types/eoc';
 import type { EOCScope } from '@/types/dashboard';
 import { EOCIncidentFeed } from './EOCIncidentFeed';
 import { EOCMap } from './EOCMap';
@@ -28,6 +26,10 @@ const TIME_FILTER_INTERVALS: Record<TimeFilter, number | null> = {
   ALL: null,
 };
 
+/** Polling intervals (ms) */
+const INCIDENTS_POLL_MS = 5_000;
+const TRANSCRIPTS_POLL_MS = 10_000;
+
 function isKansasCity(incident: EOCIncident): boolean {
   const address = incident.address?.toLowerCase();
   if (!address) return false;
@@ -37,8 +39,7 @@ function isKansasCity(incident: EOCIncident): boolean {
 }
 
 export function EOCDisplay() {
-  const { eocServerURL, eocScope, setEocScope, setAppMode } = useAppState();
-  const serverURL = eocServerURL || DEFAULT_EOC_SERVER_URL;
+  const { eocScope, setEocScope, setAppMode } = useAppState();
 
   const [incidents, setIncidents] = useState<EOCIncident[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export function EOCDisplay() {
   const [flashBorder, setFlashBorder] = useState(false);
   const [flyToCoord, setFlyToCoord] = useState<{ lat: number; lng: number } | null>(null);
   const [isMapZoomed, setIsMapZoomed] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   const prevFirstIdRef = useRef<string | null>(null);
 
@@ -66,103 +68,58 @@ export function EOCDisplay() {
   })();
   const activeIncidents = filteredIncidents.filter(i => !i.resolved_at);
 
-  // Load initial data from REST API
-  useEffect(() => {
-    if (!serverURL) return;
-
-    // Load incidents
-    fetch(`${serverURL}/api/incidents?active=true&limit=200`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.incidents) setIncidents(data.incidents);
-      })
-      .catch(() => {});
-
-    // Load scanner feeds
-    fetch(`${serverURL}/api/scanner/feeds`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.feeds) setScannerFeeds(data.feeds);
-      })
-      .catch(() => {});
-
-    // Load recent transcripts
-    fetch(`${serverURL}/api/scanner/transcripts?limit=30`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.transcripts) setTranscripts(data.transcripts);
-      })
-      .catch(() => {});
-  }, [serverURL]);
-
-  // Handle WebSocket messages
-  const handleWSMessage = useCallback((data: unknown) => {
-    const msg = data as EOCWSMessage;
-    if (!msg || !msg.type) return;
-
-    switch (msg.type) {
-      case 'incident':
-      case 'new_incident':
-        if (msg.data && 'title' in msg.data) {
-          const incident = msg.data as EOCIncident;
-          setIncidents(prev => {
-            const filtered = prev.filter(i => i.id !== incident.id);
-            const next = [incident, ...filtered];
-            return next.length > 500 ? next.slice(0, 500) : next;
-          });
-        }
-        break;
-      case 'update_incident':
-        if (msg.data && 'title' in msg.data) {
-          const incident = msg.data as EOCIncident;
-          setIncidents(prev =>
-            prev.map(i => (i.id === incident.id ? incident : i))
-          );
-        }
-        break;
-      case 'resolve_incident':
-      case 'remove_incident':
-        if (msg.id) {
-          setIncidents(prev => prev.filter(i => i.id !== msg.id));
-          setSelectedId(prev => (prev === msg.id ? null : prev));
-        }
-        break;
-      case 'scanner_transcript':
-        if (msg.data && 'transcript' in msg.data) {
-          const transcript = msg.data as ScannerTranscript;
-          setTranscripts(prev => {
-            const next = [transcript, ...prev];
-            return next.length > 200 ? next.slice(0, 200) : next;
-          });
-          // Update feed activity
-          setScannerFeeds(prev =>
-            prev.map(f =>
-              f.feed_id === transcript.feed_id
-                ? { ...f, is_active: true, transcript_count: f.transcript_count + 1, last_transcript_at: transcript.created_at }
-                : f
-            )
-          );
-        }
-        break;
-      case 'bulk_incidents':
-        if (Array.isArray(msg.data)) {
-          setIncidents(msg.data as unknown as EOCIncident[]);
-        }
-        break;
-      case 'pong':
-        break;
+  // --- Fetch helpers that go through the local Next.js API proxy ---
+  const fetchIncidents = useCallback(async () => {
+    try {
+      const res = await fetch('/api/eoc/incidents?active=true&limit=200');
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      if (data.incidents) setIncidents(data.incidents);
+      setIsConnected(true);
+    } catch {
+      setIsConnected(false);
     }
   }, []);
 
-  // Build WebSocket URL matching Swift: replace http->ws, https->wss, append /ws/incidents
-  const wsUrl = serverURL
-    ? serverURL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/incidents'
-    : null;
+  const fetchFeeds = useCallback(async () => {
+    try {
+      const res = await fetch('/api/eoc/scanner/feeds');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.feeds) setScannerFeeds(data.feeds);
+    } catch { /* ignore */ }
+  }, []);
 
-  const { isConnected } = useWebSocket({
-    url: wsUrl,
-    onMessage: handleWSMessage,
-  });
+  const fetchTranscripts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/eoc/scanner/transcripts?limit=30');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.transcripts) setTranscripts(data.transcripts);
+    } catch { /* ignore */ }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchIncidents();
+    fetchFeeds();
+    fetchTranscripts();
+  }, [fetchIncidents, fetchFeeds, fetchTranscripts]);
+
+  // Poll incidents every 5 seconds
+  useEffect(() => {
+    const id = setInterval(fetchIncidents, INCIDENTS_POLL_MS);
+    return () => clearInterval(id);
+  }, [fetchIncidents]);
+
+  // Poll transcripts every 10 seconds
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchTranscripts();
+      fetchFeeds();
+    }, TRANSCRIPTS_POLL_MS);
+    return () => clearInterval(id);
+  }, [fetchTranscripts, fetchFeeds]);
 
   // Handle new critical/major incidents (toast + flash)
   useEffect(() => {
@@ -204,24 +161,23 @@ export function EOCDisplay() {
       setIsMapZoomed(true);
       setTimeout(() => setFlyToCoord(null), 1500);
 
-      // Try to fetch full detail from API
-      if (serverURL) {
-        fetch(`${serverURL}/api/incidents/${id}`)
-          .then(res => res.json())
-          .then(full => {
+      // Fetch full detail through proxy
+      fetch(`/api/eoc/incidents/${encodeURIComponent(id)}`)
+        .then(res => res.json())
+        .then(full => {
+          if (full && !full.error) {
             setDetailIncident(full);
-            setShowDetail(true);
-          })
-          .catch(() => {
+          } else {
             setDetailIncident(incident);
-            setShowDetail(true);
-          });
-      } else {
-        setDetailIncident(incident);
-        setShowDetail(true);
-      }
+          }
+          setShowDetail(true);
+        })
+        .catch(() => {
+          setDetailIncident(incident);
+          setShowDetail(true);
+        });
     }
-  }, [incidents, serverURL]);
+  }, [incidents]);
 
   const handleDismissDetail = useCallback(() => {
     setShowDetail(false);
@@ -344,9 +300,7 @@ export function EOCDisplay() {
           ) : (
             <div className="flex items-center gap-1.5">
               <WifiOff size={12} className="text-white/25" />
-              <span className="text-[10px] text-white/25">
-                {serverURL ? 'Connecting...' : 'Disconnected'}
-              </span>
+              <span className="text-[10px] text-white/25">Connecting...</span>
             </div>
           )}
         </div>
@@ -391,7 +345,6 @@ export function EOCDisplay() {
           {showDetail && detailIncident ? (
             <EOCIncidentDetail
               incident={detailIncident}
-              serverURL={serverURL}
               onDismiss={handleDismissDetail}
             />
           ) : (
@@ -407,7 +360,6 @@ export function EOCDisplay() {
               onToggleTranscripts={() => setShowTranscripts(v => !v)}
               selectedFeedFilter={selectedFeedFilter}
               onFeedFilterChange={setSelectedFeedFilter}
-              serverURL={serverURL}
             />
           )}
         </div>

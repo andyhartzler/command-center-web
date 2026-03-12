@@ -4,7 +4,6 @@ import type { EOCIncident, EOCUpdate, EOCRadioClip, EOCLiveStream } from '@/type
 
 interface EOCIncidentDetailProps {
   incident: EOCIncident;
-  serverURL: string;
   onDismiss: () => void;
 }
 
@@ -59,7 +58,7 @@ function getHlsUrl(stream: EOCLiveStream): string | null {
   return `https://stream.mux.com/${muxId}.m3u8`;
 }
 
-export function EOCIncidentDetail({ incident, serverURL, onDismiss }: EOCIncidentDetailProps) {
+export function EOCIncidentDetail({ incident, onDismiss }: EOCIncidentDetailProps) {
   const [tab, setTab] = useState<DetailTab>('overview');
 
   const rawData = incident.raw_data;
