@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import {
-  Clock, CloudSun, Sun, Calendar, ListChecks, Newspaper, Globe,
+  Clock, CloudSun, Sun, Moon, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
   Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu,
   PlusCircle, ChevronRight, Shield, MapPin,
@@ -21,6 +21,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   clock: Clock,
   'cloud-sun': CloudSun,
   sun: Sun,
+  moon: Moon,
   calendar: Calendar,
   'list-checks': ListChecks,
   newspaper: Newspaper,

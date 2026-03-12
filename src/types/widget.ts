@@ -30,6 +30,7 @@ export type WidgetType =
   | 'conflict'
   | 'faaDelays'
   | 'wildfires'
+  | 'moonPhase'
   | 'health'
   | 'homeKit';
 
@@ -122,6 +123,11 @@ export interface PredictionMarketsConfig {
   maxEvents: number;
 }
 
+export interface MoonPhaseConfig {
+  latitude: number;
+  longitude: number;
+}
+
 export interface WebcamConfig {
   cameraIds: string[];
   cameraNames: string[];
@@ -162,6 +168,7 @@ export type WidgetConfig =
   | { type: 'webcams'; config: WebcamConfig }
   | { type: 'camera'; config: CameraConfig }
   | { type: 'liveTV'; config: LiveTVConfig }
+  | { type: 'moonPhase'; config: MoonPhaseConfig }
   | { type: 'calendar'; config: Record<string, never> }
   | { type: 'reminders'; config: Record<string, never> }
   | { type: 'health'; config: Record<string, never> }
@@ -219,6 +226,7 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   earthquakes: { displayName: 'Earthquakes', category: 'World Monitor', icon: 'activity', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   airTraffic: { displayName: 'Air Traffic', category: 'World Monitor', icon: 'plane', color: '#38bdf8', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   conflict: { displayName: 'Conflict', category: 'World Monitor', icon: 'alert-triangle', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
+  moonPhase: { displayName: 'Moon Phase', category: 'Time & Location', icon: 'moon', color: '#94a3b8', defaultFamily: 'small', supportedFamilies: ['small'] },
   faaDelays: { displayName: 'FAA Delays', category: 'World Monitor', icon: 'plane-landing', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#fb923c', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
@@ -241,6 +249,7 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'faaDelays': return { type: 'faaDelays', config: { watchedAirports: ['MCI', 'ORD', 'ATL', 'DFW', 'DEN', 'LAX', 'JFK', 'SFO'] } };
     case 'wildfires': return { type: 'wildfires', config: { region: 'us' } };
     case 'predictionMarkets': return { type: 'predictionMarkets', config: { maxEvents: 8 } };
+    case 'moonPhase': return { type: 'moonPhase', config: { latitude: 39.0997, longitude: -94.5786 } };
     case 'webcams': return { type: 'webcams', config: { cameraIds: [], cameraNames: [], corridorFilter: [], loadAllCameras: false, rotateIntervalSeconds: 15, viewMode: 'single' } };
     case 'camera': return { type: 'camera', config: { url: '', label: 'Camera', isMuted: true } };
     case 'liveTV': return { type: 'liveTV', config: { selectedChannelURL: '', selectedChannelName: '', isMuted: true, showIPTV: false } };
