@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// In-memory cache for resolved URLs
+const urlCache: Record<string, { url: string; ts: number }> = {};
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+// Known stable channel IDs (hardcoded fallbacks)
+const KMBC_CHANNEL_ID = '47d92d1bd8e44e2383563530c2a305fd';
+
 // Resolve dynamic channel URLs server-side (CORS-safe)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -9,57 +16,88 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing channel param' }, { status: 400 });
   }
 
+  // Return cached URL if fresh
+  const cached = urlCache[channel];
+  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    return NextResponse.json({ url: cached.url, cached: true });
+  }
+
   try {
+    let result: { url: string } | null = null;
+
     switch (channel) {
       case 'kmbc':
-        return await resolveKMBC();
+        result = await resolveKMBC();
+        break;
       case 'wdaf':
-        return await resolveWDAF();
+        result = await resolveWDAF();
+        break;
       default:
         return NextResponse.json({ error: `Unknown channel: ${channel}` }, { status: 400 });
     }
+
+    if (result) {
+      urlCache[channel] = { url: result.url, ts: Date.now() };
+      return NextResponse.json(result);
+    }
+
+    // Return stale cache if resolution failed
+    if (cached) {
+      return NextResponse.json({ url: cached.url, cached: true, stale: true });
+    }
+
+    return NextResponse.json({ error: 'Failed to resolve channel URL' }, { status: 502 });
   } catch (error) {
     console.error(`[LiveTV] resolve error for ${channel}:`, error);
+    // Return stale cache on error
+    if (cached) {
+      return NextResponse.json({ url: cached.url, cached: true, stale: true });
+    }
     return NextResponse.json({ error: 'Failed to resolve channel URL' }, { status: 502 });
   }
 }
 
 // KMBC 9 (ABC) - Scrape Uplynk URL from kmbc.com/nowcast
-// Matches Swift: URLResolver.kmbcNowcast
-async function resolveKMBC(): Promise<NextResponse> {
-  const res = await fetch('https://www.kmbc.com/nowcast', {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-    },
-  });
+// Prefers stable channel URL over expiring ext URL
+async function resolveKMBC(): Promise<{ url: string } | null> {
+  try {
+    const res = await fetch('https://www.kmbc.com/nowcast', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
+    });
 
-  if (!res.ok) {
-    return NextResponse.json({ error: `KMBC page returned ${res.status}` }, { status: 502 });
+    if (!res.ok) {
+      // Fall back to known channel ID
+      return { url: `https://content.uplynk.com/channel/${KMBC_CHANNEL_ID}.m3u8` };
+    }
+
+    const html = await res.text();
+
+    // Prefer channel URL (stable, doesn't expire) over ext URL (has timestamps)
+    const channelPattern = /https:\/\/content\.uplynk\.com\/channel\/[^"'\s]+\.m3u8/;
+    const extPattern = /https:\/\/content\.uplynk\.com\/ext\/[^"'\s]+\.m3u8[^"'\s]*/;
+
+    const channelMatch = html.match(channelPattern);
+    if (channelMatch) {
+      return { url: channelMatch[0].replace(/&amp;/g, '&') };
+    }
+
+    const extMatch = html.match(extPattern);
+    if (extMatch) {
+      return { url: extMatch[0].replace(/&amp;/g, '&') };
+    }
+  } catch (err) {
+    console.error('[LiveTV] KMBC scrape error', err);
   }
 
-  const html = await res.text();
-
-  // Try ext URL first (higher quality), then channel URL
-  // Matches Swift regex patterns
-  const extPattern = /https:\/\/content\.uplynk\.com\/ext\/[^"'\s]+\.m3u8[^"'\s]*/;
-  const channelPattern = /https:\/\/content\.uplynk\.com\/channel\/[^"'\s]+\.m3u8[^"'\s]*/;
-
-  const extMatch = html.match(extPattern);
-  if (extMatch) {
-    return NextResponse.json({ url: extMatch[0] });
-  }
-
-  const channelMatch = html.match(channelPattern);
-  if (channelMatch) {
-    return NextResponse.json({ url: channelMatch[0] });
-  }
-
-  return NextResponse.json({ error: 'Could not find KMBC stream URL' }, { status: 502 });
+  // Ultimate fallback: hardcoded stable channel URL
+  return { url: `https://content.uplynk.com/channel/${KMBC_CHANNEL_ID}.m3u8` };
 }
 
 // WDAF FOX 4 - Lura/Anvato API resolver
 // Matches Swift: URLResolver.luraAnvato(videoId:anvack:)
-async function resolveWDAF(): Promise<NextResponse> {
+async function resolveWDAF(): Promise<{ url: string } | null> {
   const videoId = 'adstPZWVgQ5zgzX5';
   const anvack = '70X35QbVjgovptmVD0HwZI0w9lNQk2R1';
 
@@ -71,9 +109,7 @@ async function resolveWDAF(): Promise<NextResponse> {
     },
   });
 
-  if (!res.ok) {
-    return NextResponse.json({ error: `Lura API returned ${res.status}` }, { status: 502 });
-  }
+  if (!res.ok) return null;
 
   const text = await res.text();
 
@@ -87,11 +123,10 @@ async function resolveWDAF(): Promise<NextResponse> {
   const data = JSON.parse(jsonStr);
 
   // Find m3u8-variant format in the published_urls array
-  // Matches Swift: look for format "m3u8-variant"
   const publishedUrls = data.published_urls || [];
   for (const pub of publishedUrls) {
     if (pub.format === 'm3u8-variant' && pub.embed_url) {
-      return NextResponse.json({ url: pub.embed_url });
+      return { url: pub.embed_url };
     }
   }
 
@@ -99,9 +134,9 @@ async function resolveWDAF(): Promise<NextResponse> {
   for (const pub of publishedUrls) {
     const url = pub.embed_url || pub.url || '';
     if (url.includes('.m3u8')) {
-      return NextResponse.json({ url });
+      return { url };
     }
   }
 
-  return NextResponse.json({ error: 'Could not find WDAF stream URL' }, { status: 502 });
+  return null;
 }

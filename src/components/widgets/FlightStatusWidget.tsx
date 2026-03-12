@@ -27,7 +27,7 @@ const AIRLINE_COLORS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  scheduled: { bg: 'bg-blue-500/20', text: 'text-blue-400', label: 'Scheduled' },
+  scheduled: { bg: 'bg-[#6b8aab]/20', text: 'text-[#6b8aab]', label: 'Scheduled' },
   en_route: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', label: 'En Route' },
   landed: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Landed' },
   delayed: { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Delayed' },
@@ -92,7 +92,7 @@ export function FlightStatusWidget({ config }: FlightStatusWidgetProps) {
   }, [fetchFlights]);
 
   return (
-    <div className="w-full h-full flex flex-col bg-gradient-to-br from-[#0c1220] to-[#101828] rounded-2xl overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-[#1a1a1c] rounded-2xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5 shrink-0">
         <div className="flex items-center gap-2">

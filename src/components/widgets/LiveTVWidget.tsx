@@ -212,6 +212,18 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.muted = isMuted;
         video.play().catch(() => {});
+        // Disable all subtitle/caption tracks
+        if (hls.subtitleTrack !== -1) hls.subtitleTrack = -1;
+        for (let i = 0; i < video.textTracks.length; i++) {
+          video.textTracks[i].mode = 'disabled';
+        }
+      });
+      // Also disable captions when new subtitle tracks are found
+      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+        hls.subtitleTrack = -1;
+        for (let i = 0; i < video.textTracks.length; i++) {
+          video.textTracks[i].mode = 'disabled';
+        }
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
@@ -356,7 +368,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       {/* Channel guide overlay */}
       {showGuide && (
         <div
-          className="absolute inset-0 bg-[#0f172a]/95 backdrop-blur-xl flex flex-col overflow-hidden z-20"
+          className="absolute inset-0 bg-[#1c1c1e]/95 backdrop-blur-xl flex flex-col overflow-hidden z-20"
           onClick={e => e.stopPropagation()}
         >
           {/* Guide header */}
@@ -388,7 +400,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
           <div className="flex-1 overflow-y-auto">
             {Object.entries(channelsByCategory).map(([category, channels]) => (
               <div key={category}>
-                <div className="px-3 py-1.5 text-[10px] font-semibold text-white/30 uppercase tracking-wider sticky top-0 bg-[#0f172a]/95 backdrop-blur-sm">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-white/30 uppercase tracking-wider sticky top-0 bg-[#1c1c1e]/95 backdrop-blur-sm">
                   {category}
                 </div>
                 {channels.map(channel => {

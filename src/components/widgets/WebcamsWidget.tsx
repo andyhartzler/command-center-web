@@ -219,15 +219,27 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
 
   const currentCamera = cameras[currentIndex];
 
+  // Check if this is a KC Scout camera (has corridorFilter or known scout IDs)
+  const isScout = config.corridorFilter.length > 0 || cameras.some(c => c.streamFile.includes('customInstance'));
+
   return (
-    <div className="relative w-full h-full bg-black group">
+    <div className="relative w-full h-full bg-black group overflow-hidden">
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
+        style={isScout ? { transform: 'scale(1.08)', transformOrigin: 'center 55%' } : undefined}
         playsInline
         muted
         autoPlay
       />
+      {/* Gradient overlays to hide Scout camera info bars and logo */}
+      {isScout && (
+        <>
+          <div className="absolute inset-x-0 top-0 h-[18%] pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 40%, transparent 100%)' }} />
+          <div className="absolute inset-x-0 bottom-0 h-[12%] pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)' }} />
+          <div className="absolute top-0 left-0 w-[25%] h-[25%] pointer-events-none" style={{ background: 'radial-gradient(ellipse at top left, rgba(0,0,0,0.85) 0%, transparent 70%)' }} />
+        </>
+      )}
 
       {/* Navigation arrows - visible on hover */}
       {cameras.length > 1 && (
@@ -255,7 +267,7 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
           title={isRotating ? 'Stop rotating (lock view)' : 'Start rotating cameras'}
         >
           {isRotating ? (
-            <RotateCw size={12} className="text-blue-400/80" />
+            <RotateCw size={12} className="text-[#6b8aab]/80" />
           ) : (
             <Lock size={11} className="text-white/60" />
           )}
@@ -274,7 +286,7 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
           <div className="flex items-center gap-1.5">
             {isRotating && (
               <span
-                className="text-[8px] text-blue-400/60 px-1.5 py-0.5 rounded"
+                className="text-[8px] text-[#6b8aab]/60 px-1.5 py-0.5 rounded"
                 style={{ background: 'rgba(0,0,0,0.5)' }}
               >
                 AUTO

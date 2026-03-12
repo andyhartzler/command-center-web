@@ -114,7 +114,7 @@ export function WidgetConfigPanel({ widgetId, onClose }: WidgetConfigPanelProps)
                     onClick={() => handleFamilyChange(family)}
                     className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg transition-colors text-xs ${
                       isActive
-                        ? 'bg-blue-600/15 border border-blue-500/30 text-blue-400'
+                        ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30 text-[#6b8aab]'
                         : 'bg-white/[0.02] border border-white/[0.04] text-white/40 hover:bg-white/5 hover:text-white/60'
                     }`}
                   >
@@ -159,7 +159,7 @@ export function WidgetConfigPanel({ widgetId, onClose }: WidgetConfigPanelProps)
                       style: { ...widget.style, opacity: parseFloat(e.target.value) },
                     })
                   }
-                  className="w-full h-1 rounded-full appearance-none bg-white/10 accent-blue-500"
+                  className="w-full h-1 rounded-full appearance-none bg-white/10 accent-[#6b8aab]"
                 />
               </div>
 
@@ -227,7 +227,7 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
       <button
         onClick={() => onChange(!value)}
         className={`w-8 h-[18px] rounded-full transition-colors relative ${
-          value ? 'bg-blue-600' : 'bg-white/10'
+          value ? 'bg-[#6b8aab]' : 'bg-white/10'
         }`}
       >
         <div
@@ -254,7 +254,7 @@ function ConfigTextField({ label, value, onChange, placeholder }: {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="flex-1 bg-[#1a2438] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-blue-500/40 placeholder:text-white/15"
+        className="flex-1 bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-white/15 placeholder:text-white/15"
       />
     </div>
   );
@@ -310,7 +310,7 @@ function EditableList({ label, items, onChange, placeholder }: {
               onChange(next);
             }}
             placeholder={placeholder}
-            className="flex-1 bg-[#1a2438] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/70 outline-none focus:border-blue-500/40 placeholder:text-white/15"
+            className="flex-1 bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
           />
           <button
             onClick={() => onChange(items.filter((_, idx) => idx !== i))}
@@ -322,7 +322,7 @@ function EditableList({ label, items, onChange, placeholder }: {
       ))}
       <button
         onClick={() => onChange([...items, ''])}
-        className="flex items-center gap-1 text-[11px] text-blue-400/70 hover:text-blue-400 transition-colors"
+        className="flex items-center gap-1 text-[11px] text-[#6b8aab]/70 hover:text-[#6b8aab] transition-colors"
       >
         <Plus size={10} /> Add
       </button>
@@ -397,24 +397,113 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
     case 'news':
       return (
         <ConfigSection title="News Settings">
-          <ConfigNumberField
-            label="Max Items"
-            value={(cfg.maxItems as number) || 15}
-            onChange={v => updateConfig({ maxItems: v })}
-            min={5} max={50}
-          />
+          <div className="space-y-3">
+            <ConfigNumberField
+              label="Max Items"
+              value={(cfg.maxItems as number) || 15}
+              onChange={v => updateConfig({ maxItems: v })}
+              min={5} max={50}
+            />
+            <div className="space-y-1.5">
+              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Categories</div>
+              {['local', 'crime', 'politics', 'world', 'us', 'tech', 'finance'].map(cat => {
+                const cats = (cfg.categories as string[]) || [];
+                const isOn = cats.includes(cat);
+                return (
+                  <ToggleRow
+                    key={cat}
+                    label={cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    value={isOn}
+                    onChange={v => {
+                      const next = v ? [...cats, cat] : cats.filter(c => c !== cat);
+                      updateConfig({ categories: next });
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Custom RSS Feeds</div>
+              {((cfg.feeds as { name: string; url: string }[]) || []).map((feed, i) => (
+                <div key={i} className="space-y-1 bg-white/[0.02] border border-white/[0.04] rounded-lg p-2">
+                  <input
+                    type="text"
+                    value={feed.name}
+                    onChange={e => {
+                      const feeds = [...((cfg.feeds as { name: string; url: string }[]) || [])];
+                      feeds[i] = { ...feeds[i], name: e.target.value };
+                      updateConfig({ feeds });
+                    }}
+                    placeholder="Source name"
+                    className="w-full bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-white/15 placeholder:text-white/15"
+                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={feed.url}
+                      onChange={e => {
+                        const feeds = [...((cfg.feeds as { name: string; url: string }[]) || [])];
+                        feeds[i] = { ...feeds[i], url: e.target.value };
+                        updateConfig({ feeds });
+                      }}
+                      placeholder="https://...rss"
+                      className="flex-1 bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-[10px] text-white/60 outline-none focus:border-white/15 placeholder:text-white/15 font-mono"
+                    />
+                    <button
+                      onClick={() => {
+                        const feeds = ((cfg.feeds as { name: string; url: string }[]) || []).filter((_, idx) => idx !== i);
+                        updateConfig({ feeds });
+                      }}
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                    >
+                      <Minus size={10} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const feeds = [...((cfg.feeds as { name: string; url: string }[]) || []), { name: '', url: '' }];
+                  updateConfig({ feeds });
+                }}
+                className="flex items-center gap-1 text-[11px] text-[#6b8aab]/70 hover:text-[#6b8aab] transition-colors"
+              >
+                <Plus size={10} /> Add RSS Feed
+              </button>
+            </div>
+          </div>
         </ConfigSection>
       );
 
     case 'worldNews':
       return (
         <ConfigSection title="World News Settings">
-          <ConfigNumberField
-            label="Max Items"
-            value={(cfg.maxItems as number) || 15}
-            onChange={v => updateConfig({ maxItems: v })}
-            min={5} max={100}
-          />
+          <div className="space-y-3">
+            <ConfigNumberField
+              label="Max Items"
+              value={(cfg.maxItems as number) || 15}
+              onChange={v => updateConfig({ maxItems: v })}
+              min={5} max={100}
+            />
+            <div className="space-y-1.5">
+              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Categories</div>
+              {['world', 'us', 'tech', 'finance'].map(cat => {
+                const cats = (cfg.categories as string[]) || [];
+                const isOn = cats.includes(cat);
+                return (
+                  <ToggleRow
+                    key={cat}
+                    label={cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    value={isOn}
+                    onChange={v => {
+                      const next = v ? [...cats, cat] : cats.filter(c => c !== cat);
+                      updateConfig({ categories: next });
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
         </ConfigSection>
       );
 
@@ -503,6 +592,17 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                 className="w-full h-1 rounded-full appearance-none bg-white/10 accent-red-500"
               />
             </div>
+            <ConfigNumberField
+              label="Max Quakes"
+              value={(cfg.maxQuakes as number) || 50}
+              onChange={v => updateConfig({ maxQuakes: v })}
+              min={10} max={200}
+            />
+            <ToggleRow
+              label="US Only"
+              value={(cfg.region as string) === 'us'}
+              onChange={v => updateConfig({ region: v ? 'us' : 'world' })}
+            />
           </div>
         </ConfigSection>
       );
@@ -591,7 +691,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                   onClick={() => updateConfig({ viewMode: 'single' })}
                   className={`px-2 py-0.5 text-[10px] rounded ${
                     (cfg.viewMode as string || 'single') === 'single'
-                      ? 'bg-blue-600/30 text-blue-400 font-medium'
+                      ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
                       : 'bg-white/5 text-white/40 hover:bg-white/10'
                   }`}
                 >
@@ -601,7 +701,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                   onClick={() => updateConfig({ viewMode: 'rotate' })}
                   className={`px-2 py-0.5 text-[10px] rounded ${
                     (cfg.viewMode as string) === 'rotate'
-                      ? 'bg-blue-600/30 text-blue-400 font-medium'
+                      ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
                       : 'bg-white/5 text-white/40 hover:bg-white/10'
                   }`}
                 >
@@ -721,6 +821,127 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
       );
 
     case 'calendar':
+      return (
+        <ConfigSection title="Calendar Feeds">
+          <div className="space-y-2">
+            <p className="text-[9px] text-white/25 leading-relaxed">
+              Add iCloud, Google, or Outlook calendar ICS feed URLs.
+            </p>
+            {((cfg.feeds as { name: string; url: string }[]) || []).map((feed, i) => (
+              <div key={i} className="space-y-1 bg-white/[0.02] border border-white/[0.04] rounded-lg p-2">
+                <input
+                  type="text"
+                  value={feed.name}
+                  onChange={e => {
+                    const feeds = [...((cfg.feeds as { name: string; url: string }[]) || [])];
+                    feeds[i] = { ...feeds[i], name: e.target.value };
+                    updateConfig({ feeds });
+                  }}
+                  placeholder="Calendar name"
+                  className="w-full bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-white/15 placeholder:text-white/15"
+                />
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={feed.url}
+                    onChange={e => {
+                      const feeds = [...((cfg.feeds as { name: string; url: string }[]) || [])];
+                      feeds[i] = { ...feeds[i], url: e.target.value };
+                      updateConfig({ feeds });
+                    }}
+                    placeholder="https://...ics"
+                    className="flex-1 bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-[10px] text-white/60 outline-none focus:border-white/15 placeholder:text-white/15 font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      const feeds = ((cfg.feeds as { name: string; url: string }[]) || []).filter((_, idx) => idx !== i);
+                      updateConfig({ feeds });
+                    }}
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                  >
+                    <Minus size={10} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                const feeds = [...((cfg.feeds as { name: string; url: string }[]) || []), { name: '', url: '' }];
+                updateConfig({ feeds });
+              }}
+              className="flex items-center gap-1 text-[11px] text-[#6b8aab]/70 hover:text-[#6b8aab] transition-colors"
+            >
+              <Plus size={10} /> Add Calendar Feed
+            </button>
+          </div>
+        </ConfigSection>
+      );
+
+    case 'flightStatus':
+      return (
+        <ConfigSection title="Flight Status Settings">
+          <div className="space-y-2">
+            <ConfigTextField
+              label="Airport"
+              value={(cfg.airport as string) || 'MCI'}
+              onChange={v => updateConfig({ airport: v.toUpperCase() })}
+              placeholder="e.g. MCI"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-white/60">Mode</span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => updateConfig({ mode: 'arrivals' })}
+                  className={`px-2 py-0.5 text-[10px] rounded ${
+                    (cfg.mode as string || 'arrivals') === 'arrivals'
+                      ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
+                      : 'bg-white/5 text-white/40 hover:bg-white/10'
+                  }`}
+                >
+                  Arrivals
+                </button>
+                <button
+                  onClick={() => updateConfig({ mode: 'departures' })}
+                  className={`px-2 py-0.5 text-[10px] rounded ${
+                    (cfg.mode as string) === 'departures'
+                      ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
+                      : 'bg-white/5 text-white/40 hover:bg-white/10'
+                  }`}
+                >
+                  Departures
+                </button>
+              </div>
+            </div>
+            <ConfigNumberField
+              label="Max Flights"
+              value={(cfg.limit as number) || 20}
+              onChange={v => updateConfig({ limit: v })}
+              min={5} max={50}
+            />
+          </div>
+        </ConfigSection>
+      );
+
+    case 'aircraftTracker':
+      return (
+        <ConfigSection title="Aircraft Tracker Settings">
+          <div className="space-y-2">
+            <ConfigTextField
+              label="Tail Number"
+              value={(cfg.tailNumber as string) || ''}
+              onChange={v => updateConfig({ tailNumber: v.toUpperCase() })}
+              placeholder="e.g. N233AB"
+            />
+            <ConfigTextField
+              label="Owner Label"
+              value={(cfg.ownerLabel as string) || ''}
+              onChange={v => updateConfig({ ownerLabel: v })}
+              placeholder="e.g. Dad's Plane"
+            />
+          </div>
+        </ConfigSection>
+      );
+
     case 'reminders':
     case 'health':
     case 'homeKit':
@@ -760,7 +981,7 @@ function LiveTVChannelPicker({ selectedName, onSelect }: {
             onClick={() => onSelect(ch.name, ch.url)}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left ${
               isActive
-                ? 'bg-blue-600/15 border border-blue-500/30'
+                ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30'
                 : 'bg-white/[0.02] border border-white/[0.04] hover:bg-white/5'
             }`}
           >
@@ -773,7 +994,7 @@ function LiveTVChannelPicker({ selectedName, onSelect }: {
                 {ch.name}
               </div>
             </div>
-            <span className={`text-[9px] font-bold font-mono shrink-0 ${isActive ? 'text-blue-400' : 'text-white/20'}`}>
+            <span className={`text-[9px] font-bold font-mono shrink-0 ${isActive ? 'text-[#6b8aab]' : 'text-white/20'}`}>
               {ch.callsign}
             </span>
             {isActive && (

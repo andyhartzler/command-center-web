@@ -25,8 +25,8 @@ interface WorldNewsWidgetProps {
 function categoryColor(cat: string): string {
   switch (cat) {
     case 'world': return 'text-teal-400/80';
-    case 'us': return 'text-blue-400/80';
-    case 'tech': return 'text-blue-400/80';
+    case 'us': return 'text-[#6b8aab]';
+    case 'tech': return 'text-[#6b8aab]';
     case 'finance': return 'text-emerald-300/80';
     case 'crisis': return 'text-red-400/80';
     default: return 'text-gray-400/80';
@@ -44,7 +44,14 @@ export function WorldNewsWidget({ config }: WorldNewsWidgetProps) {
       const res = await fetch('/api/news?type=world');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setArticles(data.articles ?? []);
+      let items: Article[] = data.articles ?? [];
+
+      // Filter by categories if configured
+      if (config.categories?.length) {
+        items = items.filter(a => config.categories.includes(a.category));
+      }
+
+      setArticles(items);
       setError(null);
       setHeroImgError(false);
     } catch (err) {
@@ -53,7 +60,7 @@ export function WorldNewsWidget({ config }: WorldNewsWidgetProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [config.categories]);
 
   useEffect(() => {
     fetchNews();

@@ -105,7 +105,7 @@ export function CalendarWidget({ config }: CalendarWidgetProps) {
 
   if (!hasFeeds) {
     return (
-      <div className="w-full h-full flex flex-col bg-gradient-to-br from-[#0c1220] to-[#101828] rounded-2xl overflow-hidden">
+      <div className="w-full h-full flex flex-col bg-[#1a1a1c] rounded-2xl overflow-hidden">
         <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
           <Calendar size={14} className="text-red-400" />
           <span className="text-[11px] font-semibold text-white/90 tracking-wide">Calendar</span>
@@ -120,7 +120,7 @@ export function CalendarWidget({ config }: CalendarWidgetProps) {
           </div>
           <div className="mt-2 space-y-1.5 w-full max-w-[200px]">
             <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-white/[0.03] border border-white/[0.06]">
-              <div className="w-3 h-3 rounded-sm bg-blue-500/30" />
+              <div className="w-3 h-3 rounded-sm bg-[#6b8aab]/30" />
               <span className="text-[9px] text-white/30">iCloud Calendar</span>
               <ChevronRight size={8} className="text-white/15 ml-auto" />
             </div>
@@ -141,7 +141,7 @@ export function CalendarWidget({ config }: CalendarWidgetProps) {
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full flex flex-col bg-gradient-to-br from-[#0c1220] to-[#101828] rounded-2xl overflow-hidden">
+    <div ref={containerRef} className="w-full h-full flex flex-col bg-[#1a1a1c] rounded-2xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
         <div className="flex items-center gap-2">

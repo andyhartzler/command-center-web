@@ -160,7 +160,7 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
                 gridColumn: `${dragTarget.col + 1} / span ${size.columns}`,
                 gridRow: `${dragTarget.row + 1} / span ${size.rows}`,
               }}
-              className="rounded-xl bg-blue-500/10 border-2 border-blue-500/40 pointer-events-none z-10 transition-all duration-100"
+              className="rounded-xl bg-[#6b8aab]/10 border-2 border-[#6b8aab]/40 pointer-events-none z-10 transition-all duration-100"
             />
           );
         })()}
@@ -202,7 +202,7 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
               onClick={e => handleWidgetClick(e, widget.id)}
               className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-150 group ${
                 isSelected
-                  ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-transparent'
+                  ? 'ring-2 ring-[#6b8aab] ring-offset-1 ring-offset-transparent'
                   : 'hover:ring-1 hover:ring-white/20'
               } ${isBeingDragged ? 'opacity-40' : 'opacity-100'}`}
               style={{
@@ -253,7 +253,7 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
 
               {/* Selection border overlay */}
               {isSelected && (
-                <div className="absolute inset-0 rounded-2xl border-2 border-blue-500/50 pointer-events-none z-[6]" />
+                <div className="absolute inset-0 rounded-2xl border-2 border-[#6b8aab]/50 pointer-events-none z-[6]" />
               )}
             </div>
           );

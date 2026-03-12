@@ -34,8 +34,8 @@ function getLeagueColor(league: string): string {
   switch (league) {
     case 'NFL': return 'text-green-500/70';
     case 'NBA': return 'text-orange-400/70';
-    case 'MLB': return 'text-blue-400/70';
-    case 'NHL': return 'text-cyan-400/70';
+    case 'MLB': return 'text-[#6b8aab]/70';
+    case 'NHL': return 'text-sky-400/70';
     case 'MLS': return 'text-emerald-400/70';
     default: return 'text-white/40';
   }
@@ -45,8 +45,8 @@ function getLeagueBorderColor(league: string): string {
   switch (league) {
     case 'NFL': return 'border-green-500/20';
     case 'NBA': return 'border-orange-400/20';
-    case 'MLB': return 'border-blue-400/20';
-    case 'NHL': return 'border-cyan-400/20';
+    case 'MLB': return 'border-[#6b8aab]/20';
+    case 'NHL': return 'border-sky-400/20';
     case 'MLS': return 'border-emerald-400/20';
     default: return 'border-white/10';
   }

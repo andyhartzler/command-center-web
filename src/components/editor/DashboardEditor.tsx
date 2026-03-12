@@ -92,16 +92,16 @@ export function DashboardEditor() {
   };
 
   return (
-    <div className="w-screen h-screen flex flex-col bg-[#0f172a] overflow-hidden">
+    <div className="w-screen h-screen flex flex-col bg-[#1c1c1e] overflow-hidden">
       {/* Top bar */}
-      <div className="shrink-0 h-11 border-b border-white/[0.08] flex items-center px-4 gap-3 bg-[#0f172a]/90 backdrop-blur-xl">
+      <div className="shrink-0 h-11 border-b border-white/[0.06] flex items-center px-4 gap-3 bg-[#1a1a1c]">
         {/* Left: mode toggle */}
         <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.04] rounded-lg">
           <button
             onClick={() => setAppMode('dashboard')}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               appMode === 'dashboard'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-[#6b8aab] text-white'
                 : 'text-white/40 hover:text-white/60'
             }`}
           >
@@ -123,7 +123,7 @@ export function DashboardEditor() {
                 <ChevronDown size={8} className="opacity-50" />
               </button>
               {eocMenuOpen && (
-                <div className="absolute top-full left-0 mt-1 w-44 bg-[#1a2438] border border-white/[0.08] rounded-xl shadow-xl z-50 py-1 backdrop-blur-xl">
+                <div className="absolute top-full left-0 mt-1 w-44 bg-[#252528] border border-white/[0.08] rounded-xl shadow-xl z-50 py-1 backdrop-blur-xl">
                   {(['kc', 'usa', 'global'] as const).map(scope => (
                     <button
                       key={scope}
@@ -131,7 +131,7 @@ export function DashboardEditor() {
                       className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/5 flex items-center justify-between"
                     >
                       {scopeDisplayName(scope)}
-                      {eocScope === scope && <span className="text-blue-400 text-[10px]">&#10003;</span>}
+                      {eocScope === scope && <span className="text-[#6b8aab] text-[10px]">&#10003;</span>}
                     </button>
                   ))}
                   <div className="border-t border-white/5 my-1" />
@@ -174,7 +174,7 @@ export function DashboardEditor() {
                     onContextMenu={(e) => handlePageContextMenu(e, i)}
                     className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                       isSelected
-                        ? 'bg-blue-600/10 text-white/90'
+                        ? 'bg-white/[0.06] text-white/90'
                         : 'text-white/35 hover:text-white/55 hover:bg-white/5'
                     }`}
                   >
@@ -182,7 +182,7 @@ export function DashboardEditor() {
                     <span
                       className={`text-[9px] font-bold px-1.5 py-px rounded-full ${
                         isSelected
-                          ? 'bg-blue-600 text-white'
+                          ? 'bg-[#6b8aab] text-white'
                           : 'bg-white/[0.08] text-white/40'
                       }`}
                     >
@@ -206,7 +206,7 @@ export function DashboardEditor() {
         {/* Right: display button — prominent */}
         <button
           onClick={() => setDisplayMode(true)}
-          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/25"
+          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-[#6b8aab] text-white hover:bg-[#7d9bbc] transition-all shadow-lg shadow-black/20"
         >
           <Play size={12} fill="currentColor" />
           Display
@@ -216,7 +216,7 @@ export function DashboardEditor() {
       {/* Three-panel layout */}
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left: Widget sidebar */}
-        <div className="shrink-0 w-[280px] border-r border-white/[0.08] overflow-y-auto bg-[#131c2e]/80">
+        <div className="shrink-0 w-[280px] border-r border-white/[0.08] overflow-y-auto bg-[#1a1a1c]">
           <WidgetSidebar />
         </div>
 
@@ -240,7 +240,7 @@ export function DashboardEditor() {
 
         {/* Right: Config panel (only when widget selected) */}
         {selectedWidgetId && (
-          <div className="shrink-0 w-[280px] border-l border-white/[0.08] overflow-y-auto bg-[#131c2e]/80">
+          <div className="shrink-0 w-[280px] border-l border-white/[0.08] overflow-y-auto bg-[#1a1a1c]">
             <WidgetConfigPanel
               widgetId={selectedWidgetId}
               onClose={() => setSelectedWidgetId(null)}
@@ -253,7 +253,7 @@ export function DashboardEditor() {
       {contextMenuPage && (
         <div
           ref={contextMenuRef}
-          className="fixed z-[100] bg-[#1a2438] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[160px] backdrop-blur-xl"
+          className="fixed z-[100] bg-[#252528] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[160px] backdrop-blur-xl"
           style={{ left: contextMenuPage.x, top: contextMenuPage.y }}
         >
           {isRenaming ? (
@@ -267,7 +267,7 @@ export function DashboardEditor() {
                   if (e.key === 'Escape') { setContextMenuPage(null); setIsRenaming(false); }
                 }}
                 onBlur={handleRenameSubmit}
-                className="w-full bg-[#1a2438] border border-white/[0.1] rounded px-2 py-1 text-xs text-white/90 outline-none focus:border-blue-500/50"
+                className="w-full bg-[#252528] border border-white/[0.1] rounded px-2 py-1 text-xs text-white/90 outline-none focus:border-white/20"
               />
             </div>
           ) : (

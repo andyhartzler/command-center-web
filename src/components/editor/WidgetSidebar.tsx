@@ -145,7 +145,7 @@ export function WidgetSidebar() {
                   <span className="text-[11px] text-white/50 group-hover:text-white/80 transition-colors flex-1 text-left truncate">
                     {cam.label}
                   </span>
-                  <PlusCircle size={12} className="text-blue-400/0 group-hover:text-blue-400/80 transition-all shrink-0" />
+                  <PlusCircle size={12} className="text-white/0 group-hover:text-white/60 transition-all shrink-0" />
                 </button>
               ))}
             </div>
@@ -210,10 +210,10 @@ export function WidgetSidebar() {
                         <button
                           onClick={() => handleAddWidget(type, meta.defaultFamily)}
                           disabled={!canFit}
-                          className="w-6 h-6 rounded-md bg-blue-500/10 flex items-center justify-center hover:bg-blue-500/25 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+                          className="w-6 h-6 rounded-md bg-white/[0.06] flex items-center justify-center hover:bg-white/[0.12] transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
                           title={canFit ? `Add ${meta.displayName}` : 'No space on grid'}
                         >
-                          <PlusCircle size={13} className="text-blue-400" />
+                          <PlusCircle size={13} className="text-[#6b8aab]" />
                         </button>
                       </div>
 

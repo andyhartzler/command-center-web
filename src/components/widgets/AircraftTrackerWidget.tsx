@@ -73,7 +73,7 @@ export function AircraftTrackerWidget({ config }: AircraftTrackerWidgetProps) {
   }, [fetchData]);
 
   return (
-    <div className="w-full h-full flex flex-col bg-gradient-to-br from-[#0d0f1a] to-[#131830] rounded-2xl overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-[#1a1a1c] rounded-2xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5 shrink-0">
         <div className="flex items-center gap-2">

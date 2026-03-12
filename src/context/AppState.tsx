@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { type DashboardWidget, type WidgetConfig, WIDGET_TYPE_META, FAMILY_GRID_SIZE, defaultConfig, type WidgetType, type WidgetFamily } from '@/types/widget';
 import { type DashboardPage, GRID_COLUMNS, GRID_ROWS, type AppMode, type EOCScope } from '@/types/dashboard';
 
@@ -176,31 +176,67 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [eocScope, setEocScope] = useState<EOCScope>('kc');
   const [eocServerURL, setEocServerURL] = useState('http://192.168.4.21:8080');
   const [loaded, setLoaded] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Load from localStorage
+  // Load: try server first, then fall back to localStorage
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('commandcenter-state');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.pages?.length) setPages(sanitizePages(parsed.pages));
-        if (typeof parsed.currentPageIndex === 'number') setCurrentPageIndex(parsed.currentPageIndex);
-        if (parsed.eocServerURL) setEocServerURL(parsed.eocServerURL);
+    let cancelled = false;
+
+    async function load() {
+      // Try server first
+      try {
+        const res = await fetch('/api/state');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.state && !cancelled) {
+            const parsed = data.state;
+            if (parsed.pages?.length) setPages(sanitizePages(parsed.pages));
+            if (typeof parsed.currentPageIndex === 'number') setCurrentPageIndex(parsed.currentPageIndex);
+            if (parsed.eocServerURL) setEocServerURL(parsed.eocServerURL);
+            setLoaded(true);
+            return;
+          }
+        }
+      } catch { /* server unavailable, fall through */ }
+
+      // Fall back to localStorage
+      if (!cancelled) {
+        try {
+          const saved = localStorage.getItem('commandcenter-state');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.pages?.length) setPages(sanitizePages(parsed.pages));
+            if (typeof parsed.currentPageIndex === 'number') setCurrentPageIndex(parsed.currentPageIndex);
+            if (parsed.eocServerURL) setEocServerURL(parsed.eocServerURL);
+          }
+        } catch { /* ignore */ }
+        setLoaded(true);
       }
-    } catch { /* ignore */ }
-    setLoaded(true);
+    }
+
+    load();
+    return () => { cancelled = true; };
   }, []);
 
-  // Save to localStorage
+  // Save to both localStorage and server (debounced)
   useEffect(() => {
     if (!loaded) return;
+    const stateObj = { pages, currentPageIndex, eocServerURL };
+
+    // Always save to localStorage immediately
     try {
-      localStorage.setItem('commandcenter-state', JSON.stringify({
-        pages,
-        currentPageIndex,
-        eocServerURL,
-      }));
+      localStorage.setItem('commandcenter-state', JSON.stringify(stateObj));
     } catch { /* ignore */ }
+
+    // Debounce server save (2 seconds)
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      fetch('/api/state', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: stateObj }),
+      }).catch(() => { /* server save failed silently */ });
+    }, 2000);
   }, [pages, currentPageIndex, eocServerURL, loaded]);
 
   const addPage = useCallback(() => {

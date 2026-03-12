@@ -24,9 +24,9 @@ interface NewsWidgetProps {
 // Category colors matching Swift exactly
 function categoryColor(cat: string): string {
   switch (cat) {
-    case 'local': return 'text-blue-400/80';
+    case 'local': return 'text-[#6b8aab]';
     case 'crime': return 'text-red-400/80';
-    case 'politics': return 'text-blue-400/80';
+    case 'politics': return 'text-[#6b8aab]';
     case 'missouri': return 'text-teal-400/80';
     case 'sports': return 'text-yellow-400/80';
     default: return 'text-gray-400/80';
@@ -40,10 +40,28 @@ export function NewsWidget({ config, style }: NewsWidgetProps) {
 
   const fetchNews = useCallback(async () => {
     try {
-      const res = await fetch('/api/news?type=local');
+      let url = '/api/news?type=local';
+
+      // Pass custom feeds if configured
+      if (config.feeds?.length) {
+        const feedUrls = config.feeds.map(f => f.url).filter(Boolean).join(',');
+        const feedNames = config.feeds.map(f => f.name || 'Custom').join(',');
+        if (feedUrls) {
+          url = `/api/news?feeds=${encodeURIComponent(feedUrls)}&sources=${encodeURIComponent(feedNames)}`;
+        }
+      }
+
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setArticles(data.articles ?? []);
+      let items: Article[] = data.articles ?? [];
+
+      // Filter by categories if configured
+      if (config.categories?.length) {
+        items = items.filter(a => config.categories.includes(a.category));
+      }
+
+      setArticles(items);
       setError(null);
     } catch (err) {
       console.error('[NewsWidget] fetch error:', err);
@@ -51,7 +69,7 @@ export function NewsWidget({ config, style }: NewsWidgetProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [config.feeds, config.categories]);
 
   useEffect(() => {
     fetchNews();

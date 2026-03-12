@@ -66,20 +66,20 @@ export function DashboardDisplay() {
         onMouseLeave={() => setShowToolbar(false)}
       >
         <div className="flex items-center justify-between px-5 py-2.5"
-          style={{ background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(24px) saturate(1.4)', WebkitBackdropFilter: 'blur(24px) saturate(1.4)', borderBottom: '1px solid rgba(148,197,255,0.1)' }}
+          style={{ background: 'rgba(28,28,30,0.85)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
         >
-          <span className="text-[13px] font-medium text-white/60" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+          <span className="text-[13px] font-medium text-white/50">
             CommandCenter
           </span>
           {pages.length > 1 && (
-            <span className="text-[11px] text-white/30" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            <span className="text-[11px] text-white/25">
               Page {currentPageIndex + 1} of {pages.length}
             </span>
           )}
           <button
             onClick={() => setDisplayMode(false)}
-            className="flex items-center gap-1 px-3 py-1.5 text-white/90 rounded-lg transition-colors hover:bg-white/10"
-            style={{ background: 'rgba(59,130,246,0.1)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(59,130,246,0.15)' }}
+            className="flex items-center gap-1 px-3 py-1.5 text-white/80 rounded-lg transition-colors hover:bg-white/[0.08]"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
@@ -96,29 +96,6 @@ export function DashboardDisplay() {
       {/* Widget grid */}
       <WidgetGrid page={currentPage} />
 
-      {/* Page indicator dots at bottom (matches Swift pageIndicator with Capsule background) */}
-      {pages.length > 1 && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-50">
-          <div className="page-indicator">
-            {pages.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentPageIndex(i)}
-                className="transition-all duration-200"
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: i === currentPageIndex ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.15)',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

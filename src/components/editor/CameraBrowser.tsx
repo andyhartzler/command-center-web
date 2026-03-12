@@ -136,7 +136,7 @@ export function CameraBrowser({ onClose }: { onClose: () => void }) {
 
     for (const [id, marker] of markersRef.current.entries()) {
       if (id === cam.id) {
-        marker.setStyle({ radius: 8, color: '#3b82f6', fillColor: '#3b82f6', weight: 2 });
+        marker.setStyle({ radius: 8, color: '#6b8aab', fillColor: '#6b8aab', weight: 2 });
       } else {
         marker.setStyle({ radius: 4, color: '#f97316', fillColor: '#f97316', weight: 1 });
       }
@@ -234,7 +234,7 @@ export function CameraBrowser({ onClose }: { onClose: () => void }) {
               </div>
               <button
                 onClick={() => handleAddCamera(selectedCamera)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600/80 hover:bg-blue-600 text-white rounded-md text-[11px] font-semibold transition-colors shrink-0"
+                className="flex items-center gap-1 px-3 py-1.5 bg-[#6b8aab] hover:bg-[#7d9bbc] text-white rounded-md text-[11px] font-semibold transition-colors shrink-0"
               >
                 <Plus size={12} />
                 Add
