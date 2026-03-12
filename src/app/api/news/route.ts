@@ -12,9 +12,17 @@ interface FeedDef {
 }
 
 const LOCAL_FEEDS: FeedDef[] = [
+  // KSHB local-news feed — already KC-focused
   { url: 'https://www.kshb.com/news/local-news.rss', source: 'KSHB', category: 'local' },
+  { url: 'https://www.kshb.com/news/crime.rss', source: 'KSHB', category: 'crime' },
+  // KMBC — top stories (filtered server-side for KC relevance)
   { url: 'https://www.kmbc.com/topstories-rss', source: 'KMBC', category: 'local' },
+  // KC Star — latest news (filtered server-side for KC relevance)
   { url: 'https://www.kansascity.com/latest-news/article742801.ece/BINARY/rss', source: 'KC Star', category: 'local' },
+  // KCTV5 local
+  { url: 'https://www.kctv5.com/search/?f=rss&t=article&c=news/local&l=50&s=start_time&sd=desc', source: 'KCTV5', category: 'local' },
+  // Fox4 KC
+  { url: 'https://fox4kc.com/feed/', source: 'Fox4 KC', category: 'local' },
 ];
 
 const WORLD_FEEDS: FeedDef[] = [
@@ -58,6 +66,102 @@ async function fetchFeed(def: FeedDef): Promise<Article[]> {
     console.warn(`[news] Failed to fetch ${def.source}:`, err instanceof Error ? err.message : err);
     return [];
   }
+}
+
+// ---------------------------------------------------------------------------
+// KC relevance filter — only show articles actually *about* KC
+// ---------------------------------------------------------------------------
+
+const KC_KEYWORDS = new RegExp(
+  [
+    // City names
+    'Kansas City',
+    'KCMO',
+    'KCK',
+    '\\bKC\\b',
+    // Metro cities (unambiguous names)
+    'Overland Park',
+    'Olathe',
+    "Lee'?s Summit",
+    'Blue Springs',
+    'Lenexa',
+    'Leawood',
+    'Prairie Village',
+    'Shawnee Mission',
+    'Gladstone',
+    'Raytown',
+    'Grandview',
+    'Belton',
+    'Raymore',
+    'North Kansas City',
+    'Parkville',
+    'Grain Valley',
+    'Excelsior Springs',
+    'Bonner Springs',
+    'Platte City',
+    'Smithville',
+    'Kearney',
+    'Merriam',
+    'Roeland Park',
+    // Counties
+    'Johnson County',
+    'Jackson County',
+    'Wyandotte',
+    'Clay County',
+    'Platte County',
+    'Cass County',
+    '\\bJoCo\\b',
+    // Sports
+    '\\bChiefs\\b',
+    '\\bRoyals\\b',
+    'Sporting KC',
+    'Sporting Kansas City',
+    'KC Current',
+    '\\bArrowhead\\b',
+    '\\bKauffman\\b',
+    'GEHA Field',
+    // Landmarks & institutions
+    'T-Mobile Center',
+    'Sprint Center',
+    'Power & Light',
+    'Power and Light',
+    'Country Club Plaza',
+    'Union Station',
+    'Nelson-Atkins',
+    'Crown Center',
+    "Children'?s Mercy",
+    'Worlds of Fun',
+    'Oceans of Fun',
+    // Education
+    '\\bUMKC\\b',
+    'KU Med',
+    'KU Medical',
+    'KU Health',
+    // Neighborhoods
+    'Westport',
+    'Brookside',
+    '\\bWaldo\\b',
+    'Crossroads',
+    'River Market',
+    '\\bMidtown\\b',
+    // Highways
+    'I-435',
+    'I-635',
+    // Government & agencies
+    '\\bKCPD\\b',
+    '\\bKCFD\\b',
+    '\\bKCATA\\b',
+    // Airport
+    '\\bKCI\\b',
+    '\\bMCI\\b',
+    'Kansas City International',
+  ].join('|'),
+  'i'
+);
+
+function isKCRelevant(article: Article): boolean {
+  const text = `${article.title} ${article.snippet}`;
+  return KC_KEYWORDS.test(text);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +219,14 @@ export async function GET(request: NextRequest) {
 
   // Fetch all feeds concurrently
   const results = await Promise.all(feedDefs.map(fetchFeed));
-  const allArticles = results.flat();
+  let allArticles = results.flat();
+
+  // For local feeds, filter to only KC-relevant articles
+  if (type === 'local') {
+    const before = allArticles.length;
+    allArticles = allArticles.filter(isKCRelevant);
+    console.log(`[news] KC relevance filter: ${before} → ${allArticles.length} articles`);
+  }
 
   // Deduplicate
   const unique = deduplicateArticles(allArticles);

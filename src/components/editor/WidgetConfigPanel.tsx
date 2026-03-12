@@ -1,10 +1,10 @@
 'use client';
 import { useMemo } from 'react';
 import {
-  Clock, CloudSun, Sun, Calendar, ListChecks, Newspaper, Globe,
+  Clock, CloudSun, Sun, Moon, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
   Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu,
-  Trash2, X, Plus, Minus,
+  Trash2, X, Plus, Minus, Radio,
 } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import {
@@ -16,7 +16,7 @@ import {
 } from '@/types/widget';
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  clock: Clock, 'cloud-sun': CloudSun, sun: Sun, calendar: Calendar,
+  clock: Clock, 'cloud-sun': CloudSun, sun: Sun, moon: Moon, calendar: Calendar,
   'list-checks': ListChecks, newspaper: Newspaper, globe: Globe,
   video: Video, camera: Camera, tv: Tv, trophy: Trophy,
   'trending-up': TrendingUp, bitcoin: Bitcoin, 'bar-chart-3': BarChart3,
@@ -675,27 +675,46 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
     case 'liveTV':
       return (
         <ConfigSection title="Live TV Settings">
-          <div className="space-y-2">
-            <ConfigTextField
-              label="Channel"
-              value={(cfg.selectedChannelName as string) || ''}
-              onChange={v => updateConfig({ selectedChannelName: v })}
-            />
-            <ConfigTextField
-              label="Stream URL"
-              value={(cfg.selectedChannelURL as string) || ''}
-              onChange={v => updateConfig({ selectedChannelURL: v })}
-              placeholder="http://..."
+          <div className="space-y-3">
+            {/* Channel picker */}
+            <LiveTVChannelPicker
+              selectedName={(cfg.selectedChannelName as string) || ''}
+              onSelect={(name, url) => updateConfig({ selectedChannelName: name, selectedChannelURL: url })}
             />
             <ToggleRow
               label="Muted"
               value={(cfg.isMuted as boolean) ?? true}
               onChange={v => updateConfig({ isMuted: v })}
             />
-            <ToggleRow
-              label="Show IPTV Channels"
-              value={(cfg.showIPTV as boolean) || false}
-              onChange={v => updateConfig({ showIPTV: v })}
+            {/* Custom URL fallback */}
+            <div className="border-t border-white/[0.04] pt-2">
+              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider mb-1.5">Custom Stream</div>
+              <ConfigTextField
+                label="URL"
+                value={(cfg.selectedChannelURL as string) || ''}
+                onChange={v => updateConfig({ selectedChannelURL: v })}
+                placeholder="http://..."
+              />
+            </div>
+          </div>
+        </ConfigSection>
+      );
+
+    case 'moonPhase':
+      return (
+        <ConfigSection title="Moon Phase Settings">
+          <div className="space-y-2">
+            <ConfigNumberField
+              label="Latitude"
+              value={(cfg.latitude as number) || 39.0997}
+              onChange={v => updateConfig({ latitude: v })}
+              min={-90} max={90} step={0.01}
+            />
+            <ConfigNumberField
+              label="Longitude"
+              value={(cfg.longitude as number) || -94.5786}
+              onChange={v => updateConfig({ longitude: v })}
+              min={-180} max={180} step={0.01}
             />
           </div>
         </ConfigSection>
@@ -714,4 +733,58 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
     default:
       return null;
   }
+}
+
+// --- Live TV Channel Picker ---
+
+const LIVETV_CHANNELS: { name: string; url: string; resolver?: string; callsign: string }[] = [
+  { name: 'KSHB 41 (NBC)', url: 'https://content.uplynk.com/channel/50d0fa1b042945a3a4f550f9b8412c83.m3u8', callsign: 'KSHB' },
+  { name: 'KMBC 9 (ABC)', url: '', resolver: 'kmbc', callsign: 'KMBC' },
+  { name: 'KCTV5 (CBS)', url: 'https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00312-graytelevisioni-kctv5news-vizious/playlist.m3u8', callsign: 'KCTV5' },
+  { name: 'WDAF FOX 4', url: '', resolver: 'wdaf', callsign: 'FOX4' },
+  { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', callsign: 'PBS' },
+];
+
+function LiveTVChannelPicker({ selectedName, onSelect }: {
+  selectedName: string;
+  onSelect: (name: string, url: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider mb-1">KC Local Channels</div>
+      {LIVETV_CHANNELS.map(ch => {
+        const isActive = selectedName === ch.name;
+        return (
+          <button
+            key={ch.name}
+            onClick={() => onSelect(ch.name, ch.url)}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left ${
+              isActive
+                ? 'bg-blue-600/15 border border-blue-500/30'
+                : 'bg-white/[0.02] border border-white/[0.04] hover:bg-white/5'
+            }`}
+          >
+            <Radio
+              size={11}
+              className={isActive ? 'text-red-400 shrink-0' : 'text-white/20 shrink-0'}
+            />
+            <div className="flex-1 min-w-0">
+              <div className={`text-xs font-medium truncate ${isActive ? 'text-white/90' : 'text-white/60'}`}>
+                {ch.name}
+              </div>
+            </div>
+            <span className={`text-[9px] font-bold font-mono shrink-0 ${isActive ? 'text-blue-400' : 'text-white/20'}`}>
+              {ch.callsign}
+            </span>
+            {isActive && (
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
