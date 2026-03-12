@@ -40,7 +40,9 @@ export function GlobalView() {
   const [earthquakes, setEarthquakes] = useState<any[]>([]);
   const [fires, setFires] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
+  const [spaceWeather, setSpaceWeather] = useState<any>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [utcTime, setUtcTime] = useState(new Date().toISOString().slice(11, 19));
 
   // ETag caching for conditional requests
   const etagsRef = useRef<Record<string, string>>({});
@@ -86,7 +88,7 @@ export function GlobalView() {
     setLastUpdated(new Date().toISOString());
   }, [activeLayers.flights, activeLayers.military, activeLayers.private, activeLayers.earthquakes]);
 
-  // Slow data fetcher (fires + news)
+  // Slow data fetcher (fires + news + space weather)
   const fetchSlow = useCallback(async () => {
     await Promise.allSettled([
       // Fires
@@ -110,8 +112,24 @@ export function GlobalView() {
           }
         } catch {}
       })(),
+      // Space weather
+      (async () => {
+        try {
+          const res = await fetch('/api/global/space-weather');
+          if (res.ok) {
+            const data = await res.json();
+            setSpaceWeather(data);
+          }
+        } catch {}
+      })(),
     ]);
   }, [activeLayers.fires]);
+
+  // UTC clock
+  useEffect(() => {
+    const id = setInterval(() => setUtcTime(new Date().toISOString().slice(11, 19)), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Initial fetch
   useEffect(() => {
@@ -222,16 +240,54 @@ export function GlobalView() {
           <GlobalNewsFeed news={news} onFlyTo={handleNewsFlyTo} />
         </div>
 
+        {/* Space weather badge (top right corner) */}
+        {spaceWeather?.scales && (
+          <div className="absolute top-4 right-[320px] z-10 pointer-events-auto mr-4">
+            <div className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2 text-[9px] font-mono">
+              <div className="text-white/40 tracking-widest mb-1">SPACE WEATHER</div>
+              <div className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <span className={`font-bold ${spaceWeather.scales.radio_blackout.scale > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                    R{spaceWeather.scales.radio_blackout.scale}
+                  </span>
+                  <span className="text-white/20">RADIO</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className={`font-bold ${spaceWeather.scales.solar_radiation.scale > 0 ? 'text-orange-400' : 'text-green-400'}`}>
+                    S{spaceWeather.scales.solar_radiation.scale}
+                  </span>
+                  <span className="text-white/20">SOLAR</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className={`font-bold ${spaceWeather.scales.geomagnetic_storm.scale > 0 ? 'text-purple-400' : 'text-green-400'}`}>
+                    G{spaceWeather.scales.geomagnetic_storm.scale}
+                  </span>
+                  <span className="text-white/20">GEO</span>
+                </div>
+                {spaceWeather.kp_index != null && (
+                  <div className="flex flex-col items-center">
+                    <span className={`font-bold ${spaceWeather.kp_index >= 5 ? 'text-red-400' : spaceWeather.kp_index >= 4 ? 'text-yellow-400' : 'text-green-400'}`}>
+                      {spaceWeather.kp_index.toFixed(1)}
+                    </span>
+                    <span className="text-white/20">Kp</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bottom status bar */}
         <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/60 to-transparent flex items-end justify-center pb-1 pointer-events-none z-10">
           <div className="flex items-center gap-4 text-[9px] font-mono text-white/25">
-            <span>SYS: OPERATIONAL</span>
-            <span>·</span>
-            <span>UTC: {new Date().toISOString().slice(11, 19)}</span>
+            <span className="text-cyan-500/50">REC</span>
+            <span className="text-white/40">{utcTime} UTC</span>
             <span>·</span>
             <span>SOURCES: {Object.values(activeLayers).filter(Boolean).length} ACTIVE</span>
             <span>·</span>
             <span>EQ: {earthquakes.length} · FIRES: {fires.length} · NEWS: {news.length}</span>
+            <span>·</span>
+            <span>MIL: {flights?.military?.length || 0} · CIV: {(flights?.commercial?.length || 0) + (flights?.private?.length || 0)}</span>
           </div>
         </div>
       </div>
