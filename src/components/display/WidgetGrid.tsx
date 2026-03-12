@@ -8,7 +8,7 @@ interface WidgetGridProps {
   page: DashboardPage;
 }
 
-const SPACING = 8; // matches Swift spacing = 8
+const SPACING = 4; // Finer grid = tighter spacing
 
 /**
  * Faithfully replicates Swift WidgetGridView.
@@ -45,8 +45,8 @@ export function WidgetGrid({ page }: WidgetGridProps) {
     return () => ro.disconnect();
   }, []);
 
-  const gridCols = page.gridColumns ?? 12;
-  const gridRows = page.gridRows ?? 8;
+  const gridCols = page.gridColumns ?? 24;
+  const gridRows = page.gridRows ?? 16;
 
   let cellW = 0;
   let cellH = 0;

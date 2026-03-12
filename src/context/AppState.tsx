@@ -8,13 +8,31 @@ const VALID_WIDGET_TYPES = new Set(Object.keys(WIDGET_TYPE_META));
 
 // Sanitize pages loaded from localStorage to handle schema changes
 function sanitizePages(pages: DashboardPage[]): DashboardPage[] {
-  return pages.map(page => ({
-    ...page,
-    widgets: page.widgets.filter(w => {
-      // Remove widgets whose type no longer exists (e.g. systemStatus)
-      return VALID_WIDGET_TYPES.has(w.widgetConfig?.type);
-    }),
-  }));
+  return pages.map(page => {
+    // Detect old 12x8 grid and migrate to 24x16
+    const isOldGrid = (page.gridColumns ?? 12) <= 12 && (page.gridRows ?? 8) <= 8;
+
+    return {
+      ...page,
+      gridColumns: isOldGrid ? 24 : (page.gridColumns ?? 24),
+      gridRows: isOldGrid ? 16 : (page.gridRows ?? 16),
+      widgets: page.widgets
+        .filter(w => VALID_WIDGET_TYPES.has(w.widgetConfig?.type))
+        .map(w => {
+          if (!isOldGrid) return w;
+          // Migrate positions and sizes: multiply by 2
+          const newSize = FAMILY_GRID_SIZE[w.family];
+          return {
+            ...w,
+            position: {
+              column: Math.min(w.position.column * 2, GRID_COLUMNS - newSize.columns),
+              row: Math.min(w.position.row * 2, GRID_ROWS - newSize.rows),
+            },
+            size: { columns: newSize.columns, rows: newSize.rows },
+          };
+        }),
+    };
+  });
 }
 
 interface AppStateContextType {
@@ -63,35 +81,34 @@ function demoWidget(
 }
 
 /**
- * Demo page matching the Swift DashboardPage.demo layout.
- * Grid: 12 columns x 8 rows. Positions are 0-indexed (matching Swift).
+ * Demo page layout.
+ * Grid: 24 columns x 16 rows.
  *
- * Layout:
- *   Row 0-1: clock(3x2@0,0)  weather(3x2@3,0)  crypto(3x2@6,0)   sun(3x2@9,0)
- *   Row 2-4: news(4x3@0,2)   stocks(4x3@4,2)    worldNews(4x3@8,2)
- *   Row 5-6: sports(3x2@0,5) faaDelays(3x2@3,5) predictions(3x2@6,5) system(3x2@9,5)
- *   Row 7:   (empty breathing room at bottom)
+ * Layout (using new 24x16 grid):
+ *   Row 0-3:  clock(6x4@0,0)  weather(6x4@6,0)  crypto(6x4@12,0)  sun(6x4@18,0)
+ *   Row 4-9:  news(8x6@0,4)   stocks(8x6@8,4)   worldNews(8x6@16,4)
+ *   Row 10-13: sports(6x4@0,10) faaDelays(6x4@6,10) predictions(6x4@12,10) moon(4x4@18,10)
  */
 const DEMO_PAGE: DashboardPage = {
   id: 'demo',
   name: 'Main',
-  gridColumns: 12,
-  gridRows: 8,
+  gridColumns: 24,
+  gridRows: 16,
   widgets: [
-    // Top row: four medium (3x2) widgets
+    // Top row: four medium (6x4) widgets
     demoWidget('w1', 'clock',              'medium', 0, 0),
-    demoWidget('w2', 'weather',            'medium', 3, 0),
-    demoWidget('w3', 'crypto',             'medium', 6, 0),
-    demoWidget('w4', 'sun',                'medium', 9, 0),
-    // Middle row: three large (4x3) widgets
-    demoWidget('w5', 'news',               'large',  0, 2),
-    demoWidget('w6', 'stocks',             'large',  4, 2),
-    demoWidget('w7', 'worldNews',          'large',  8, 2),
-    // Bottom row: four medium (3x2) widgets
-    demoWidget('w8', 'sports',             'medium', 0, 5),
-    demoWidget('w9', 'faaDelays',          'medium', 3, 5),
-    demoWidget('w10', 'predictionMarkets', 'medium', 6, 5),
-    demoWidget('w11', 'sun',               'small',  9, 5),
+    demoWidget('w2', 'weather',            'medium', 6, 0),
+    demoWidget('w3', 'crypto',             'medium', 12, 0),
+    demoWidget('w4', 'sun',                'medium', 18, 0),
+    // Middle row: three large (8x6) widgets
+    demoWidget('w5', 'news',               'large',  0, 4),
+    demoWidget('w6', 'stocks',             'large',  8, 4),
+    demoWidget('w7', 'worldNews',          'large',  16, 4),
+    // Bottom row: three medium + one small
+    demoWidget('w8', 'sports',             'medium', 0, 10),
+    demoWidget('w9', 'faaDelays',          'medium', 6, 10),
+    demoWidget('w10', 'predictionMarkets', 'medium', 12, 10),
+    demoWidget('w11', 'moonPhase',         'small',  18, 10),
   ],
   backgroundTheme: 'deepSpace',
   autoRotateSeconds: null,

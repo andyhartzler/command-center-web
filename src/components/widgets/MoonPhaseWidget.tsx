@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { type MoonPhaseConfig, type WidgetStyle } from '@/types/widget';
 
 interface Props {
@@ -30,35 +30,182 @@ function getMoonPhase(): { phase: number; name: string; illumination: number; ag
   return { phase, name, illumination, age: moonAge };
 }
 
-/** Generate SVG path for the moon shadow overlay */
-function moonShadowPath(phase: number, cx: number, cy: number, r: number): string {
-  // phase: 0 = new (all dark), 0.5 = full (no shadow), 1 = new
-  const sweep = Math.cos(phase * 2 * Math.PI);
-  const terminatorRx = Math.max(0.5, Math.abs(sweep) * r);
+/**
+ * Draw a realistic moon on a canvas using procedural craters and phase shadow.
+ * Creates a moonlike texture with maria (dark areas) and highlands,
+ * then overlays the phase terminator.
+ */
+function drawMoon(canvas: HTMLCanvasElement, phase: number) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
 
-  if (phase <= 0.001 || phase >= 0.999) {
-    // New moon - full shadow circle
-    return `M ${cx} ${cy - r} A ${r} ${r} 0 1 0 ${cx} ${cy + r} A ${r} ${r} 0 1 0 ${cx} ${cy - r} Z`;
+  const size = canvas.width;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 2;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Draw base moon disc with gradient
+  const baseGrad = ctx.createRadialGradient(cx * 0.85, cy * 0.8, r * 0.1, cx, cy, r);
+  baseGrad.addColorStop(0, '#e8e0d0');
+  baseGrad.addColorStop(0.3, '#d4cbb8');
+  baseGrad.addColorStop(0.7, '#bfb6a3');
+  baseGrad.addColorStop(1, '#a09888');
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.clip();
+
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Draw maria (dark lunar seas) - positioned to roughly match real moon
+  const maria = [
+    { x: 0.35, y: 0.3, rx: 0.18, ry: 0.12, a: -0.2, o: 0.25 },  // Mare Imbrium
+    { x: 0.5, y: 0.45, rx: 0.12, ry: 0.15, a: 0.1, o: 0.2 },    // Mare Serenitatis
+    { x: 0.55, y: 0.55, rx: 0.15, ry: 0.12, a: -0.15, o: 0.22 }, // Mare Tranquillitatis
+    { x: 0.4, y: 0.55, rx: 0.08, ry: 0.1, a: 0, o: 0.18 },      // Mare Nubium
+    { x: 0.6, y: 0.35, rx: 0.07, ry: 0.08, a: 0.3, o: 0.15 },   // Mare Crisium
+    { x: 0.3, y: 0.5, rx: 0.1, ry: 0.08, a: -0.1, o: 0.2 },     // Oceanus Procellarum
+    { x: 0.45, y: 0.65, rx: 0.08, ry: 0.06, a: 0.2, o: 0.15 },   // Mare Fecunditatis
+    { x: 0.38, y: 0.42, rx: 0.06, ry: 0.05, a: 0, o: 0.12 },     // Mare Vaporum
+  ];
+
+  for (const m of maria) {
+    ctx.save();
+    ctx.translate(m.x * size, m.y * size);
+    ctx.rotate(m.a);
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, m.rx * size);
+    grad.addColorStop(0, `rgba(80, 75, 65, ${m.o})`);
+    grad.addColorStop(0.7, `rgba(90, 85, 75, ${m.o * 0.5})`);
+    grad.addColorStop(1, 'rgba(90, 85, 75, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, m.rx * size, m.ry * size, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
-  if (phase > 0.499 && phase < 0.501) {
-    // Full moon - no shadow
-    return '';
+  // Draw craters with rims
+  const craters = [
+    { x: 0.62, y: 0.75, r: 0.04 },  // Tycho
+    { x: 0.3, y: 0.25, r: 0.035 },   // Copernicus
+    { x: 0.45, y: 0.2, r: 0.025 },
+    { x: 0.7, y: 0.4, r: 0.02 },
+    { x: 0.25, y: 0.6, r: 0.03 },
+    { x: 0.55, y: 0.8, r: 0.02 },
+    { x: 0.35, y: 0.75, r: 0.025 },
+    { x: 0.65, y: 0.25, r: 0.015 },
+    { x: 0.2, y: 0.4, r: 0.02 },
+    { x: 0.75, y: 0.55, r: 0.018 },
+    { x: 0.5, y: 0.3, r: 0.015 },
+    { x: 0.4, y: 0.85, r: 0.02 },
+    { x: 0.55, y: 0.15, r: 0.012 },
+    { x: 0.28, y: 0.35, r: 0.012 },
+    { x: 0.68, y: 0.62, r: 0.015 },
+  ];
+
+  for (const c of craters) {
+    const cr = c.r * size;
+    const ccx = c.x * size;
+    const ccy = c.y * size;
+
+    // Crater shadow (darker inside)
+    const craterGrad = ctx.createRadialGradient(ccx - cr * 0.2, ccy - cr * 0.2, 0, ccx, ccy, cr);
+    craterGrad.addColorStop(0, 'rgba(60, 55, 48, 0.3)');
+    craterGrad.addColorStop(0.6, 'rgba(80, 75, 65, 0.15)');
+    craterGrad.addColorStop(1, 'rgba(100, 95, 85, 0)');
+    ctx.fillStyle = craterGrad;
+    ctx.beginPath();
+    ctx.arc(ccx, ccy, cr, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rim highlight (top-left lit)
+    ctx.strokeStyle = 'rgba(220, 215, 200, 0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(ccx, ccy, cr * 0.9, -Math.PI * 0.8, Math.PI * 0.2);
+    ctx.stroke();
   }
 
-  if (phase < 0.5) {
-    // Waxing: right side lit, shadow on left
-    const sweepFlag = sweep > 0 ? 1 : 0;
-    return `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r} A ${terminatorRx} ${r} 0 0 ${sweepFlag} ${cx} ${cy - r} Z`;
-  } else {
-    // Waning: left side lit, shadow on right
-    const sweepFlag = sweep > 0 ? 0 : 1;
-    return `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r} A ${terminatorRx} ${r} 0 0 ${sweepFlag} ${cx} ${cy - r} Z`;
+  // Add subtle noise texture
+  const imageData = ctx.getImageData(0, 0, size, size);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const px = (i / 4) % size;
+    const py = Math.floor(i / 4 / size);
+    const dx = px - cx;
+    const dy = py - cy;
+    if (dx * dx + dy * dy <= r * r) {
+      const noise = (Math.random() - 0.5) * 12;
+      data[i] = Math.max(0, Math.min(255, data[i] + noise));
+      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+    }
   }
+  ctx.putImageData(imageData, 0, 0);
+
+  // Draw phase shadow
+  if (phase < 0.001 || phase > 0.999) {
+    // New moon - full shadow
+    ctx.fillStyle = 'rgba(5, 8, 15, 0.95)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (phase < 0.499 || phase > 0.501) {
+    // Compute terminator
+    const sweep = Math.cos(phase * 2 * Math.PI);
+    const terminatorRx = Math.abs(sweep) * r;
+
+    ctx.fillStyle = 'rgba(5, 8, 15, 0.93)';
+    ctx.beginPath();
+
+    if (phase < 0.5) {
+      // Waxing: shadow on left side
+      // Arc from top to bottom along the LEFT side of the circle
+      ctx.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2, true);
+      // Terminator ellipse from bottom to top
+      if (sweep > 0) {
+        ctx.ellipse(cx, cy, terminatorRx, r, 0, Math.PI / 2, -Math.PI / 2, true);
+      } else {
+        ctx.ellipse(cx, cy, terminatorRx, r, 0, Math.PI / 2, -Math.PI / 2, false);
+      }
+    } else {
+      // Waning: shadow on right side
+      // Arc from top to bottom along the RIGHT side
+      ctx.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2, false);
+      // Terminator ellipse from bottom to top
+      if (sweep > 0) {
+        ctx.ellipse(cx, cy, terminatorRx, r, 0, Math.PI / 2, -Math.PI / 2, false);
+      } else {
+        ctx.ellipse(cx, cy, terminatorRx, r, 0, Math.PI / 2, -Math.PI / 2, true);
+      }
+    }
+
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Subtle glow on the lit edge
+  const glowGrad = ctx.createRadialGradient(cx, cy, r * 0.95, cx, cy, r * 1.08);
+  glowGrad.addColorStop(0, 'rgba(200, 210, 230, 0)');
+  glowGrad.addColorStop(0.5, 'rgba(200, 210, 230, 0.05)');
+  glowGrad.addColorStop(1, 'rgba(200, 210, 230, 0)');
+  ctx.fillStyle = glowGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 export function MoonPhaseWidget({ config }: Props) {
   const [moonData, setMoonData] = useState(() => getMoonPhase());
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState(200);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -67,72 +214,58 @@ export function MoonPhaseWidget({ config }: Props) {
     return () => clearInterval(interval);
   }, []);
 
-  const { phase, name, illumination } = moonData;
+  // Resize canvas to fill container
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-  const size = 100;
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = 38;
-  const shadowPath = moonShadowPath(phase, cx, cy, r);
+    const update = () => {
+      const rect = container.getBoundingClientRect();
+      // Use the smaller dimension, leave room for text
+      const maxSize = Math.min(rect.width - 16, rect.height - 50);
+      setCanvasSize(Math.max(80, Math.floor(maxSize)));
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, []);
+
+  // Draw moon when phase or size changes
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvasSize * dpr;
+    canvas.height = canvasSize * dpr;
+    canvas.style.width = `${canvasSize}px`;
+    canvas.style.height = `${canvasSize}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.scale(dpr, dpr);
+      drawMoon(canvas, moonData.phase);
+    }
+  }, [moonData.phase, canvasSize]);
+
+  const { name, illumination } = moonData;
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-3 gap-1">
-      {/* Moon SVG */}
+    <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center p-2 gap-1 bg-gradient-to-b from-[#0a0e1a] to-[#0d1220]">
+      {/* Moon canvas */}
       <div className="flex-1 flex items-center justify-center w-full min-h-0">
-        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full max-w-[90px] max-h-[90px]">
-          <defs>
-            {/* Radial gradient for realistic moon surface */}
-            <radialGradient id="moonSurface" cx="45%" cy="40%">
-              <stop offset="0%" stopColor="#f0ead6" />
-              <stop offset="60%" stopColor="#d4cbb8" />
-              <stop offset="100%" stopColor="#b8b0a0" />
-            </radialGradient>
-            {/* Soft glow around moon */}
-            <radialGradient id="moonGlow" cx="50%" cy="50%">
-              <stop offset="70%" stopColor="transparent" />
-              <stop offset="100%" stopColor="rgba(200,210,230,0.08)" />
-            </radialGradient>
-            {/* Shadow fill: semi-transparent dark to show some detail */}
-            <radialGradient id="shadowFill" cx="50%" cy="50%">
-              <stop offset="0%" stopColor="rgba(10,16,30,0.92)" />
-              <stop offset="100%" stopColor="rgba(8,12,24,0.95)" />
-            </radialGradient>
-          </defs>
-
-          {/* Glow ring */}
-          <circle cx={cx} cy={cy} r={r + 6} fill="url(#moonGlow)" />
-
-          {/* Moon body */}
-          <circle cx={cx} cy={cy} r={r} fill="url(#moonSurface)" />
-
-          {/* Surface detail - subtle craters */}
-          <circle cx={cx - 8} cy={cy - 10} r={5} fill="rgba(160,150,135,0.3)" />
-          <circle cx={cx + 12} cy={cy + 5} r={7} fill="rgba(155,145,130,0.25)" />
-          <circle cx={cx - 3} cy={cy + 14} r={4} fill="rgba(165,155,140,0.2)" />
-          <circle cx={cx + 5} cy={cy - 16} r={3} fill="rgba(150,140,125,0.25)" />
-          <circle cx={cx - 14} cy={cy + 4} r={3.5} fill="rgba(160,150,135,0.2)" />
-          <circle cx={cx + 16} cy={cy - 8} r={2.5} fill="rgba(155,145,130,0.2)" />
-
-          {/* Shadow overlay */}
-          {shadowPath && (
-            <path d={shadowPath} fill="url(#shadowFill)" />
-          )}
-
-          {/* Subtle rim light on the lit edge */}
-          <circle
-            cx={cx}
-            cy={cy}
-            r={r - 0.5}
-            fill="none"
-            stroke="rgba(220,215,200,0.15)"
-            strokeWidth="1"
-          />
-        </svg>
+        <canvas
+          ref={canvasRef}
+          className="rounded-full"
+          style={{ filter: 'drop-shadow(0 0 12px rgba(200, 210, 230, 0.08))' }}
+        />
       </div>
 
       {/* Phase name */}
-      <div className="text-center shrink-0">
-        <div className="text-[10px] font-semibold text-white/70 leading-tight">{name}</div>
+      <div className="text-center shrink-0 pb-1">
+        <div className="text-[11px] font-semibold text-white/80 leading-tight">{name}</div>
         <div className="text-[9px] text-white/35">{Math.round(illumination * 100)}% lit</div>
       </div>
     </div>

@@ -31,6 +31,8 @@ export type WidgetType =
   | 'faaDelays'
   | 'wildfires'
   | 'moonPhase'
+  | 'flightStatus'
+  | 'aircraftTracker'
   | 'health'
   | 'homeKit';
 
@@ -150,6 +152,17 @@ export interface LiveTVConfig {
   showIPTV: boolean;
 }
 
+export interface FlightStatusConfig {
+  airport: string;
+  mode: 'arrivals' | 'departures';
+  limit: number;
+}
+
+export interface AircraftTrackerConfig {
+  tailNumber: string;
+  ownerLabel: string;
+}
+
 export type WidgetConfig =
   | { type: 'clock'; config: ClockConfig }
   | { type: 'weather'; config: WeatherConfig }
@@ -169,6 +182,8 @@ export type WidgetConfig =
   | { type: 'camera'; config: CameraConfig }
   | { type: 'liveTV'; config: LiveTVConfig }
   | { type: 'moonPhase'; config: MoonPhaseConfig }
+  | { type: 'flightStatus'; config: FlightStatusConfig }
+  | { type: 'aircraftTracker'; config: AircraftTrackerConfig }
   | { type: 'calendar'; config: Record<string, never> }
   | { type: 'reminders'; config: Record<string, never> }
   | { type: 'health'; config: Record<string, never> }
@@ -183,14 +198,14 @@ export interface DashboardWidget {
   style: WidgetStyle;
 }
 
-// Family <-> grid size mapping (matches Swift exactly)
-// Swift: small=2x2, medium=3x2, large=4x3, wide=6x2, extraLarge=6x4
+// Family <-> grid size mapping
+// Grid is 24x16 (each old cell is now 2x2 for finer placement)
 export const FAMILY_GRID_SIZE: Record<WidgetFamily, GridSize> = {
-  small: { columns: 2, rows: 2 },
-  medium: { columns: 3, rows: 2 },
-  large: { columns: 4, rows: 3 },
-  wide: { columns: 6, rows: 2 },
-  extraLarge: { columns: 6, rows: 4 },
+  small: { columns: 4, rows: 4 },
+  medium: { columns: 6, rows: 4 },
+  large: { columns: 8, rows: 6 },
+  wide: { columns: 12, rows: 4 },
+  extraLarge: { columns: 12, rows: 8 },
 };
 
 export const FAMILY_DISPLAY_NAME: Record<WidgetFamily, string> = {
@@ -227,6 +242,8 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   airTraffic: { displayName: 'Air Traffic', category: 'World Monitor', icon: 'plane', color: '#38bdf8', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   conflict: { displayName: 'Conflict', category: 'World Monitor', icon: 'alert-triangle', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   moonPhase: { displayName: 'Moon Phase', category: 'Time & Location', icon: 'moon', color: '#94a3b8', defaultFamily: 'small', supportedFamilies: ['small'] },
+  flightStatus: { displayName: 'Flight Status', category: 'World Monitor', icon: 'plane-takeoff', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
+  aircraftTracker: { displayName: 'Aircraft Tracker', category: 'World Monitor', icon: 'radar', color: '#a78bfa', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   faaDelays: { displayName: 'FAA Delays', category: 'World Monitor', icon: 'plane-landing', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#fb923c', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
@@ -250,6 +267,8 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'wildfires': return { type: 'wildfires', config: { region: 'us' } };
     case 'predictionMarkets': return { type: 'predictionMarkets', config: { maxEvents: 8 } };
     case 'moonPhase': return { type: 'moonPhase', config: { latitude: 39.0997, longitude: -94.5786 } };
+    case 'flightStatus': return { type: 'flightStatus', config: { airport: 'MCI', mode: 'arrivals', limit: 20 } };
+    case 'aircraftTracker': return { type: 'aircraftTracker', config: { tailNumber: 'N233AB', ownerLabel: "Dad's Plane" } };
     case 'webcams': return { type: 'webcams', config: { cameraIds: [], cameraNames: [], corridorFilter: [], loadAllCameras: false, rotateIntervalSeconds: 15, viewMode: 'single' } };
     case 'camera': return { type: 'camera', config: { url: '', label: 'Camera', isMuted: true } };
     case 'liveTV': return { type: 'liveTV', config: { selectedChannelURL: '', selectedChannelName: '', isMuted: true, showIPTV: false } };

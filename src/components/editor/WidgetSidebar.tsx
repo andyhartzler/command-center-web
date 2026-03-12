@@ -4,7 +4,7 @@ import {
   Clock, CloudSun, Sun, Moon, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
   Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu,
-  PlusCircle, ChevronRight, Shield, MapPin,
+  PlusCircle, Shield, MapPin, Search, X, PlaneTakeoff, Radar,
 } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import {
@@ -18,64 +18,20 @@ import {
 import { CameraBrowser } from './CameraBrowser';
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  clock: Clock,
-  'cloud-sun': CloudSun,
-  sun: Sun,
-  moon: Moon,
-  calendar: Calendar,
-  'list-checks': ListChecks,
-  newspaper: Newspaper,
-  globe: Globe,
-  video: Video,
-  camera: Camera,
-  tv: Tv,
-  trophy: Trophy,
-  'trending-up': TrendingUp,
-  bitcoin: Bitcoin,
-  'bar-chart-3': BarChart3,
-  activity: Activity,
-  plane: Plane,
-  'alert-triangle': AlertTriangle,
-  'plane-landing': PlaneLanding,
-  flame: Flame,
-  heart: Heart,
-  home: Home,
-  cpu: Cpu,
+  clock: Clock, 'cloud-sun': CloudSun, sun: Sun, moon: Moon,
+  calendar: Calendar, 'list-checks': ListChecks, newspaper: Newspaper, globe: Globe,
+  video: Video, camera: Camera, tv: Tv, trophy: Trophy,
+  'trending-up': TrendingUp, bitcoin: Bitcoin, 'bar-chart-3': BarChart3, activity: Activity,
+  plane: Plane, 'alert-triangle': AlertTriangle, 'plane-landing': PlaneLanding,
+  'plane-takeoff': PlaneTakeoff, radar: Radar,
+  flame: Flame, heart: Heart, home: Home, cpu: Cpu,
 };
 
-const CATEGORY_ICONS: Record<WidgetCategory, React.ComponentType<{ size?: number; className?: string }>> = {
-  'Time & Location': Clock,
-  'Productivity': Calendar,
-  'Media': Tv,
-  'Finance': TrendingUp,
-  'World Monitor': Globe,
-  'System': Cpu,
-};
-
-const ALL_CATEGORIES: WidgetCategory[] = [
-  'Time & Location',
-  'Productivity',
-  'Media',
-  'Finance',
-  'World Monitor',
-  'System',
+const CATEGORY_ORDER: WidgetCategory[] = [
+  'Time & Location', 'Media', 'Finance', 'World Monitor', 'Productivity', 'System',
 ];
 
-interface QuickAdd {
-  label: string;
-  type: WidgetType;
-  family: WidgetFamily;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  color: string;
-}
-
-const QUICK_ADDS: QuickAdd[] = [
-  { label: 'KC News', type: 'news', family: 'large', icon: Newspaper, color: '#3b82f6' },
-  { label: 'World News', type: 'worldNews', family: 'large', icon: Globe, color: '#06b6d4' },
-  { label: 'Traffic Cams', type: 'webcams', family: 'medium', icon: Video, color: '#64748b' },
-];
-
-// Grand security cameras - matching Swift DashboardEditorView
+// Grand security cameras
 const GRAND_CAMERAS: { label: string; url: string }[] = [
   { label: 'Parking Lot', url: '/api/grand-cameras/1/stream.m3u8' },
   { label: 'Grand Blvd South', url: '/api/grand-cameras/2/stream.m3u8' },
@@ -83,19 +39,16 @@ const GRAND_CAMERAS: { label: string; url: string }[] = [
 ];
 
 export function WidgetSidebar() {
-  const { addWidget } = useAppState();
-  const [selectedCategory, setSelectedCategory] = useState<WidgetCategory | null>('Time & Location');
+  const { addWidget, pages, currentPageIndex, hasSpaceForWidget } = useAppState();
+  const [search, setSearch] = useState('');
+  const [selectedFamily, setSelectedFamily] = useState<WidgetFamily | null>(null);
   const [showCameraBrowser, setShowCameraBrowser] = useState(false);
 
-  // Group widget types by category
+  const currentPage = pages[currentPageIndex];
+
   const widgetsByCategory = useMemo(() => {
     const groups: Record<WidgetCategory, { type: WidgetType; meta: (typeof WIDGET_TYPE_META)[WidgetType] }[]> = {
-      'Time & Location': [],
-      'Productivity': [],
-      'Media': [],
-      'Finance': [],
-      'World Monitor': [],
-      'System': [],
+      'Time & Location': [], 'Productivity': [], 'Media': [], 'Finance': [], 'World Monitor': [], 'System': [],
     };
     for (const [type, meta] of Object.entries(WIDGET_TYPE_META)) {
       groups[meta.category].push({ type: type as WidgetType, meta });
@@ -103,203 +56,198 @@ export function WidgetSidebar() {
     return groups;
   }, []);
 
+  const filteredCategories = useMemo(() => {
+    if (!search.trim()) return CATEGORY_ORDER;
+    const q = search.toLowerCase();
+    return CATEGORY_ORDER.filter(cat =>
+      widgetsByCategory[cat].some(w =>
+        w.meta.displayName.toLowerCase().includes(q) || w.type.toLowerCase().includes(q)
+      )
+    );
+  }, [search, widgetsByCategory]);
+
+  const filterWidgets = (widgets: typeof widgetsByCategory[WidgetCategory]) => {
+    if (!search.trim()) return widgets;
+    const q = search.toLowerCase();
+    return widgets.filter(w =>
+      w.meta.displayName.toLowerCase().includes(q) || w.type.toLowerCase().includes(q)
+    );
+  };
+
   const handleAddWidget = (type: WidgetType, family: WidgetFamily) => {
     addWidget(type, family);
   };
 
+  if (showCameraBrowser) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+          <button
+            onClick={() => setShowCameraBrowser(false)}
+            className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+          >
+            <X size={12} className="text-white/50" />
+          </button>
+          <span className="text-[11px] font-semibold text-white/70">KC Scout Cameras</span>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <CameraBrowser onClose={() => setShowCameraBrowser(false)} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 pt-3 pb-2">
-        <h2 className="text-[10px] font-bold text-white/30 uppercase tracking-[2px]">WIDGETS</h2>
-      </div>
-
-      {/* Quick-add buttons */}
-      <div className="px-2 pb-2">
-        {QUICK_ADDS.map(qa => {
-          const Icon = qa.icon;
-          return (
+      {/* Search bar */}
+      <div className="px-3 pt-3 pb-2 shrink-0">
+        <div className="relative">
+          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/25" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search widgets..."
+            className="w-full pl-7 pr-7 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/80 placeholder:text-white/20 focus:outline-none focus:border-white/15 focus:bg-white/[0.06] transition-colors"
+          />
+          {search && (
             <button
-              key={qa.label}
-              onClick={() => handleAddWidget(qa.type, qa.family)}
-              className="flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-left hover:bg-white/5 transition-colors group"
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
             >
-              <span className="shrink-0" style={{ color: qa.color }}><Icon size={13} /></span>
-              <span className="text-[13px] font-medium text-white/70 group-hover:text-white/90 transition-colors flex-1">
-                {qa.label}
-              </span>
-              <PlusCircle size={14} className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              <X size={12} />
             </button>
-          );
-        })}
-      </div>
-
-      <div className="mx-4 border-t border-white/[0.06]" />
-
-      {/* Security Cameras - matching Swift editor sidebar */}
-      <div className="px-2 pb-2 pt-1">
-        <div className="px-3 py-1">
-          <span className="text-[9px] font-bold text-white/20 uppercase" style={{ letterSpacing: '1.5px' }}>
-            Security Cameras
-          </span>
+          )}
         </div>
-        {GRAND_CAMERAS.map(cam => (
+      </div>
+
+      {/* Scrollable widget gallery */}
+      <div className="flex-1 overflow-y-auto min-h-0 px-3 pb-4 space-y-4 scrollbar-thin">
+
+        {/* Security cameras section */}
+        {!search && (
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Shield size={10} className="text-emerald-400/60" />
+              <span className="text-[9px] font-bold text-white/25 uppercase tracking-[1.5px]">Security</span>
+            </div>
+            <div className="grid grid-cols-1 gap-1">
+              {GRAND_CAMERAS.map(cam => (
+                <button
+                  key={cam.label}
+                  onClick={() => addWidget('camera', 'medium', {
+                    type: 'camera',
+                    config: { url: cam.url, label: cam.label, isMuted: true },
+                  })}
+                  className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group"
+                >
+                  <Camera size={11} className="text-emerald-400/50 shrink-0" />
+                  <span className="text-[11px] text-white/50 group-hover:text-white/80 transition-colors flex-1 text-left truncate">
+                    {cam.label}
+                  </span>
+                  <PlusCircle size={12} className="text-blue-400/0 group-hover:text-blue-400/80 transition-all shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* KC Scout button */}
+        {!search && (
           <button
-            key={cam.label}
-            onClick={() => addWidget('camera', 'medium', {
-              type: 'camera',
-              config: { url: cam.url, label: cam.label, isMuted: true },
-            })}
-            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-left hover:bg-white/5 transition-colors group"
+            onClick={() => setShowCameraBrowser(true)}
+            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-orange-500/[0.06] border border-orange-500/10 hover:bg-orange-500/[0.12] hover:border-orange-500/20 transition-all group"
           >
-            <span className="shrink-0 text-emerald-400/70"><Shield size={12} /></span>
-            <span className="text-[12px] font-medium text-white/60 group-hover:text-white/80 transition-colors flex-1">
-              {cam.label}
+            <MapPin size={12} className="text-orange-400/70 shrink-0" />
+            <span className="text-[11px] font-medium text-orange-300/70 group-hover:text-orange-200 transition-colors flex-1 text-left">
+              KC Scout Traffic Cameras
             </span>
-            <PlusCircle size={13} className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            <span className="text-[9px] text-orange-400/30">341</span>
           </button>
-        ))}
-      </div>
+        )}
 
-      <div className="mx-4 border-t border-white/[0.06]" />
+        {/* Widget categories with inline widgets */}
+        {filteredCategories.map(category => {
+          const widgets = filterWidgets(widgetsByCategory[category]);
+          if (widgets.length === 0) return null;
 
-      {/* Categories list */}
-      <div className="px-2 py-2">
-        {ALL_CATEGORIES.map(category => {
-          const CatIcon = CATEGORY_ICONS[category];
-          const isSelected = selectedCategory === category && !showCameraBrowser;
-          const typeCount = widgetsByCategory[category].length;
           return (
-            <button
-              key={category}
-              onClick={() => {
-                setSelectedCategory(isSelected ? null : category);
-                setShowCameraBrowser(false);
-              }}
-              className={`flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-left transition-colors ${
-                isSelected
-                  ? 'bg-blue-600/10 text-white/90'
-                  : 'hover:bg-white/5 text-white/50 hover:text-white/70'
-              }`}
-            >
-              <CatIcon size={13} className="shrink-0" />
-              <span className="text-[13px] flex-1">{category}</span>
-              <span className="text-[11px] text-white/20">{typeCount}</span>
-              <ChevronRight
-                size={11}
-                className={`text-white/20 transition-transform ${isSelected ? 'rotate-90' : ''}`}
-              />
-            </button>
-          );
-        })}
-      </div>
+            <div key={category}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-[9px] font-bold text-white/25 uppercase tracking-[1.5px]">{category}</span>
+                <span className="text-[9px] text-white/10">{widgets.length}</span>
+              </div>
 
-      <div className="mx-4 border-t border-white/[0.06]" />
-
-      {/* KC Scout Camera Browser button - matching Swift */}
-      <div className="px-2 py-2">
-        <button
-          onClick={() => {
-            setShowCameraBrowser(true);
-            setSelectedCategory(null);
-          }}
-          className={`flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-left transition-colors ${
-            showCameraBrowser
-              ? 'bg-blue-600/10 text-white/90'
-              : 'hover:bg-white/5 text-white/50 hover:text-white/70'
-          }`}
-        >
-          <MapPin size={13} className="shrink-0 text-orange-400" />
-          <span className="text-[13px] flex-1">KC Scout Cameras</span>
-          <span className="text-[11px] text-white/20">341</span>
-        </button>
-      </div>
-
-      <div className="mx-4 border-t border-white/[0.06]" />
-
-      {/* Content area: Camera Browser OR Widget Gallery */}
-      <div className="flex-1 overflow-y-auto">
-        {showCameraBrowser ? (
-          <CameraBrowser onClose={() => {
-            setShowCameraBrowser(false);
-            setSelectedCategory('Media');
-          }} />
-        ) : (
-          <div className="px-3 py-3">
-            {selectedCategory && (
-              <div className="flex flex-col gap-3">
-                {widgetsByCategory[selectedCategory].map(({ type, meta }) => {
+              <div className="grid grid-cols-1 gap-1.5">
+                {widgets.map(({ type, meta }) => {
                   const Icon = ICON_MAP[meta.icon] || Cpu;
+                  const canFit = currentPage ? hasSpaceForWidget(FAMILY_GRID_SIZE[meta.defaultFamily], currentPage) : false;
+
                   return (
                     <div
                       key={type}
-                      className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-3"
+                      className={`rounded-xl border transition-all ${
+                        canFit
+                          ? 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05] hover:border-white/[0.08]'
+                          : 'bg-white/[0.01] border-white/[0.03] opacity-50'
+                      }`}
                     >
-                      {/* Widget type header */}
-                      <div className="flex items-center gap-2.5 mb-3">
+                      {/* Widget header + quick add */}
+                      <div className="flex items-center gap-2.5 p-2.5">
                         <div
-                          className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                           style={{
-                            background: `linear-gradient(135deg, ${meta.color}, ${meta.color}88)`,
+                            background: `linear-gradient(135deg, ${meta.color}30, ${meta.color}15)`,
+                            border: `1px solid ${meta.color}20`,
+                            color: meta.color,
                           }}
                         >
-                          <Icon size={16} className="text-white" />
+                          <Icon size={14} />
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-bold text-white/90">{meta.displayName}</div>
-                          <div className="text-[10px] text-white/30">{meta.category}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[12px] font-semibold text-white/85 leading-tight">{meta.displayName}</div>
                         </div>
+                        <button
+                          onClick={() => handleAddWidget(type, meta.defaultFamily)}
+                          disabled={!canFit}
+                          className="w-6 h-6 rounded-md bg-blue-500/10 flex items-center justify-center hover:bg-blue-500/25 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+                          title={canFit ? `Add ${meta.displayName}` : 'No space on grid'}
+                        >
+                          <PlusCircle size={13} className="text-blue-400" />
+                        </button>
                       </div>
 
-                      {/* Size variant buttons */}
-                      <div className="flex flex-wrap gap-2">
-                        {meta.supportedFamilies.map(family => {
-                          const gridSize = FAMILY_GRID_SIZE[family];
-                          return (
-                            <button
-                              key={family}
-                              onClick={() => handleAddWidget(type, family)}
-                              className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] text-white/40 hover:bg-white/[0.08] hover:text-white/70 hover:border-white/10 transition-all"
-                            >
-                              {/* Mini grid preview */}
-                              <div className="flex flex-col gap-px mb-0.5">
-                                {Array.from({ length: Math.min(gridSize.rows, 3) }).map((_, r) => (
-                                  <div key={r} className="flex gap-px">
-                                    {Array.from({ length: Math.min(gridSize.columns, 4) }).map((_, c) => (
-                                      <div
-                                        key={c}
-                                        className="w-1.5 h-1.5 rounded-[1px]"
-                                        style={{ backgroundColor: meta.color + '40' }}
-                                      />
-                                    ))}
-                                  </div>
-                                ))}
-                              </div>
-                              <span className="text-[10px] font-medium">
+                      {/* Size options - compact row */}
+                      {meta.supportedFamilies.length > 1 && (
+                        <div className="flex items-center gap-1 px-2.5 pb-2">
+                          {meta.supportedFamilies.map(family => {
+                            const gs = FAMILY_GRID_SIZE[family];
+                            const fits = currentPage ? hasSpaceForWidget(gs, currentPage) : false;
+                            return (
+                              <button
+                                key={family}
+                                onClick={() => handleAddWidget(type, family)}
+                                disabled={!fits}
+                                className={`px-2 py-0.5 rounded text-[9px] font-medium transition-all ${
+                                  family === meta.defaultFamily
+                                    ? 'bg-white/[0.06] text-white/50 hover:bg-white/[0.1] hover:text-white/70'
+                                    : 'text-white/25 hover:bg-white/[0.04] hover:text-white/40'
+                                } disabled:opacity-20 disabled:cursor-not-allowed`}
+                                title={`${FAMILY_DISPLAY_NAME[family]} (${gs.columns}x${gs.rows})`}
+                              >
                                 {FAMILY_DISPLAY_NAME[family]}
-                              </span>
-                              <span className="text-[8px] font-mono opacity-50">
-                                {gridSize.columns}x{gridSize.rows}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
-            )}
-
-            {!selectedCategory && (
-              <div className="flex items-center justify-center h-32">
-                <p className="text-[11px] text-white/20 text-center">
-                  Select a category to browse widgets
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

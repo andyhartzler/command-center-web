@@ -24,5 +24,5 @@ export interface DashboardPage {
   gridRows?: number;
 }
 
-export const GRID_COLUMNS = 12;
-export const GRID_ROWS = 8;
+export const GRID_COLUMNS = 24;
+export const GRID_ROWS = 16;

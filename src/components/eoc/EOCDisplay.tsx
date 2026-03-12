@@ -72,15 +72,53 @@ export function EOCDisplay() {
   // --- Fetch helpers that go through the local Next.js API proxy ---
   const fetchIncidents = useCallback(async () => {
     try {
-      const res = await fetch('/api/eoc/incidents?active=true&limit=200');
-      if (!res.ok) throw new Error(`${res.status}`);
-      const data = await res.json();
-      if (data.incidents) setIncidents(data.incidents);
-      setIsConnected(true);
+      // Fetch both active and recent historical incidents for time filtering
+      const params = new URLSearchParams({ limit: '500' });
+      // For narrow time filters, also get active; for wider ones, get all recent
+      const interval = TIME_FILTER_INTERVALS[timeFilter];
+      if (interval) {
+        const since = new Date(Date.now() - interval).toISOString();
+        params.set('since', since);
+      }
+
+      const [activeRes, allRes] = await Promise.all([
+        fetch('/api/eoc/incidents?active=true&limit=200'),
+        fetch(`/api/eoc/incidents?${params.toString()}`),
+      ]);
+
+      const mergedMap = new Map<string, EOCIncident>();
+
+      if (activeRes.ok) {
+        const activeData = await activeRes.json();
+        if (activeData.incidents) {
+          for (const inc of activeData.incidents) mergedMap.set(inc.id, inc);
+        }
+      }
+
+      if (allRes.ok) {
+        const allData = await allRes.json();
+        if (allData.incidents) {
+          for (const inc of allData.incidents) mergedMap.set(inc.id, inc);
+        }
+      }
+
+      const merged = Array.from(mergedMap.values()).sort(
+        (a, b) => new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime()
+      );
+
+      if (merged.length > 0) {
+        setIncidents(merged);
+        setIsConnected(true);
+      } else if (activeRes.ok || allRes.ok) {
+        setIncidents([]);
+        setIsConnected(true);
+      } else {
+        setIsConnected(false);
+      }
     } catch {
       setIsConnected(false);
     }
-  }, []);
+  }, [timeFilter]);
 
   const fetchFeeds = useCallback(async () => {
     try {

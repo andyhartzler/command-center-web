@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import type { EOCIncident } from '@/types/eoc';
 
 interface EOCMapProps {
@@ -13,12 +13,33 @@ interface EOCMapProps {
 const KC_CENTER: [number, number] = [39.0997, -94.5786];
 const KC_ZOOM = 11;
 
+/**
+ * Build a GeoJSON polygon that covers the entire world EXCEPT the KC city limits.
+ * This creates the dark mask effect outside the boundary.
+ */
+function buildInverseMask(cityCoords: [number, number][][]): GeoJSON.Feature {
+  // World bounding box (outer ring, counter-clockwise)
+  const world: [number, number][] = [
+    [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90],
+  ];
+
+  // The city polygon coords become holes in the world polygon
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'Polygon',
+      coordinates: [world, ...cityCoords],
+    },
+  };
+}
+
 export function EOCMap({ incidents, selectedId, onSelect, flyToCoord }: EOCMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   const leafletRef = useRef<typeof import('leaflet') | null>(null);
-  const geoJsonLayerRef = useRef<L.GeoJSON | null>(null);
+  const [coords, setCoords] = useState({ lat: KC_CENTER[0], lng: KC_CENTER[1] });
 
   // Store latest callbacks in refs to avoid recreating map
   const onSelectRef = useRef(onSelect);
@@ -44,6 +65,8 @@ export function EOCMap({ incidents, selectedId, onSelect, flyToCoord }: EOCMapPr
         zoom: KC_ZOOM,
         zoomControl: false,
         attributionControl: false,
+        minZoom: 10,
+        maxZoom: 18,
       });
 
       // Dark CartoDB tiles
@@ -57,25 +80,56 @@ export function EOCMap({ incidents, selectedId, onSelect, flyToCoord }: EOCMapPr
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+      // Track map center for coordinate display
+      map.on('move', () => {
+        const center = map.getCenter();
+        setCoords({ lat: center.lat, lng: center.lng });
+      });
+
       mapRef.current = map;
 
       // Load KC city limits boundary
       try {
         const res = await fetch('/kc_city_limits.geojson');
-        if (res.ok) {
-          const geojson = await res.json();
-          if (!cancelled && mapRef.current) {
-            geoJsonLayerRef.current = L.geoJSON(geojson, {
-              style: {
-                color: '#3b82f6',
-                weight: 1.5,
-                opacity: 0.3,
-                fillColor: '#3b82f6',
-                fillOpacity: 0.03,
-              },
-            }).addTo(mapRef.current);
-          }
-        }
+        if (!res.ok) return;
+        const geojson = await res.json();
+        if (cancelled || !mapRef.current) return;
+
+        // Extract polygon coordinates from the feature
+        const feature = geojson.features?.[0];
+        if (!feature?.geometry?.coordinates) return;
+
+        const cityCoords = feature.geometry.coordinates as [number, number][][];
+
+        // 1) Add the dark mask OUTSIDE the city limits
+        const inverseMask = buildInverseMask(cityCoords);
+        L.geoJSON(inverseMask as GeoJSON.GeoJsonObject, {
+          style: {
+            color: 'transparent',
+            weight: 0,
+            fillColor: '#0a0f1a',
+            fillOpacity: 0.85,
+          },
+        }).addTo(mapRef.current);
+
+        // 2) Add the cyan city limits border
+        L.geoJSON(geojson, {
+          style: {
+            color: '#22d3ee',
+            weight: 2,
+            opacity: 0.7,
+            fillColor: 'transparent',
+            fillOpacity: 0,
+          },
+        }).addTo(mapRef.current);
+
+        // 3) Fit map bounds to the city polygon
+        const boundsLayer = L.geoJSON(geojson);
+        const bounds = boundsLayer.getBounds();
+        mapRef.current.fitBounds(bounds, { padding: [20, 20] });
+
+        // 4) Set max bounds with some padding to keep KC in view
+        mapRef.current.setMaxBounds(bounds.pad(0.5));
       } catch {
         // Silently skip if not available
       }
@@ -106,7 +160,7 @@ export function EOCMap({ incidents, selectedId, onSelect, flyToCoord }: EOCMapPr
     }
   }, []);
 
-  // Create emoji icon with severity ring (matching Swift annotation view)
+  // Create emoji icon with severity ring
   const createEmojiIcon = useCallback((incident: EOCIncident, isSelected: boolean) => {
     const L = leafletRef.current;
     if (!L) return undefined;
@@ -202,8 +256,15 @@ export function EOCMap({ incidents, selectedId, onSelect, flyToCoord }: EOCMapPr
   }, [flyToCoord]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative bg-[#0a0f1a]">
       <div ref={mapContainerRef} className="w-full h-full" />
+
+      {/* Coordinate bar at bottom - matching screenshot */}
+      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center py-1.5 pointer-events-none z-[400]">
+        <span className="text-[10px] font-mono text-white/25 tracking-widest">
+          {Math.abs(coords.lat).toFixed(4)}°{coords.lat >= 0 ? 'N' : 'S'} · {Math.abs(coords.lng).toFixed(4)}°{coords.lng >= 0 ? 'E' : 'W'} · KANSAS CITY MO
+        </span>
+      </div>
 
       {/* Custom tooltip styling */}
       <style jsx global>{`

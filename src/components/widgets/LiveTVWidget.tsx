@@ -1,18 +1,20 @@
 'use client';
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import Hls from 'hls.js';
-import { Tv, Volume2, VolumeX, Search, X, Radio } from 'lucide-react';
+import { Tv, Volume2, VolumeX, Search, X, Radio, ChevronDown } from 'lucide-react';
 import type { LiveTVConfig, WidgetStyle } from '@/types/widget';
 
 interface Channel {
   name: string;
   url: string;
   category: string;
-  resolver?: 'kmbc' | 'wdaf'; // dynamic URL resolution
+  resolver?: 'kmbc' | 'wdaf' | 'pluto'; // dynamic URL resolution
+  plutoId?: string; // Pluto TV channel ID
 }
 
-// All 5 KC Local channels matching Swift LiveTVWidgetView exactly
-const KC_CHANNELS: Channel[] = [
+// All channels from live-stream-urls.txt
+const ALL_CHANNELS: Channel[] = [
+  // KC Local
   {
     name: 'KSHB 41 (NBC)',
     url: 'https://content.uplynk.com/channel/50d0fa1b042945a3a4f550f9b8412c83.m3u8',
@@ -20,7 +22,7 @@ const KC_CHANNELS: Channel[] = [
   },
   {
     name: 'KMBC 9 (ABC)',
-    url: '', // resolved dynamically
+    url: '',
     category: 'KC Local',
     resolver: 'kmbc',
   },
@@ -31,7 +33,7 @@ const KC_CHANNELS: Channel[] = [
   },
   {
     name: 'WDAF FOX 4',
-    url: '', // resolved dynamically
+    url: '',
     category: 'KC Local',
     resolver: 'wdaf',
   },
@@ -40,7 +42,82 @@ const KC_CHANNELS: Channel[] = [
     url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8',
     category: 'KC Local',
   },
+
+  // National
+  {
+    name: 'PBS National',
+    url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8',
+    category: 'National',
+  },
+  {
+    name: 'Scripps News',
+    url: 'https://547f72e6652371c3.mediapackage.us-east-1.amazonaws.com/out/v1/e3e6e29095844c4ba7d887f01e44a5ef/index.m3u8',
+    category: 'National',
+  },
+  {
+    name: 'Newsmax',
+    url: 'https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8',
+    category: 'National',
+  },
+  {
+    name: 'NBC News',
+    url: 'https://d1bl6tskrpq9ze.cloudfront.net/hls/master.m3u8?ads.xumo_channelId=99984003',
+    category: 'National',
+  },
+  {
+    name: 'Bloomberg',
+    url: 'https://www.bloomberg.com/media-manifest/streams/us.m3u8',
+    category: 'National',
+  },
+  {
+    name: 'Reuters',
+    url: 'https://amg00453-reuters-amg00453c1-xumo-us-2073.playouts.now.amagi.tv/reuters-reuters-hls/playlist.m3u8',
+    category: 'National',
+  },
+  {
+    name: 'CNN',
+    url: 'https://dbrb49pjoymg4.cloudfront.net/10001/99951386/hls/playlist.m3u8?ads.xumo_channelId=99951386',
+    category: 'National',
+  },
+  {
+    name: 'Univision',
+    url: 'https://streaming-live-fcdn.api.prd.univisionnow.com/kuvn/kuvn.isml/hls/kuvn.m3u8',
+    category: 'National',
+  },
+  {
+    name: 'Telemundo',
+    url: 'https://cdn.igocast.com/wkrp_channel1_hls/wkrp_channel1_master.m3u8',
+    category: 'National',
+  },
+
+  // Pluto TV
+  {
+    name: 'CBS News (Pluto)',
+    url: '',
+    category: 'Pluto TV',
+    resolver: 'pluto',
+    plutoId: '5a6b92f6e22a617379789618',
+  },
+  {
+    name: 'ABC News (Pluto)',
+    url: '',
+    category: 'Pluto TV',
+    resolver: 'pluto',
+    plutoId: '6508be683a0d700008c534e4',
+  },
+  {
+    name: 'FOX News / LiveNOW (Pluto)',
+    url: '',
+    category: 'Pluto TV',
+    resolver: 'pluto',
+    plutoId: '63d025db4e83e700086eaa96',
+  },
 ];
+
+function buildPlutoUrl(channelId: string): string {
+  const sid = crypto.randomUUID().replace(/-/g, '');
+  return `https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv/stitch/hls/channel/${channelId}/master.m3u8?deviceType=web&deviceId=${sid}&deviceMake=Chrome&deviceModel=Chrome&deviceVersion=120&appVersion=7.0.0&sid=${sid}&deviceDNT=0`;
+}
 
 interface LiveTVWidgetProps {
   config: LiveTVConfig;
@@ -61,8 +138,10 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   // Resolve dynamic channel URLs on mount
   useEffect(() => {
     async function resolveChannels() {
-      for (const ch of KC_CHANNELS) {
-        if (ch.resolver && !ch.url) {
+      for (const ch of ALL_CHANNELS) {
+        if (ch.resolver === 'pluto' && ch.plutoId) {
+          setResolvedUrls(prev => ({ ...prev, [`pluto-${ch.plutoId}`]: buildPlutoUrl(ch.plutoId!) }));
+        } else if (ch.resolver && !ch.url) {
           try {
             const res = await fetch(`/api/livetv?channel=${ch.resolver}`);
             if (res.ok) {
@@ -79,13 +158,16 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     }
     resolveChannels();
 
-    // Re-resolve every 30 minutes (URLs can expire)
+    // Re-resolve every 30 minutes
     const interval = setInterval(resolveChannels, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Get the effective URL for a channel (static or resolved)
+  // Get the effective URL for a channel
   const getChannelUrl = useCallback((channel: Channel): string => {
+    if (channel.resolver === 'pluto' && channel.plutoId) {
+      return resolvedUrls[`pluto-${channel.plutoId}`] || buildPlutoUrl(channel.plutoId);
+    }
     if (channel.resolver) {
       return resolvedUrls[channel.resolver] || '';
     }
@@ -95,10 +177,14 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   // Select initial channel
   useEffect(() => {
     if (config.selectedChannelURL) {
-      const found = KC_CHANNELS.find(c => c.url === config.selectedChannelURL || c.name === config.selectedChannelName);
+      const found = ALL_CHANNELS.find(c => c.url === config.selectedChannelURL || c.name === config.selectedChannelName);
       setCurrentChannel(found || { name: config.selectedChannelName || 'Custom', url: config.selectedChannelURL, category: 'Custom' });
-    } else if (KC_CHANNELS.length > 0) {
-      setCurrentChannel(KC_CHANNELS[0]);
+    } else if (config.selectedChannelName) {
+      const found = ALL_CHANNELS.find(c => c.name === config.selectedChannelName);
+      if (found) setCurrentChannel(found);
+      else setCurrentChannel(ALL_CHANNELS[0]);
+    } else {
+      setCurrentChannel(ALL_CHANNELS[0]);
     }
   }, [config.selectedChannelURL, config.selectedChannelName]);
 
@@ -108,7 +194,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     if (!video || !currentChannel) return;
 
     const url = getChannelUrl(currentChannel);
-    if (!url) return; // URL not yet resolved
+    if (!url) return;
 
     if (hlsRef.current) {
       hlsRef.current.destroy();
@@ -130,8 +216,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            // If this is a dynamic channel, try re-resolving
-            if (currentChannel.resolver) {
+            if (currentChannel.resolver && currentChannel.resolver !== 'pluto') {
               setResolving(currentChannel.resolver);
               fetch(`/api/livetv?channel=${currentChannel.resolver}`)
                 .then(r => r.json())
@@ -142,6 +227,10 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
                   setResolving(null);
                 })
                 .catch(() => setResolving(null));
+            } else if (currentChannel.resolver === 'pluto' && currentChannel.plutoId) {
+              // Refresh Pluto URL
+              const newUrl = buildPlutoUrl(currentChannel.plutoId);
+              setResolvedUrls(prev => ({ ...prev, [`pluto-${currentChannel.plutoId}`]: newUrl }));
             } else {
               setTimeout(() => hls.startLoad(), 3000);
             }
@@ -165,18 +254,16 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     };
   }, [currentChannel, getChannelUrl, resolvedUrls]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update mute state on video element
+  // Update mute state
   useEffect(() => {
     const video = videoRef.current;
-    if (video) {
-      video.muted = isMuted;
-    }
+    if (video) video.muted = isMuted;
   }, [isMuted]);
 
   const filteredChannels = useMemo(() => {
-    if (!searchQuery.trim()) return KC_CHANNELS;
+    if (!searchQuery.trim()) return ALL_CHANNELS;
     const q = searchQuery.toLowerCase();
-    return KC_CHANNELS.filter(
+    return ALL_CHANNELS.filter(
       c => c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q)
     );
   }, [searchQuery]);
@@ -207,14 +294,12 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   }
 
   const currentUrl = getChannelUrl(currentChannel);
-  const isResolving = currentChannel.resolver && !currentUrl;
+  const isResolving = currentChannel.resolver && currentChannel.resolver !== 'pluto' && !currentUrl;
 
   return (
     <div
       ref={containerRef}
       className="relative w-full h-full bg-black group"
-      onMouseEnter={() => setShowGuide(true)}
-      onMouseLeave={() => { setShowGuide(false); setSearchQuery(''); }}
     >
       {/* Video player */}
       {isResolving ? (
@@ -232,16 +317,26 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
         />
       )}
 
-      {/* Bottom controls bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="relative flex h-2 w-2 shrink-0">
+      {/* Channel selector dropdown at top */}
+      <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <button
+          onClick={() => setShowGuide(!showGuide)}
+          className="flex items-center gap-2 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 transition-colors"
+        >
+          <span className="relative flex h-1.5 w-1.5 shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
           </span>
           <span className="text-xs font-medium text-white/90 truncate">
             {currentChannel.name}
           </span>
+          <ChevronDown size={12} className={`text-white/50 transition-transform ${showGuide ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {/* Bottom controls bar */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-2 min-w-0">
           {resolving && (
             <span className="text-[9px] text-yellow-400/60">reconnecting...</span>
           )}
@@ -258,11 +353,11 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
         </button>
       </div>
 
-      {/* Channel guide overlay - right side panel */}
+      {/* Channel guide overlay */}
       {showGuide && (
         <div
-          className="absolute top-0 right-0 bottom-0 w-56 bg-[#0f172a]/95 backdrop-blur-xl border-l border-white/[0.1] flex flex-col overflow-hidden"
-          onMouseEnter={() => setShowGuide(true)}
+          className="absolute inset-0 bg-[#0f172a]/95 backdrop-blur-xl flex flex-col overflow-hidden z-20"
+          onClick={e => e.stopPropagation()}
         >
           {/* Guide header */}
           <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between shrink-0">
@@ -293,18 +388,18 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
           <div className="flex-1 overflow-y-auto">
             {Object.entries(channelsByCategory).map(([category, channels]) => (
               <div key={category}>
-                <div className="px-3 py-1.5 text-[10px] font-semibold text-white/30 uppercase tracking-wider">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-white/30 uppercase tracking-wider sticky top-0 bg-[#0f172a]/95 backdrop-blur-sm">
                   {category}
                 </div>
                 {channels.map(channel => {
                   const isActive = currentChannel.name === channel.name;
                   const channelUrl = getChannelUrl(channel);
-                  const isUnavailable = channel.resolver && !channelUrl;
+                  const isUnavailable = channel.resolver && channel.resolver !== 'pluto' && !channelUrl;
                   return (
                     <button
                       key={channel.name}
                       onClick={() => !isUnavailable && selectChannel(channel)}
-                      className={`w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-white/5 transition-colors ${
+                      className={`w-full px-3 py-2.5 flex items-center gap-2 text-left hover:bg-white/5 transition-colors ${
                         isActive ? 'bg-white/10' : ''
                       } ${isUnavailable ? 'opacity-40' : ''}`}
                       disabled={!!isUnavailable}
@@ -313,17 +408,17 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
                         size={10}
                         className={isActive ? 'text-red-400' : 'text-white/20'}
                       />
-                      <span className={`text-xs truncate ${isActive ? 'text-white font-medium' : 'text-white/60'}`}>
+                      <span className={`text-xs truncate flex-1 ${isActive ? 'text-white font-medium' : 'text-white/60'}`}>
                         {channel.name}
                       </span>
                       {isActive && (
-                        <span className="ml-auto relative flex h-1.5 w-1.5 shrink-0">
+                        <span className="relative flex h-1.5 w-1.5 shrink-0">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
                         </span>
                       )}
                       {isUnavailable && (
-                        <span className="ml-auto text-[8px] text-white/30">loading...</span>
+                        <span className="text-[8px] text-white/30">loading...</span>
                       )}
                     </button>
                   );

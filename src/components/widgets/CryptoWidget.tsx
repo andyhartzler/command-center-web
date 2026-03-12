@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import type { CryptoConfig, WidgetStyle } from '@/types/widget';
 
@@ -12,26 +12,13 @@ interface CoinData {
 }
 
 const COIN_SYMBOLS: Record<string, string> = {
-  bitcoin: 'BTC',
-  ethereum: 'ETH',
-  solana: 'SOL',
-  dogecoin: 'DOGE',
-  cardano: 'ADA',
-  polkadot: 'DOT',
-  avalanche: 'AVAX',
-  chainlink: 'LINK',
-  polygon: 'MATIC',
-  litecoin: 'LTC',
-  ripple: 'XRP',
-  tron: 'TRX',
+  bitcoin: 'BTC', ethereum: 'ETH', solana: 'SOL', dogecoin: 'DOGE',
+  cardano: 'ADA', polkadot: 'DOT', avalanche: 'AVAX', chainlink: 'LINK',
+  polygon: 'MATIC', litecoin: 'LTC', ripple: 'XRP', tron: 'TRX',
 };
 
 const COIN_NAMES: Record<string, string> = {
-  bitcoin: 'Bitcoin',
-  ethereum: 'Ethereum',
-  solana: 'Solana',
-  dogecoin: 'Dogecoin',
-  cardano: 'Cardano',
+  bitcoin: 'Bitcoin', ethereum: 'Ethereum', solana: 'Solana', dogecoin: 'Dogecoin', cardano: 'Cardano',
 };
 
 interface CryptoWidgetProps {
@@ -47,6 +34,18 @@ function formatPrice(p: number): string {
 
 export function CryptoWidget({ config }: CryptoWidgetProps) {
   const [coins, setCoins] = useState<CoinData[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dims, setDims] = useState<{ w: number; h: number }>({ w: 200, h: 160 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => setDims({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const fetchCrypto = useCallback(async () => {
     try {
@@ -54,9 +53,7 @@ export function CryptoWidget({ config }: CryptoWidgetProps) {
       const res = await fetch(`/api/crypto?coins=${coinIds}`);
       if (!res.ok) return;
       const data: CoinData[] = await res.json();
-      if (Array.isArray(data)) {
-        setCoins(data);
-      }
+      if (Array.isArray(data)) setCoins(data);
     } catch (err) {
       console.error('[CryptoWidget] fetch error', err);
     }
@@ -64,7 +61,7 @@ export function CryptoWidget({ config }: CryptoWidgetProps) {
 
   useEffect(() => {
     fetchCrypto();
-    const interval = setInterval(fetchCrypto, 60_000); // Match Swift: 60s
+    const interval = setInterval(fetchCrypto, 60_000);
     return () => clearInterval(interval);
   }, [fetchCrypto]);
 
@@ -76,18 +73,23 @@ export function CryptoWidget({ config }: CryptoWidgetProps) {
     );
   }
 
-  return (
-    <div className="w-full h-full flex flex-col p-4 overflow-hidden">
-      {/* Header - matches Swift: CRYPTO with tracking */}
-      <div
-        className="text-[10px] font-bold text-white/30 uppercase mb-3"
-        style={{ letterSpacing: '4px' }}
-      >
-        Crypto
-      </div>
+  const scale = Math.min(dims.w / 220, dims.h / 160);
+  const isCompact = dims.h < 160;
+  const padding = Math.max(6, Math.min(16, 12 * scale));
+  const rowPy = Math.max(3, Math.min(8, 7 * scale));
 
-      {/* Coin list */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide">
+  return (
+    <div ref={containerRef} className="w-full h-full flex flex-col overflow-hidden" style={{ padding }}>
+      {!isCompact && (
+        <div
+          className="font-bold text-white/30 uppercase shrink-0"
+          style={{ letterSpacing: '4px', fontSize: `${Math.max(8, 10 * scale)}px`, marginBottom: `${Math.max(4, 8 * scale)}px` }}
+        >
+          Crypto
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0">
         <div className="flex flex-col">
           {coins.map((coin, i) => {
             const isUp = coin.change24h >= 0;
@@ -97,41 +99,29 @@ export function CryptoWidget({ config }: CryptoWidgetProps) {
 
             return (
               <div key={coin.id}>
-                <div className="flex items-center gap-2.5 py-[7px]">
-                  {/* Symbol */}
-                  <span className="text-xs font-bold text-white/50 w-[36px]">
+                <div className="flex items-center gap-2" style={{ paddingTop: `${rowPy}px`, paddingBottom: `${rowPy}px` }}>
+                  <span className="font-bold text-white/50" style={{ fontSize: `${Math.max(10, 12 * scale)}px`, width: `${Math.max(30, 36 * scale)}px` }}>
                     {ticker}
                   </span>
-
-                  {/* Name */}
-                  <span className="text-xs text-white/60 truncate">
-                    {name}
-                  </span>
-
+                  {dims.w > 180 && (
+                    <span className="text-white/60 truncate" style={{ fontSize: `${Math.max(9, 11 * scale)}px` }}>
+                      {name}
+                    </span>
+                  )}
                   <div className="flex-1" />
-
-                  {/* Price + Change */}
                   <div className="flex flex-col items-end gap-0.5">
-                    <span className="text-[13px] font-light text-white/85 tabular-nums">
+                    <span className="font-light text-white/85 tabular-nums" style={{ fontSize: `${Math.max(10, 13 * scale)}px` }}>
                       {formatPrice(coin.price)}
                     </span>
-                    <div
-                      className={`flex items-center gap-0.5 ${
-                        isUp ? 'text-green-500/80' : 'text-red-500/80'
-                      }`}
-                    >
-                      <ArrowIcon size={8} strokeWidth={3} />
-                      <span className="text-[10px] font-medium tabular-nums">
+                    <div className={`flex items-center gap-0.5 ${isUp ? 'text-green-500/80' : 'text-red-500/80'}`}>
+                      <ArrowIcon size={Math.max(7, 8 * scale)} strokeWidth={3} />
+                      <span className="font-medium tabular-nums" style={{ fontSize: `${Math.max(8, 10 * scale)}px` }}>
                         {Math.abs(coin.change24h).toFixed(1)}%
                       </span>
                     </div>
                   </div>
                 </div>
-
-                {/* Divider */}
-                {i < coins.length - 1 && (
-                  <div className="h-px bg-white/[0.04]" />
-                )}
+                {i < coins.length - 1 && <div className="h-px bg-white/[0.04]" />}
               </div>
             );
           })}
