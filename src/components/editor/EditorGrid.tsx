@@ -142,7 +142,7 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
               gridColumn: `${col + 1} / span 1`,
               gridRow: `${row + 1} / span 1`,
             }}
-            className="rounded-lg bg-[#0d1525]/40 border border-[#1e2d4a]/30"
+            className="rounded-lg bg-[#1a2640]/40 border border-[#2a3d5e]/35"
           />
         ))}
 

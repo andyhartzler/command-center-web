@@ -92,9 +92,9 @@ export function DashboardEditor() {
   };
 
   return (
-    <div className="w-screen h-screen flex flex-col bg-[#060a14] overflow-hidden">
+    <div className="w-screen h-screen flex flex-col bg-[#0f172a] overflow-hidden">
       {/* Top bar */}
-      <div className="shrink-0 h-11 border-b border-white/[0.06] flex items-center px-4 gap-3 bg-[#060a14]/90 backdrop-blur-xl">
+      <div className="shrink-0 h-11 border-b border-white/[0.08] flex items-center px-4 gap-3 bg-[#0f172a]/90 backdrop-blur-xl">
         {/* Left: mode toggle */}
         <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.04] rounded-lg">
           <button
@@ -123,7 +123,7 @@ export function DashboardEditor() {
                 <ChevronDown size={8} className="opacity-50" />
               </button>
               {eocMenuOpen && (
-                <div className="absolute top-full left-0 mt-1 w-44 bg-[#0c1220] border border-white/[0.08] rounded-xl shadow-xl z-50 py-1 backdrop-blur-xl">
+                <div className="absolute top-full left-0 mt-1 w-44 bg-[#1a2438] border border-white/[0.08] rounded-xl shadow-xl z-50 py-1 backdrop-blur-xl">
                   {(['kc', 'usa', 'global'] as const).map(scope => (
                     <button
                       key={scope}
@@ -203,12 +203,12 @@ export function DashboardEditor() {
 
         <div className="flex-1" />
 
-        {/* Right: display button */}
+        {/* Right: display button — prominent */}
         <button
           onClick={() => setDisplayMode(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 transition-colors"
+          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/25"
         >
-          <Play size={10} fill="currentColor" />
+          <Play size={12} fill="currentColor" />
           Display
         </button>
       </div>
@@ -216,7 +216,7 @@ export function DashboardEditor() {
       {/* Three-panel layout */}
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left: Widget sidebar */}
-        <div className="shrink-0 w-[280px] border-r border-white/[0.06] overflow-y-auto bg-[#0a0f1a]/80">
+        <div className="shrink-0 w-[280px] border-r border-white/[0.08] overflow-y-auto bg-[#131c2e]/80">
           <WidgetSidebar />
         </div>
 
@@ -240,7 +240,7 @@ export function DashboardEditor() {
 
         {/* Right: Config panel (only when widget selected) */}
         {selectedWidgetId && (
-          <div className="shrink-0 w-[280px] border-l border-white/[0.06] overflow-y-auto bg-[#0a0f1a]/80">
+          <div className="shrink-0 w-[280px] border-l border-white/[0.08] overflow-y-auto bg-[#131c2e]/80">
             <WidgetConfigPanel
               widgetId={selectedWidgetId}
               onClose={() => setSelectedWidgetId(null)}
@@ -253,7 +253,7 @@ export function DashboardEditor() {
       {contextMenuPage && (
         <div
           ref={contextMenuRef}
-          className="fixed z-[100] bg-[#0c1220] border border-white/[0.08] rounded-xl shadow-2xl py-1 min-w-[160px] backdrop-blur-xl"
+          className="fixed z-[100] bg-[#1a2438] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[160px] backdrop-blur-xl"
           style={{ left: contextMenuPage.x, top: contextMenuPage.y }}
         >
           {isRenaming ? (
@@ -267,7 +267,7 @@ export function DashboardEditor() {
                   if (e.key === 'Escape') { setContextMenuPage(null); setIsRenaming(false); }
                 }}
                 onBlur={handleRenameSubmit}
-                className="w-full bg-[#0c1220] border border-white/[0.08] rounded px-2 py-1 text-xs text-white/90 outline-none focus:border-blue-500/50"
+                className="w-full bg-[#1a2438] border border-white/[0.1] rounded px-2 py-1 text-xs text-white/90 outline-none focus:border-blue-500/50"
               />
             </div>
           ) : (

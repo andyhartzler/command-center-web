@@ -66,7 +66,7 @@ export function DashboardDisplay() {
         onMouseLeave={() => setShowToolbar(false)}
       >
         <div className="flex items-center justify-between px-5 py-2.5"
-          style={{ background: 'rgba(6,10,20,0.65)', backdropFilter: 'blur(24px) saturate(1.4)', WebkitBackdropFilter: 'blur(24px) saturate(1.4)', borderBottom: '1px solid rgba(148,197,255,0.06)' }}
+          style={{ background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(24px) saturate(1.4)', WebkitBackdropFilter: 'blur(24px) saturate(1.4)', borderBottom: '1px solid rgba(148,197,255,0.1)' }}
         >
           <span className="text-[13px] font-medium text-white/60" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             CommandCenter

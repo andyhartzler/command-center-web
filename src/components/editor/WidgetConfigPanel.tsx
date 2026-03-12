@@ -254,7 +254,7 @@ function ConfigTextField({ label, value, onChange, placeholder }: {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="flex-1 bg-[#0c1220] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-blue-500/40 placeholder:text-white/15"
+        className="flex-1 bg-[#1a2438] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-blue-500/40 placeholder:text-white/15"
       />
     </div>
   );
@@ -310,7 +310,7 @@ function EditableList({ label, items, onChange, placeholder }: {
               onChange(next);
             }}
             placeholder={placeholder}
-            className="flex-1 bg-[#0c1220] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/70 outline-none focus:border-blue-500/40 placeholder:text-white/15"
+            className="flex-1 bg-[#1a2438] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/70 outline-none focus:border-blue-500/40 placeholder:text-white/15"
           />
           <button
             onClick={() => onChange(items.filter((_, idx) => idx !== i))}

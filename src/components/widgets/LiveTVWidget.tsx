@@ -261,7 +261,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       {/* Channel guide overlay - right side panel */}
       {showGuide && (
         <div
-          className="absolute top-0 right-0 bottom-0 w-56 bg-[#060a14]/95 backdrop-blur-xl border-l border-white/[0.08] flex flex-col overflow-hidden"
+          className="absolute top-0 right-0 bottom-0 w-56 bg-[#0f172a]/95 backdrop-blur-xl border-l border-white/[0.1] flex flex-col overflow-hidden"
           onMouseEnter={() => setShowGuide(true)}
         >
           {/* Guide header */}
