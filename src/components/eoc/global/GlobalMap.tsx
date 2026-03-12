@@ -100,6 +100,31 @@ interface JammingZone {
   severity: string;
 }
 
+interface ShipData {
+  mmsi: number;
+  name: string;
+  type: string;
+  lat: number;
+  lng: number;
+  heading: number;
+  sog: number;
+  country: string;
+}
+
+interface LiveUAMapEvent {
+  id: string;
+  title: string;
+  lat: number;
+  lng: number;
+  region: string;
+  timestamp?: string;
+}
+
+interface MeasurePoint {
+  lat: number;
+  lng: number;
+}
+
 interface Props {
   activeLayers: ActiveLayers;
   flights?: { commercial: FlightData[]; military: FlightData[]; private: FlightData[]; tracked?: FlightData[]; jammingZones?: JammingZone[] };
@@ -112,18 +137,49 @@ interface Props {
   kiwisdr?: KiwiSDRData[];
   frontlines?: any; // GeoJSON
   gdeltIncidents?: GDELTIncident[];
+  ships?: ShipData[];
+  liveuamapEvents?: LiveUAMapEvent[];
+  measurePoints?: MeasurePoint[];
+  measureActive?: boolean;
   mapStyle?: MapStyleId;
   flyToLocation?: { lat: number; lng: number } | null;
   onMouseCoords?: (lat: number, lng: number) => void;
   onContextMenu?: (lat: number, lng: number) => void;
+  onMeasureClick?: (lat: number, lng: number) => void;
 }
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
+// SVG ship icon
+const svgShip = (color: string, size = 12) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" stroke="black" stroke-width="0.5"><path d="M20 21c-1.39 0-2.78-.47-4-1.32-2.44 1.71-5.56 1.71-8 0C6.78 20.53 5.39 21 4 21H2v2h2c1.38 0 2.74-.35 4-.99 2.52 1.29 5.48 1.29 8 0 1.26.65 2.62.99 4 .99h2v-2h-2zM3.95 19H4c1.6 0 3.02-.88 4-2 .98 1.12 2.4 2 4 2s3.02-.88 4-2c.98 1.12 2.4 2 4 2h.05l1.89-6.68c.08-.26.06-.54-.06-.78s-.34-.42-.6-.5L20 10.62V6c0-1.1-.9-2-2-2h-3V1H9v3H6c-1.1 0-2 .9-2 2v4.62l-1.29.42c-.26.08-.48.26-.6.5s-.14.52-.05.78L3.95 19zM6 6h12v3.97L12 8 6 9.97V6z"/></svg>`)}`;
+
+// Generate great circle arc points between two coordinates
+function greatCircleArc(p1: { lat: number; lng: number }, p2: { lat: number; lng: number }, segments = 50): [number, number][] {
+  const toRad = (d: number) => d * Math.PI / 180;
+  const toDeg = (r: number) => r * 180 / Math.PI;
+  const lat1 = toRad(p1.lat), lng1 = toRad(p1.lng);
+  const lat2 = toRad(p2.lat), lng2 = toRad(p2.lng);
+  const d = 2 * Math.asin(Math.sqrt(Math.sin((lat2 - lat1) / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lng2 - lng1) / 2) ** 2));
+  if (d < 0.0001) return [[p1.lng, p1.lat], [p2.lng, p2.lat]];
+  const points: [number, number][] = [];
+  for (let i = 0; i <= segments; i++) {
+    const f = i / segments;
+    const A = Math.sin((1 - f) * d) / Math.sin(d);
+    const B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(lat1) * Math.cos(lng1) + B * Math.cos(lat2) * Math.cos(lng2);
+    const y = A * Math.cos(lat1) * Math.sin(lng1) + B * Math.cos(lat2) * Math.sin(lng2);
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+    points.push([toDeg(Math.atan2(y, x)), toDeg(Math.atan2(z, Math.sqrt(x * x + y * y)))]);
+  }
+  return points;
+}
+
 export function GlobalMap({
   activeLayers, flights, earthquakes, fires, news,
   satellites, carriers, cctv, kiwisdr, frontlines, gdeltIncidents,
-  mapStyle = 'dark', flyToLocation, onMouseCoords, onContextMenu,
+  ships, liveuamapEvents, measurePoints, measureActive,
+  mapStyle = 'dark', flyToLocation, onMouseCoords, onContextMenu, onMeasureClick,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -280,6 +336,62 @@ export function GlobalMap({
     return frontlines;
   }, [activeLayers.frontlines, frontlines]);
 
+  // Ships GeoJSON
+  const shipsGeoJSON = useMemo(() => {
+    if (!activeLayers.ships || !ships?.length) return EMPTY_FC;
+    const visible = ships.filter(s => inView(s.lat, s.lng));
+    return {
+      type: 'FeatureCollection' as const,
+      features: visible.map((s, i) => ({
+        type: 'Feature' as const,
+        properties: { id: i, name: s.name, type: s.type, sog: s.sog, heading: s.heading, country: s.country, mmsi: s.mmsi },
+        geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
+      })),
+    };
+  }, [activeLayers.ships, ships, inView]);
+
+  // LiveUAMap events GeoJSON
+  const liveuamapGeoJSON = useMemo(() => {
+    if (!activeLayers.liveuamap || !liveuamapEvents?.length) return EMPTY_FC;
+    return {
+      type: 'FeatureCollection' as const,
+      features: liveuamapEvents.map((e, i) => ({
+        type: 'Feature' as const,
+        properties: { id: i, title: e.title, region: e.region },
+        geometry: { type: 'Point' as const, coordinates: [e.lng, e.lat] },
+      })),
+    };
+  }, [activeLayers.liveuamap, liveuamapEvents]);
+
+  // Measure line GeoJSON
+  const measureGeoJSON = useMemo(() => {
+    if (!measurePoints || measurePoints.length < 2) return EMPTY_FC;
+    return {
+      type: 'FeatureCollection' as const,
+      features: [{
+        type: 'Feature' as const,
+        properties: {},
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: measurePoints.map(p => [p.lng, p.lat]),
+        },
+      }],
+    };
+  }, [measurePoints]);
+
+  // Measure points GeoJSON
+  const measurePointsGeoJSON = useMemo(() => {
+    if (!measurePoints || measurePoints.length === 0) return EMPTY_FC;
+    return {
+      type: 'FeatureCollection' as const,
+      features: measurePoints.map((p, i) => ({
+        type: 'Feature' as const,
+        properties: { id: i, label: `P${i + 1}` },
+        geometry: { type: 'Point' as const, coordinates: [p.lng, p.lat] },
+      })),
+    };
+  }, [measurePoints]);
+
   // GPS Jamming zones GeoJSON
   const jammingGeoJSON = useMemo(() => {
     if (!activeLayers.gps_jamming || !flights?.jammingZones?.length) return EMPTY_FC;
@@ -348,12 +460,18 @@ export function GlobalMap({
   }, [flights, activeLayers, inView]);
 
   const handleClick = useCallback((e: any) => {
+    // Measure mode takes priority
+    if (measureActive && onMeasureClick) {
+      onMeasureClick(e.lngLat.lat, e.lngLat.lng);
+      return;
+    }
+
     if (!mapRef.current) return;
     const map = mapRef.current.getMap();
     const queryLayers = [
       'earthquakes-circle', 'news-circle', 'satellites-circle',
       'cctv-clusters', 'cctv-unclustered', 'kiwisdr-clusters', 'kiwisdr-unclustered',
-      'gdelt-circle',
+      'gdelt-circle', 'liveuamap-circle', 'ships-circle',
     ];
     const features = map.queryRenderedFeatures(e.point, { layers: queryLayers });
     if (features.length > 0) {
@@ -368,13 +486,17 @@ export function GlobalMap({
         content = `${p.name} · ${p.type} · ${p.alt} km`;
       } else if (p.source && p.mediaUrl) {
         content = `${p.name} · ${p.source}`;
+      } else if (p.mmsi) {
+        content = `${p.name} · ${p.type} · ${p.sog} kts · ${p.country}`;
+      } else if (p.region) {
+        content = `${p.title} · ${p.region}`;
       }
 
       setPopup({ lng: coords[0], lat: coords[1], content });
     } else {
       setPopup(null);
     }
-  }, []);
+  }, [measureActive, onMeasureClick]);
 
   const handleContextMenu = useCallback((e: any) => {
     e.preventDefault();
@@ -384,7 +506,7 @@ export function GlobalMap({
   }, [onContextMenu]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className={`w-full h-full relative ${measureActive ? 'cursor-crosshair' : ''}`}>
       <Map
         ref={mapRef}
         {...viewState}
@@ -744,6 +866,134 @@ export function GlobalMap({
               'circle-radius': 4,
               'circle-color': '#f59e0b',
               'circle-opacity': 0.7,
+            }}
+          />
+        </Source>
+
+        {/* Ships / Maritime vessels */}
+        <Source id="ships-src" type="geojson" data={shipsGeoJSON} cluster clusterMaxZoom={8} clusterRadius={30}>
+          <Layer
+            id="ships-clusters"
+            type="circle"
+            filter={['has', 'point_count']}
+            paint={{
+              'circle-radius': ['step', ['get', 'point_count'], 8, 10, 12, 50, 16],
+              'circle-color': '#2dd4bf',
+              'circle-opacity': 0.6,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': 'rgba(45,212,191,0.3)',
+            }}
+          />
+          <Layer
+            id="ships-cluster-count"
+            type="symbol"
+            filter={['has', 'point_count']}
+            layout={{
+              'text-field': '{point_count_abbreviated}',
+              'text-size': 9,
+              'text-font': ['Open Sans Regular'],
+            }}
+            paint={{ 'text-color': '#ffffff' }}
+          />
+          <Layer
+            id="ships-circle"
+            type="circle"
+            filter={['!', ['has', 'point_count']]}
+            paint={{
+              'circle-radius': ['match', ['get', 'type'],
+                'tanker', 5,
+                'cargo', 5,
+                'military_vessel', 6,
+                'passenger', 5,
+                4,
+              ],
+              'circle-color': ['match', ['get', 'type'],
+                'tanker', '#ef4444',
+                'cargo', '#ef4444',
+                'military_vessel', '#eab308',
+                'passenger', '#9ca3af',
+                'yacht', '#3b82f6',
+                '#2dd4bf',
+              ],
+              'circle-opacity': 0.7,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': 'rgba(255,255,255,0.15)',
+            }}
+          />
+          <Layer
+            id="ships-label"
+            type="symbol"
+            filter={['all', ['!', ['has', 'point_count']], ['any',
+              ['==', ['get', 'type'], 'military_vessel'],
+              ['==', ['get', 'type'], 'passenger'],
+            ]]}
+            layout={{
+              'text-field': ['get', 'name'],
+              'text-size': 8,
+              'text-offset': [0, 1.3],
+              'text-font': ['Open Sans Regular'],
+              'text-max-width': 8,
+            }}
+            paint={{
+              'text-color': '#2dd4bf',
+              'text-halo-color': '#000000',
+              'text-halo-width': 1,
+              'text-opacity': 0.6,
+            }}
+          />
+        </Source>
+
+        {/* LiveUAMap events */}
+        <Source id="liveuamap-src" type="geojson" data={liveuamapGeoJSON}>
+          <Layer
+            id="liveuamap-circle"
+            type="circle"
+            paint={{
+              'circle-radius': 7,
+              'circle-color': '#fb923c',
+              'circle-opacity': 0.6,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#f97316',
+              'circle-stroke-opacity': 0.4,
+            }}
+          />
+          <Layer
+            id="liveuamap-pulse"
+            type="circle"
+            paint={{
+              'circle-radius': 14,
+              'circle-color': 'transparent',
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#f97316',
+              'circle-stroke-opacity': 0.15,
+            }}
+          />
+        </Source>
+
+        {/* Measure line */}
+        <Source id="measure-line-src" type="geojson" data={measureGeoJSON}>
+          <Layer
+            id="measure-line"
+            type="line"
+            paint={{
+              'line-color': '#22d3ee',
+              'line-width': 2,
+              'line-dasharray': [4, 3],
+              'line-opacity': 0.8,
+            }}
+          />
+        </Source>
+        <Source id="measure-points-src" type="geojson" data={measurePointsGeoJSON}>
+          <Layer
+            id="measure-points"
+            type="circle"
+            paint={{
+              'circle-radius': 5,
+              'circle-color': '#22d3ee',
+              'circle-opacity': 0.9,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#ffffff',
+              'circle-stroke-opacity': 0.6,
             }}
           />
         </Source>

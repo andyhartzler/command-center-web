@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import {
   Plane, AlertTriangle, Activity, Flame, Newspaper,
   Sun, ChevronDown, ChevronUp, Globe, Shield, Wifi,
-  Satellite, Anchor, Camera, Radio, MapPin, Zap, Star, AlertOctagon
+  Satellite, Anchor, Camera, Radio, MapPin, Zap, Star, AlertOctagon, Ship
 } from 'lucide-react';
 
 export type LayerKey =
@@ -12,7 +12,8 @@ export type LayerKey =
   | 'earthquakes' | 'fires' | 'news_markers'
   | 'day_night' | 'gps_jamming'
   | 'satellites' | 'carriers' | 'cctv'
-  | 'kiwisdr' | 'frontlines' | 'gdelt_incidents';
+  | 'kiwisdr' | 'frontlines' | 'gdelt_incidents'
+  | 'ships' | 'liveuamap';
 
 export type ActiveLayers = Record<LayerKey, boolean>;
 
@@ -32,6 +33,8 @@ export const DEFAULT_LAYERS: ActiveLayers = {
   kiwisdr: false,
   frontlines: true,
   gdelt_incidents: true,
+  ships: false,
+  liveuamap: true,
 };
 
 interface LayerDef {
@@ -57,6 +60,8 @@ const LAYERS: LayerDef[] = [
   { id: 'news_markers', name: 'Global Incidents', source: 'RSS / GDELT', icon: AlertTriangle, color: 'text-amber-400' },
   { id: 'cctv', name: 'CCTV Cameras', source: 'TfL / SGP / NYC', icon: Camera, color: 'text-green-400' },
   { id: 'kiwisdr', name: 'KiwiSDR Receivers', source: 'kiwisdr.com', icon: Radio, color: 'text-amber-500' },
+  { id: 'ships', name: 'Maritime Vessels', source: 'AIS', icon: Ship, color: 'text-teal-400' },
+  { id: 'liveuamap', name: 'LiveUA Map Events', source: 'liveuamap.com', icon: Zap, color: 'text-orange-300' },
   { id: 'day_night', name: 'Day / Night Cycle', source: 'Solar Calc', icon: Sun, color: 'text-blue-300' },
 ];
 

@@ -23,6 +23,9 @@ export function GlobalMapLegend() {
     { color: '#ef4444', label: 'News Incident (high)', shape: 'circle' },
     { color: '#22c55e', label: 'CCTV Camera', shape: 'circle' },
     { color: '#f59e0b', label: 'KiwiSDR Receiver', shape: 'circle' },
+    { color: '#2dd4bf', label: 'Maritime Vessel', shape: 'circle' },
+    { color: '#ef4444', label: 'Tanker / Cargo Ship', shape: 'circle' },
+    { color: '#fb923c', label: 'LiveUA Map Event', shape: 'circle' },
     { color: '#000020', label: 'Night Zone (solar)', shape: 'rect' },
   ];
 

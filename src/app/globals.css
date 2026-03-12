@@ -24,6 +24,11 @@
 }
 .maplibregl-ctrl-attrib { display: none !important; }
 
+/* Smooth position interpolation for flight/satellite markers */
+.maplibregl-marker {
+  transition: transform 2s ease-out !important;
+}
+
 /* Custom scrollbar for panels */
 .styled-scrollbar::-webkit-scrollbar { width: 4px; }
 .styled-scrollbar::-webkit-scrollbar-track { background: transparent; }
