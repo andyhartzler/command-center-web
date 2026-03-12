@@ -34,7 +34,8 @@ export type WidgetType =
   | 'flightStatus'
   | 'aircraftTracker'
   | 'health'
-  | 'homeKit';
+  | 'homeKit'
+  | 'airQuality';
 
 export interface GridSize {
   columns: number;
@@ -163,6 +164,11 @@ export interface AircraftTrackerConfig {
   ownerLabel: string;
 }
 
+export interface AirQualityConfig {
+  latitude: number;
+  longitude: number;
+}
+
 export type WidgetConfig =
   | { type: 'clock'; config: ClockConfig }
   | { type: 'weather'; config: WeatherConfig }
@@ -187,7 +193,8 @@ export type WidgetConfig =
   | { type: 'calendar'; config: { feeds?: { name: string; url: string }[] } }
   | { type: 'reminders'; config: Record<string, never> }
   | { type: 'health'; config: Record<string, never> }
-  | { type: 'homeKit'; config: Record<string, never> };
+  | { type: 'homeKit'; config: Record<string, never> }
+  | { type: 'airQuality'; config: AirQualityConfig };
 
 export interface DashboardWidget {
   id: string;
@@ -248,6 +255,7 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#fb923c', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
+  airQuality: { displayName: 'Air Quality', category: 'Time & Location', icon: 'wind', color: '#34d399', defaultFamily: 'small', supportedFamilies: ['small', 'medium'] },
 };
 
 export function defaultConfig(type: WidgetType): WidgetConfig {
@@ -276,5 +284,6 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'reminders': return { type: 'reminders', config: {} };
     case 'health': return { type: 'health', config: {} };
     case 'homeKit': return { type: 'homeKit', config: {} };
+    case 'airQuality': return { type: 'airQuality', config: { latitude: 39.0997, longitude: -94.5786 } };
   }
 }

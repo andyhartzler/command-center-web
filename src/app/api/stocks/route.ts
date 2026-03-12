@@ -24,6 +24,15 @@ export async function GET(request: NextRequest) {
     if (res.ok) {
       const data = await res.json();
       const results = symbolList.map(sym => {
+        // New format: data[SYMBOL] = { close: [...], previousClose, chartPreviousClose, ... }
+        const symData = data[sym];
+        if (symData && Array.isArray(symData.close) && symData.close.length > 0) {
+          const price = symData.close[symData.close.length - 1] ?? 0;
+          const prevClose = symData.previousClose ?? symData.chartPreviousClose ?? price;
+          const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+          return { symbol: sym, price, changePercent };
+        }
+        // Legacy format: data.spark.result[].response[0].meta
         const spark = data.spark?.result?.find((r: { symbol: string }) => r.symbol === sym);
         const meta = spark?.response?.[0]?.meta;
         if (meta) {

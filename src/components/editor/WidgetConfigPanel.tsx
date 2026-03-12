@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import {
   Clock, CloudSun, Sun, Moon, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
-  Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu,
+  Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu, Wind,
   Trash2, X, Plus, Minus, Radio,
 } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
@@ -22,7 +22,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   'trending-up': TrendingUp, bitcoin: Bitcoin, 'bar-chart-3': BarChart3,
   activity: Activity, plane: Plane, 'alert-triangle': AlertTriangle,
   'plane-landing': PlaneLanding, flame: Flame, heart: Heart,
-  home: Home, cpu: Cpu,
+  home: Home, cpu: Cpu, wind: Wind,
 };
 
 interface WidgetConfigPanelProps {
@@ -937,6 +937,26 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
               value={(cfg.ownerLabel as string) || ''}
               onChange={v => updateConfig({ ownerLabel: v })}
               placeholder="e.g. Dad's Plane"
+            />
+          </div>
+        </ConfigSection>
+      );
+
+    case 'airQuality':
+      return (
+        <ConfigSection title="Air Quality Settings">
+          <div className="space-y-2">
+            <ConfigNumberField
+              label="Latitude"
+              value={(cfg.latitude as number) || 39.0997}
+              onChange={v => updateConfig({ latitude: v })}
+              min={-90} max={90} step={0.01}
+            />
+            <ConfigNumberField
+              label="Longitude"
+              value={(cfg.longitude as number) || -94.5786}
+              onChange={v => updateConfig({ longitude: v })}
+              min={-180} max={180} step={0.01}
             />
           </div>
         </ConfigSection>
