@@ -49,8 +49,7 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
     case 'calendar':
     case 'reminders':
     case 'health':
-    case 'homeKit':
-    case 'systemStatus': {
+    case 'homeKit': {
       const meta = WIDGET_TYPE_META[widgetConfig.type];
       return <PlaceholderWidget name={meta.displayName} icon={meta.icon} color={meta.color} />;
     }

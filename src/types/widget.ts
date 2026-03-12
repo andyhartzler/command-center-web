@@ -31,8 +31,7 @@ export type WidgetType =
   | 'faaDelays'
   | 'wildfires'
   | 'health'
-  | 'homeKit'
-  | 'systemStatus';
+  | 'homeKit';
 
 export interface GridSize {
   columns: number;
@@ -166,8 +165,7 @@ export type WidgetConfig =
   | { type: 'calendar'; config: Record<string, never> }
   | { type: 'reminders'; config: Record<string, never> }
   | { type: 'health'; config: Record<string, never> }
-  | { type: 'homeKit'; config: Record<string, never> }
-  | { type: 'systemStatus'; config: Record<string, never> };
+  | { type: 'homeKit'; config: Record<string, never> };
 
 export interface DashboardWidget {
   id: string;
@@ -225,7 +223,6 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#fb923c', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
   health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  systemStatus: { displayName: 'System', category: 'System', icon: 'cpu', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
 };
 
 export function defaultConfig(type: WidgetType): WidgetConfig {
@@ -251,6 +248,5 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'reminders': return { type: 'reminders', config: {} };
     case 'health': return { type: 'health', config: {} };
     case 'homeKit': return { type: 'homeKit', config: {} };
-    case 'systemStatus': return { type: 'systemStatus', config: {} };
   }
 }

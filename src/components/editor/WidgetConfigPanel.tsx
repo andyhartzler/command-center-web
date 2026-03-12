@@ -705,7 +705,6 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
     case 'reminders':
     case 'health':
     case 'homeKit':
-    case 'systemStatus':
       return (
         <ConfigSection title="Settings">
           <p className="text-[11px] text-white/25 italic">No additional settings for this widget type.</p>

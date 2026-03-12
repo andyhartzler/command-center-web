@@ -77,7 +77,7 @@ const DEMO_PAGE: DashboardPage = {
     demoWidget('w8', 'sports',             'medium', 0, 5),
     demoWidget('w9', 'faaDelays',          'medium', 3, 5),
     demoWidget('w10', 'predictionMarkets', 'medium', 6, 5),
-    demoWidget('w11', 'systemStatus',      'medium', 9, 5),
+    demoWidget('w11', 'sun',               'small',  9, 5),
   ],
   backgroundTheme: 'deepSpace',
   autoRotateSeconds: null,
