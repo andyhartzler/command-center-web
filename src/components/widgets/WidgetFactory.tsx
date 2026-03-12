@@ -53,5 +53,9 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
       const meta = WIDGET_TYPE_META[widgetConfig.type];
       return <PlaceholderWidget name={meta.displayName} icon={meta.icon} color={meta.color} />;
     }
+    default: {
+      // Safety net for removed/unknown widget types
+      return <PlaceholderWidget name="Unknown" icon="cpu" color="#64748b" />;
+    }
   }
 }

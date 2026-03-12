@@ -1,7 +1,21 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { type DashboardWidget, type WidgetConfig, FAMILY_GRID_SIZE, defaultConfig, type WidgetType, type WidgetFamily } from '@/types/widget';
+import { type DashboardWidget, type WidgetConfig, WIDGET_TYPE_META, FAMILY_GRID_SIZE, defaultConfig, type WidgetType, type WidgetFamily } from '@/types/widget';
 import { type DashboardPage, GRID_COLUMNS, GRID_ROWS, type AppMode, type EOCScope } from '@/types/dashboard';
+
+// Valid widget types (used to filter out removed types from saved state)
+const VALID_WIDGET_TYPES = new Set(Object.keys(WIDGET_TYPE_META));
+
+// Sanitize pages loaded from localStorage to handle schema changes
+function sanitizePages(pages: DashboardPage[]): DashboardPage[] {
+  return pages.map(page => ({
+    ...page,
+    widgets: page.widgets.filter(w => {
+      // Remove widgets whose type no longer exists (e.g. systemStatus)
+      return VALID_WIDGET_TYPES.has(w.widgetConfig?.type);
+    }),
+  }));
+}
 
 interface AppStateContextType {
   pages: DashboardPage[];
@@ -152,7 +166,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const saved = localStorage.getItem('commandcenter-state');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.pages?.length) setPages(parsed.pages);
+        if (parsed.pages?.length) setPages(sanitizePages(parsed.pages));
         if (typeof parsed.currentPageIndex === 'number') setCurrentPageIndex(parsed.currentPageIndex);
         if (parsed.eocServerURL) setEocServerURL(parsed.eocServerURL);
       }
