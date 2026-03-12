@@ -24,8 +24,8 @@ export function ClockWidget({ config }: Props) {
     const update = () => {
       const w = el.clientWidth;
       const h = el.clientHeight;
-      // Base design: ~240x160. Scale proportionally.
-      const s = Math.min(w / 240, h / 160);
+      // Base design: ~240 wide, content ~120 tall (label+time+date).
+      const s = Math.min(w / 240, h / 120);
       setScale(Math.max(0.4, Math.min(2.5, s)));
     };
     update();
