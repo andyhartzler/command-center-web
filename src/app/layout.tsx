@@ -13,8 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Command Center",
-  description: "Real-time dashboard and operations center",
+  title: "H",
+  description: "Observe. Everything is connected.",
+  metadataBase: new URL("https://hartzler.app"),
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon",
+  },
 };
 
 export default function RootLayout({

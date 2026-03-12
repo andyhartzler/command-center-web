@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="96" fill="#0a0a0a"/>
+  <g>
+    <!-- Left vertical stroke -->
+    <rect x="112" y="96" width="64" height="320" rx="32" fill="url(#grad)"/>
+    <!-- Right vertical stroke -->
+    <rect x="336" y="96" width="64" height="320" rx="32" fill="url(#grad)"/>
+    <!-- Crossbar - angled for abstract feel -->
+    <rect x="144" y="224" width="224" height="56" rx="28" fill="url(#grad)" transform="rotate(-6 256 252)"/>
+  </g>
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+  </defs>
+</svg>
