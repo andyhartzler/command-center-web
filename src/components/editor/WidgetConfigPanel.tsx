@@ -1,10 +1,10 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Clock, CloudSun, Sun, Moon, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
   Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu, Wind,
-  Trash2, X, Plus, Minus, Radio,
+  Trash2, X, Plus, Minus, Radio, Search,
 } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import {
@@ -786,6 +786,22 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
               value={(cfg.isMuted as boolean) ?? true}
               onChange={v => updateConfig({ isMuted: v })}
             />
+            {/* IPTV toggle + browser */}
+            <div className="border-t border-white/[0.04] pt-2">
+              <ToggleRow
+                label="Show IPTV Channels"
+                value={(cfg.showIPTV as boolean) || false}
+                onChange={v => updateConfig({ showIPTV: v })}
+              />
+              {(cfg.showIPTV as boolean) && (
+                <div className="mt-2">
+                  <IPTVChannelBrowser
+                    selectedName={(cfg.selectedChannelName as string) || ''}
+                    onSelect={(name, url) => updateConfig({ selectedChannelName: name, selectedChannelURL: url })}
+                  />
+                </div>
+              )}
+            </div>
             {/* Custom URL fallback */}
             <div className="border-t border-white/[0.04] pt-2">
               <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider mb-1.5">Custom Stream</div>
@@ -1026,6 +1042,146 @@ function LiveTVChannelPicker({ selectedName, onSelect }: {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// --- IPTV Channel Browser ---
+
+interface IPTVChannel {
+  name: string;
+  url: string;
+  logo: string;
+  country: string;
+  group: string;
+}
+
+function IPTVChannelBrowser({ selectedName, onSelect }: {
+  selectedName: string;
+  onSelect: (name: string, url: string) => void;
+}) {
+  const [channels, setChannels] = useState<IPTVChannel[]>([]);
+  const [countries, setCountries] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const [country, setCountry] = useState('United States');
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const fetchChannels = useCallback(async (s: string, c: string) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (s) params.set('search', s);
+      if (c) params.set('country', c);
+      const res = await fetch(`/api/iptv?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setChannels(data.channels || []);
+        setTotal(data.total || 0);
+        if (data.countries) setCountries(data.countries);
+      }
+    } catch (err) {
+      console.error('[IPTV] fetch error', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChannels('', country);
+  }, [fetchChannels, country]);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchChannels(val, country);
+    }, 300);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">
+        IPTV Channels ({total.toLocaleString()})
+      </div>
+
+      {/* Country filter */}
+      <select
+        value={country}
+        onChange={e => { setCountry(e.target.value); setSearch(''); }}
+        className="w-full bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-[10px] text-white/70 outline-none focus:border-white/15"
+      >
+        <option value="">All Countries</option>
+        {countries.map(c => (
+          <option key={c} value={c}>{c}</option>
+        ))}
+      </select>
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-white/20" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => handleSearchChange(e.target.value)}
+          placeholder="Search channels..."
+          className="w-full bg-[#252528] border border-white/[0.06] rounded pl-6 pr-2 py-1 text-[10px] text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
+        />
+      </div>
+
+      {/* Channel list */}
+      <div className="max-h-[300px] overflow-y-auto space-y-0.5 scrollbar-thin">
+        {loading ? (
+          <div className="flex items-center justify-center py-4">
+            <div className="w-3 h-3 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
+          </div>
+        ) : channels.length === 0 ? (
+          <div className="text-[10px] text-white/25 text-center py-3">No channels found</div>
+        ) : (
+          channels.map((ch, i) => {
+            const isActive = selectedName === ch.name;
+            return (
+              <button
+                key={`${ch.name}-${i}`}
+                onClick={() => onSelect(ch.name, ch.url)}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left ${
+                  isActive
+                    ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30'
+                    : 'bg-white/[0.02] border border-transparent hover:bg-white/5'
+                }`}
+              >
+                {ch.logo ? (
+                  <img
+                    src={ch.logo}
+                    alt=""
+                    className="w-5 h-5 rounded object-contain bg-white/5 shrink-0"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <Tv size={10} className="text-white/20 shrink-0 w-5" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className={`text-[10px] font-medium truncate ${isActive ? 'text-white/90' : 'text-white/60'}`}>
+                    {ch.name}
+                  </div>
+                </div>
+                {isActive && (
+                  <span className="relative flex h-1.5 w-1.5 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+                  </span>
+                )}
+              </button>
+            );
+          })
+        )}
+        {!loading && total > 200 && (
+          <div className="text-[9px] text-white/20 text-center py-1">
+            Showing 200 of {total.toLocaleString()} channels. Search to narrow results.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

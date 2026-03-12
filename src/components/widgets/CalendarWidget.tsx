@@ -64,6 +64,7 @@ export function CalendarWidget({ config }: CalendarWidgetProps) {
 
   const feeds = (config as CalendarConfig).feeds || [];
   const hasFeeds = feeds.length > 0;
+  const feedsKey = JSON.stringify(feeds);
 
   const fetchEvents = useCallback(async () => {
     if (!hasFeeds) {
@@ -71,7 +72,7 @@ export function CalendarWidget({ config }: CalendarWidgetProps) {
       return;
     }
     try {
-      const res = await fetch(`/api/calendar?feeds=${encodeURIComponent(JSON.stringify(feeds))}`);
+      const res = await fetch(`/api/calendar?feeds=${encodeURIComponent(feedsKey)}`);
       if (res.ok) {
         const data = await res.json();
         setEvents(data.events || []);
@@ -81,7 +82,7 @@ export function CalendarWidget({ config }: CalendarWidgetProps) {
     } finally {
       setLoading(false);
     }
-  }, [hasFeeds, feeds]);
+  }, [hasFeeds, feedsKey]);
 
   useEffect(() => {
     fetchEvents();

@@ -50,6 +50,8 @@ interface AppStateContextType {
   setEocServerURL: (u: string) => void;
   addPage: () => void;
   deletePage: (index: number) => void;
+  duplicatePage: (index: number) => void;
+  movePage: (from: number, to: number) => void;
   renamePage: (index: number, name: string) => void;
   addWidget: (type: WidgetType, family: WidgetFamily, configOverride?: WidgetConfig) => void;
   deleteWidget: (id: string) => void;
@@ -263,6 +265,34 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setCurrentPageIndex(prev => Math.min(prev, Math.max(0, pages.length - 2)));
   }, [pages.length]);
 
+  const duplicatePage = useCallback((index: number) => {
+    setPages(prev => {
+      if (index >= prev.length) return prev;
+      const source = prev[index];
+      const dup: DashboardPage = {
+        ...source,
+        id: crypto.randomUUID(),
+        name: `${source.name} (Copy)`,
+        widgets: source.widgets.map(w => ({ ...w, id: crypto.randomUUID() })),
+      };
+      const next = [...prev];
+      next.splice(index + 1, 0, dup);
+      return next;
+    });
+    setCurrentPageIndex(index + 1);
+  }, []);
+
+  const movePage = useCallback((from: number, to: number) => {
+    setPages(prev => {
+      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setCurrentPageIndex(to);
+  }, []);
+
   const renamePage = useCallback((index: number, name: string) => {
     setPages(prev => {
       if (index >= prev.length) return prev;
@@ -382,7 +412,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       pages, setPages, currentPageIndex, setCurrentPageIndex,
       isDisplayMode, setDisplayMode, appMode, setAppMode,
       eocScope, setEocScope, eocServerURL, setEocServerURL,
-      addPage, deletePage, renamePage,
+      addPage, deletePage, duplicatePage, movePage, renamePage,
       addWidget, deleteWidget, moveWidget, updateWidget, resizeWidget,
       hasSpaceForWidget,
     }}>

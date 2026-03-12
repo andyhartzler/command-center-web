@@ -14,6 +14,8 @@ export function DashboardEditor() {
     setDisplayMode,
     addPage,
     deletePage,
+    duplicatePage,
+    movePage,
     renamePage,
     appMode,
     setAppMode,
@@ -79,6 +81,24 @@ export function DashboardEditor() {
   const handleDeletePage = () => {
     if (contextMenuPage === null) return;
     deletePage(contextMenuPage.index);
+    setContextMenuPage(null);
+  };
+
+  const handleDuplicatePage = () => {
+    if (contextMenuPage === null) return;
+    duplicatePage(contextMenuPage.index);
+    setContextMenuPage(null);
+  };
+
+  const handleMovePageLeft = () => {
+    if (contextMenuPage === null || contextMenuPage.index === 0) return;
+    movePage(contextMenuPage.index, contextMenuPage.index - 1);
+    setContextMenuPage(null);
+  };
+
+  const handleMovePageRight = () => {
+    if (contextMenuPage === null || contextMenuPage.index >= pages.length - 1) return;
+    movePage(contextMenuPage.index, contextMenuPage.index + 1);
     setContextMenuPage(null);
   };
 
@@ -277,6 +297,27 @@ export function DashboardEditor() {
                 className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/5"
               >
                 Rename...
+              </button>
+              <button
+                onClick={handleDuplicatePage}
+                className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/5"
+              >
+                Duplicate
+              </button>
+              <div className="border-t border-white/5 my-1" />
+              <button
+                onClick={handleMovePageLeft}
+                disabled={contextMenuPage.index === 0}
+                className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Move Left
+              </button>
+              <button
+                onClick={handleMovePageRight}
+                disabled={contextMenuPage.index >= pages.length - 1}
+                className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Move Right
               </button>
               <div className="border-t border-white/5 my-1" />
               <button
