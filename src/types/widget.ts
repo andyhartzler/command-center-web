@@ -184,7 +184,7 @@ export type WidgetConfig =
   | { type: 'moonPhase'; config: MoonPhaseConfig }
   | { type: 'flightStatus'; config: FlightStatusConfig }
   | { type: 'aircraftTracker'; config: AircraftTrackerConfig }
-  | { type: 'calendar'; config: Record<string, never> }
+  | { type: 'calendar'; config: { feeds?: { name: string; url: string }[] } }
   | { type: 'reminders'; config: Record<string, never> }
   | { type: 'health'; config: Record<string, never> }
   | { type: 'homeKit'; config: Record<string, never> };
@@ -272,7 +272,7 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'webcams': return { type: 'webcams', config: { cameraIds: [], cameraNames: [], corridorFilter: [], loadAllCameras: false, rotateIntervalSeconds: 15, viewMode: 'single' } };
     case 'camera': return { type: 'camera', config: { url: '', label: 'Camera', isMuted: true } };
     case 'liveTV': return { type: 'liveTV', config: { selectedChannelURL: '', selectedChannelName: '', isMuted: true, showIPTV: false } };
-    case 'calendar': return { type: 'calendar', config: {} };
+    case 'calendar': return { type: 'calendar', config: { feeds: [] } };
     case 'reminders': return { type: 'reminders', config: {} };
     case 'health': return { type: 'health', config: {} };
     case 'homeKit': return { type: 'homeKit', config: {} };

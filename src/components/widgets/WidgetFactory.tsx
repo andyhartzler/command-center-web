@@ -22,6 +22,7 @@ const LiveTVWidget = dynamic(() => import('./LiveTVWidget').then(m => ({ default
 const MoonPhaseWidget = dynamic(() => import('./MoonPhaseWidget').then(m => ({ default: m.MoonPhaseWidget })), { ssr: false });
 const FlightStatusWidget = dynamic(() => import('./FlightStatusWidget').then(m => ({ default: m.FlightStatusWidget })), { ssr: false });
 const AircraftTrackerWidget = dynamic(() => import('./AircraftTrackerWidget').then(m => ({ default: m.AircraftTrackerWidget })), { ssr: false });
+const CalendarWidget = dynamic(() => import('./CalendarWidget').then(m => ({ default: m.CalendarWidget })), { ssr: false });
 const PlaceholderWidget = dynamic(() => import('./PlaceholderWidget').then(m => ({ default: m.PlaceholderWidget })), { ssr: false });
 
 interface WidgetFactoryProps {
@@ -52,7 +53,7 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
     case 'moonPhase': return <MoonPhaseWidget config={widgetConfig.config} style={style} />;
     case 'flightStatus': return <FlightStatusWidget config={widgetConfig.config} style={style} />;
     case 'aircraftTracker': return <AircraftTrackerWidget config={widgetConfig.config} style={style} />;
-    case 'calendar':
+    case 'calendar': return <CalendarWidget config={widgetConfig.config} style={style} />;
     case 'reminders':
     case 'health':
     case 'homeKit': {
