@@ -31,17 +31,17 @@ function getMoonPhase(): { phase: number; name: string; illumination: number; ag
 }
 
 /**
- * Draw a clean, macOS-style moon.
- * Uses smooth gradients and soft maria - NO noise, minimal craters.
+ * Draw phase shadow over a real moon photograph.
+ * Loads /moon-texture.jpg, draws it, then overlays the shadow terminator.
  */
-function drawMoon(canvas: HTMLCanvasElement, phase: number) {
+function drawMoon(canvas: HTMLCanvasElement, phase: number, moonImg: HTMLImageElement) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
   const size = canvas.width;
   const cx = size / 2;
   const cy = size / 2;
-  const r = size / 2 - 2;
+  const r = size / 2;
 
   ctx.clearRect(0, 0, size, size);
 
@@ -51,92 +51,10 @@ function drawMoon(canvas: HTMLCanvasElement, phase: number) {
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.clip();
 
-  // Base moon disc - clean silver with soft limb darkening
-  const baseGrad = ctx.createRadialGradient(cx * 0.92, cy * 0.88, r * 0.05, cx, cy, r);
-  baseGrad.addColorStop(0, '#e8e4de');
-  baseGrad.addColorStop(0.3, '#ddd8d0');
-  baseGrad.addColorStop(0.6, '#ccc7be');
-  baseGrad.addColorStop(0.85, '#b0aba2');
-  baseGrad.addColorStop(1, '#8a8580');
-  ctx.fillStyle = baseGrad;
-  ctx.fillRect(0, 0, size, size);
+  // Draw the real moon photograph
+  ctx.drawImage(moonImg, 0, 0, size, size);
 
-  // Maria (dark lunar seas) - soft, blurred ellipses
-  const maria = [
-    { x: 0.35, y: 0.28, rx: 0.18, ry: 0.12, o: 0.18 },  // Mare Imbrium
-    { x: 0.28, y: 0.44, rx: 0.12, ry: 0.18, o: 0.15 },  // Oceanus Procellarum
-    { x: 0.50, y: 0.38, rx: 0.09, ry: 0.11, o: 0.16 },  // Mare Serenitatis
-    { x: 0.55, y: 0.50, rx: 0.12, ry: 0.09, o: 0.17 },  // Mare Tranquillitatis
-    { x: 0.40, y: 0.56, rx: 0.09, ry: 0.07, o: 0.13 },  // Mare Nubium
-    { x: 0.63, y: 0.32, rx: 0.05, ry: 0.07, o: 0.14 },  // Mare Crisium
-    { x: 0.50, y: 0.60, rx: 0.07, ry: 0.05, o: 0.11 },  // Mare Fecunditatis
-    { x: 0.38, y: 0.48, rx: 0.05, ry: 0.04, o: 0.10 },  // Mare Humorum
-  ];
-
-  for (const m of maria) {
-    const grad = ctx.createRadialGradient(
-      m.x * size, m.y * size, 0,
-      m.x * size, m.y * size, Math.max(m.rx, m.ry) * size
-    );
-    grad.addColorStop(0, `rgba(100, 96, 88, ${m.o})`);
-    grad.addColorStop(0.6, `rgba(110, 105, 96, ${m.o * 0.5})`);
-    grad.addColorStop(1, 'rgba(120, 115, 105, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.ellipse(m.x * size, m.y * size, m.rx * size, m.ry * size, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // A few key craters - just subtle bright rims, no heavy shadows
-  const craters = [
-    { x: 0.62, y: 0.76, r: 0.030 },  // Tycho
-    { x: 0.30, y: 0.22, r: 0.025 },  // Copernicus
-    { x: 0.25, y: 0.62, r: 0.022 },  // Kepler
-    { x: 0.70, y: 0.38, r: 0.018 },  // Langrenus
-  ];
-
-  for (const c of craters) {
-    const cr = c.r * size;
-    const ccx = c.x * size;
-    const ccy = c.y * size;
-    const dx = ccx - cx;
-    const dy = ccy - cy;
-    if (dx * dx + dy * dy > r * r * 0.9) continue;
-
-    // Subtle crater shadow
-    const cGrad = ctx.createRadialGradient(ccx, ccy, cr * 0.2, ccx, ccy, cr);
-    cGrad.addColorStop(0, 'rgba(80, 76, 68, 0.12)');
-    cGrad.addColorStop(0.7, 'rgba(90, 86, 78, 0.06)');
-    cGrad.addColorStop(1, 'rgba(100, 96, 88, 0)');
-    ctx.fillStyle = cGrad;
-    ctx.beginPath();
-    ctx.arc(ccx, ccy, cr, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Bright rim
-    ctx.strokeStyle = 'rgba(220, 216, 208, 0.12)';
-    ctx.lineWidth = Math.max(0.5, cr * 0.1);
-    ctx.beginPath();
-    ctx.arc(ccx, ccy, cr * 0.8, -Math.PI * 0.8, Math.PI * 0.2);
-    ctx.stroke();
-  }
-
-  // Tycho rays - very subtle
-  ctx.globalAlpha = 0.03;
-  const tychoX = 0.62 * size;
-  const tychoY = 0.76 * size;
-  for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 6) {
-    const rayLen = r * (0.25 + Math.sin(angle * 3) * 0.15);
-    ctx.strokeStyle = '#ddd8d0';
-    ctx.lineWidth = r * 0.006;
-    ctx.beginPath();
-    ctx.moveTo(tychoX, tychoY);
-    ctx.lineTo(tychoX + Math.cos(angle) * rayLen, tychoY + Math.sin(angle) * rayLen);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-
-  // Phase shadow using imageData for smooth pixel-level terminator
+  // Phase shadow using pixel manipulation for smooth terminator
   const imageData = ctx.getImageData(0, 0, size, size);
   const data = imageData.data;
   const sweep = Math.cos(phase * 2 * Math.PI);
@@ -150,58 +68,37 @@ function drawMoon(canvas: HTMLCanvasElement, phase: number) {
     const terminatorX = cx + sweep * chordHalf;
 
     for (let px = 0; px < size; px++) {
-      const dx2 = (px - cx) * (px - cx);
-      if (dx2 + dy * dy > r * r) continue;
+      const dx = px - cx;
+      if (dx * dx + dy * dy > r * r) continue;
 
       const i = (py * size + px) * 4;
 
-      // Phase shadow
       let inShadow = false;
       if (isNewMoon) {
         inShadow = true;
       } else if (phase < 0.5) {
+        // Waxing: shadow on the left (right side lit)
         inShadow = px < terminatorX;
       } else {
+        // Waning: shadow on the right (left side lit)
         inShadow = px > terminatorX;
       }
 
       if (inShadow) {
         const distToTerminator = Math.abs(px - terminatorX);
-        const edgeWidth = r * 0.04; // Wider for softer edge
+        const edgeWidth = r * 0.06;
         const edgeFade = Math.min(1, distToTerminator / edgeWidth);
-        const shadowStrength = 0.92 * edgeFade;
+        const shadowStrength = 0.95 * edgeFade;
 
+        // Darken to near-black in shadow
         data[i] = Math.round(data[i] * (1 - shadowStrength));
         data[i + 1] = Math.round(data[i + 1] * (1 - shadowStrength));
-        data[i + 2] = Math.round(data[i + 2] * (1 - shadowStrength * 0.88));
-      }
-
-      // Limb darkening
-      const distFromCenter = Math.sqrt(dx2 + dy * dy) / r;
-      if (distFromCenter > 0.8) {
-        const limbFactor = (distFromCenter - 0.8) / 0.2;
-        const darken = limbFactor * limbFactor * 0.25;
-        data[i] = Math.round(data[i] * (1 - darken));
-        data[i + 1] = Math.round(data[i + 1] * (1 - darken));
-        data[i + 2] = Math.round(data[i + 2] * (1 - darken));
+        data[i + 2] = Math.round(data[i + 2] * (1 - shadowStrength));
       }
     }
   }
 
   ctx.putImageData(imageData, 0, 0);
-
-  // Soft glow on lit edge
-  if (!isNewMoon) {
-    const glowGrad = ctx.createRadialGradient(cx, cy, r * 0.97, cx, cy, r * 1.04);
-    glowGrad.addColorStop(0, 'rgba(210, 215, 225, 0)');
-    glowGrad.addColorStop(0.5, 'rgba(210, 215, 225, 0.03)');
-    glowGrad.addColorStop(1, 'rgba(210, 215, 225, 0)');
-    ctx.fillStyle = glowGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.04, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
   ctx.restore();
 }
 
@@ -210,6 +107,19 @@ export function MoonPhaseWidget({ config }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState(200);
+  const moonImgRef = useRef<HTMLImageElement | null>(null);
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  // Load moon texture once
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      moonImgRef.current = img;
+      setImgLoaded(true);
+    };
+    img.src = '/moon-texture.jpg';
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -235,23 +145,21 @@ export function MoonPhaseWidget({ config }: Props) {
     return () => ro.disconnect();
   }, []);
 
-  // Draw moon when phase or size changes
+  // Draw moon when phase, size, or image changes
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const moonImg = moonImgRef.current;
+    if (!canvas || !moonImg || !imgLoaded) return;
 
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasSize * dpr;
-    canvas.height = canvasSize * dpr;
+    const drawSize = canvasSize * dpr;
+    canvas.width = drawSize;
+    canvas.height = drawSize;
     canvas.style.width = `${canvasSize}px`;
     canvas.style.height = `${canvasSize}px`;
 
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.scale(dpr, dpr);
-      drawMoon(canvas, moonData.phase);
-    }
-  }, [moonData.phase, canvasSize]);
+    drawMoon(canvas, moonData.phase, moonImg);
+  }, [moonData.phase, canvasSize, imgLoaded]);
 
   const { name, illumination } = moonData;
 
