@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Observe.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#0a0a0a',
-    theme_color: '#22d3ee',
+    background_color: '#0c1220',
+    theme_color: '#e8e8ee',
     icons: [
       {
         src: '/icon.svg',

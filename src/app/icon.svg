@@ -1,17 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="96" fill="#0a0a0a"/>
+  <rect width="512" height="512" rx="96" fill="#0c1220"/>
   <g>
     <!-- Left vertical stroke -->
-    <rect x="112" y="96" width="64" height="320" rx="32" fill="url(#grad)"/>
+    <rect x="116" y="100" width="58" height="312" rx="29" fill="url(#g1)"/>
     <!-- Right vertical stroke -->
-    <rect x="336" y="96" width="64" height="320" rx="32" fill="url(#grad)"/>
+    <rect x="338" y="100" width="58" height="312" rx="29" fill="url(#g1)"/>
     <!-- Crossbar - angled for abstract feel -->
-    <rect x="144" y="224" width="224" height="56" rx="28" fill="url(#grad)" transform="rotate(-6 256 252)"/>
+    <rect x="148" y="228" width="216" height="50" rx="25" fill="url(#g2)" transform="rotate(-6 256 253)"/>
   </g>
   <defs>
-    <linearGradient id="grad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#22d3ee"/>
-      <stop offset="100%" stop-color="#6366f1"/>
+    <linearGradient id="g1" x1="256" y1="80" x2="256" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f0f0f0"/>
+      <stop offset="100%" stop-color="#8a8a9a"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="128" y1="253" x2="384" y2="253" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#d0d0da"/>
+      <stop offset="100%" stop-color="#a0a0b0"/>
     </linearGradient>
   </defs>
 </svg>

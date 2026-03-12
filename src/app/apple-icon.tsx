@@ -13,7 +13,7 @@ export default function AppleIcon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0a0a0a',
+          background: '#0c1220',
           borderRadius: 36,
         }}
       >
@@ -24,16 +24,16 @@ export default function AppleIcon() {
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <rect x="112" y="96" width="64" height="320" rx="32" fill="#22d3ee" />
-          <rect x="336" y="96" width="64" height="320" rx="32" fill="#6366f1" />
+          <rect x="116" y="100" width="58" height="312" rx="29" fill="#e8e8ee" />
+          <rect x="338" y="100" width="58" height="312" rx="29" fill="#a0a0b0" />
           <rect
-            x="144"
-            y="224"
-            width="224"
-            height="56"
-            rx="28"
-            fill="#4f8ef7"
-            transform="rotate(-6 256 252)"
+            x="148"
+            y="228"
+            width="216"
+            height="50"
+            rx="25"
+            fill="#c0c0cc"
+            transform="rotate(-6 256 253)"
           />
         </svg>
       </div>
