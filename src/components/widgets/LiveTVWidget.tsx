@@ -162,29 +162,35 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       hlsRef.current = null;
     }
 
+    // Aggressively disable captions on the video element
+    const disableCaptions = () => {
+      for (let i = 0; i < video.textTracks.length; i++) {
+        video.textTracks[i].mode = 'disabled';
+      }
+    };
+
+    // Listen for any new text tracks being added (catches native WebVTT/CEA-608/708)
+    video.textTracks.addEventListener('addtrack', disableCaptions);
+
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
         backBufferLength: 30,
+        enableCEA708Captions: false,
+        renderTextTracksNatively: false,
       });
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.muted = isMuted;
         video.play().catch(() => {});
-        // Disable all subtitle/caption tracks
         if (hls.subtitleTrack !== -1) hls.subtitleTrack = -1;
-        for (let i = 0; i < video.textTracks.length; i++) {
-          video.textTracks[i].mode = 'disabled';
-        }
+        disableCaptions();
       });
-      // Also disable captions when new subtitle tracks are found
       hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
         hls.subtitleTrack = -1;
-        for (let i = 0; i < video.textTracks.length; i++) {
-          video.textTracks[i].mode = 'disabled';
-        }
+        disableCaptions();
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
@@ -220,6 +226,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     }
 
     return () => {
+      video.textTracks.removeEventListener('addtrack', disableCaptions);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
