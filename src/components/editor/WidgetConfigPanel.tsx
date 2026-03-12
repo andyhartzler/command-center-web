@@ -959,7 +959,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
 // --- Live TV Channel Picker ---
 
 const LIVETV_CHANNELS: { name: string; url: string; resolver?: string; callsign: string }[] = [
-  { name: 'KSHB 41 (NBC)', url: 'https://content.uplynk.com/channel/50d0fa1b042945a3a4f550f9b8412c83.m3u8', callsign: 'KSHB' },
+  { name: 'KSHB 41 (NBC)', url: '', resolver: 'kshb', callsign: 'KSHB' },
   { name: 'KMBC 9 (ABC)', url: '', resolver: 'kmbc', callsign: 'KMBC' },
   { name: 'KCTV5 (CBS)', url: 'https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00312-graytelevisioni-kctv5news-vizious/playlist.m3u8', callsign: 'KCTV5' },
   { name: 'WDAF FOX 4', url: '', resolver: 'wdaf', callsign: 'FOX4' },

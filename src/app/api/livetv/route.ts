@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
       case 'kmbc':
         result = await resolveKMBC();
         break;
+      case 'kshb':
+        result = await resolveKSHB();
+        break;
       case 'wdaf':
         result = await resolveWDAF();
         break;
@@ -58,7 +61,7 @@ export async function GET(request: NextRequest) {
 }
 
 // KMBC 9 (ABC) - Scrape Uplynk URL from kmbc.com/nowcast
-// Prefers stable channel URL over expiring ext URL
+// Prefers ext URL (actual live content) over channel URL (shows logo when not live)
 async function resolveKMBC(): Promise<{ url: string } | null> {
   try {
     const res = await fetch('https://www.kmbc.com/nowcast', {
@@ -68,31 +71,64 @@ async function resolveKMBC(): Promise<{ url: string } | null> {
     });
 
     if (!res.ok) {
-      // Fall back to known channel ID
       return { url: `https://content.uplynk.com/channel/${KMBC_CHANNEL_ID}.m3u8` };
     }
 
     const html = await res.text();
 
-    // Prefer channel URL (stable, doesn't expire) over ext URL (has timestamps)
-    const channelPattern = /https:\/\/content\.uplynk\.com\/channel\/[^"'\s]+\.m3u8/;
+    // Prefer ext URL (actual nowcast content) over channel URL (holding screen)
     const extPattern = /https:\/\/content\.uplynk\.com\/ext\/[^"'\s]+\.m3u8[^"'\s]*/;
-
-    const channelMatch = html.match(channelPattern);
-    if (channelMatch) {
-      return { url: channelMatch[0].replace(/&amp;/g, '&') };
-    }
+    const channelPattern = /https:\/\/content\.uplynk\.com\/channel\/[^"'\s]+\.m3u8/;
 
     const extMatch = html.match(extPattern);
     if (extMatch) {
       return { url: extMatch[0].replace(/&amp;/g, '&') };
     }
+
+    const channelMatch = html.match(channelPattern);
+    if (channelMatch) {
+      return { url: channelMatch[0].replace(/&amp;/g, '&') };
+    }
   } catch (err) {
     console.error('[LiveTV] KMBC scrape error', err);
   }
 
-  // Ultimate fallback: hardcoded stable channel URL
   return { url: `https://content.uplynk.com/channel/${KMBC_CHANNEL_ID}.m3u8` };
+}
+
+// KSHB 41 (NBC/Scripps) - Scrape Uplynk URL from kshb.com/nowcast
+async function resolveKSHB(): Promise<{ url: string } | null> {
+  try {
+    const res = await fetch('https://www.kshb.com/nowcast', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
+    });
+
+    if (!res.ok) {
+      // Fallback to known Scripps News channel
+      return { url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8' };
+    }
+
+    const html = await res.text();
+
+    const extPattern = /https:\/\/content\.uplynk\.com\/ext\/[^"'\s]+\.m3u8[^"'\s]*/;
+    const channelPattern = /https:\/\/content\.uplynk\.com\/channel\/[^"'\s]+\.m3u8/;
+
+    const extMatch = html.match(extPattern);
+    if (extMatch) {
+      return { url: extMatch[0].replace(/&amp;/g, '&') };
+    }
+
+    const channelMatch = html.match(channelPattern);
+    if (channelMatch) {
+      return { url: channelMatch[0].replace(/&amp;/g, '&') };
+    }
+  } catch (err) {
+    console.error('[LiveTV] KSHB scrape error', err);
+  }
+
+  return { url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8' };
 }
 
 // WDAF FOX 4 - Lura/Anvato API resolver
