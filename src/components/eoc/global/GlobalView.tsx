@@ -64,6 +64,8 @@ export function GlobalView() {
     flights: (flights?.commercial?.length || 0),
     military: (flights?.military?.length || 0),
     private: (flights?.private?.length || 0),
+    tracked: (flights?.tracked?.length || 0),
+    gps_jamming: (flights?.jammingZones?.length || 0),
     earthquakes: earthquakes.length,
     fires: fires.length,
     news_markers: news.filter(n => n.coords).length,
@@ -79,7 +81,7 @@ export function GlobalView() {
   const fetchFast = useCallback(async () => {
     await Promise.allSettled([
       (async () => {
-        if (!activeLayers.flights && !activeLayers.military && !activeLayers.private) return;
+        if (!activeLayers.flights && !activeLayers.military && !activeLayers.private && !activeLayers.tracked && !activeLayers.gps_jamming) return;
         try {
           const res = await fetch('/api/global/flights');
           if (res.ok) {
@@ -102,7 +104,7 @@ export function GlobalView() {
       })(),
     ]);
     setLastUpdated(new Date().toISOString());
-  }, [activeLayers.flights, activeLayers.military, activeLayers.private, activeLayers.earthquakes]);
+  }, [activeLayers.flights, activeLayers.military, activeLayers.private, activeLayers.tracked, activeLayers.gps_jamming, activeLayers.earthquakes]);
 
   // Slow data fetcher (fires + news + space weather + satellites + carriers + geopolitics)
   const fetchSlow = useCallback(async () => {

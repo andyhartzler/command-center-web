@@ -4,13 +4,13 @@ import React, { useState } from 'react';
 import {
   Plane, AlertTriangle, Activity, Flame, Newspaper,
   Sun, ChevronDown, ChevronUp, Globe, Shield, Wifi,
-  Satellite, Anchor, Camera, Radio, MapPin, Zap
+  Satellite, Anchor, Camera, Radio, MapPin, Zap, Star, AlertOctagon
 } from 'lucide-react';
 
 export type LayerKey =
-  | 'flights' | 'military' | 'private'
+  | 'flights' | 'military' | 'private' | 'tracked'
   | 'earthquakes' | 'fires' | 'news_markers'
-  | 'day_night'
+  | 'day_night' | 'gps_jamming'
   | 'satellites' | 'carriers' | 'cctv'
   | 'kiwisdr' | 'frontlines' | 'gdelt_incidents';
 
@@ -20,10 +20,12 @@ export const DEFAULT_LAYERS: ActiveLayers = {
   flights: false,
   military: true,
   private: false,
+  tracked: true,
   earthquakes: true,
   fires: true,
   news_markers: true,
   day_night: true,
+  gps_jamming: true,
   satellites: false,
   carriers: true,
   cctv: false,
@@ -41,9 +43,11 @@ interface LayerDef {
 }
 
 const LAYERS: LayerDef[] = [
+  { id: 'tracked', name: 'Tracked / POTUS Fleet', source: 'adsb.lol LADD', icon: Star, color: 'text-pink-400' },
   { id: 'military', name: 'Military Flights', source: 'adsb.lol', icon: Shield, color: 'text-yellow-400' },
   { id: 'flights', name: 'Commercial Flights', source: 'adsb.lol', icon: Plane, color: 'text-cyan-400' },
-  { id: 'private', name: 'Private / GA', source: 'adsb.lol', icon: Plane, color: 'text-orange-400' },
+  { id: 'private', name: 'Private / Jets', source: 'adsb.lol', icon: Plane, color: 'text-orange-400' },
+  { id: 'gps_jamming', name: 'GPS Jamming Zones', source: 'ADS-B NACp', icon: AlertOctagon, color: 'text-rose-400' },
   { id: 'satellites', name: 'Satellites', source: 'CelesTrak', icon: Satellite, color: 'text-purple-400' },
   { id: 'carriers', name: 'Carrier Strike Groups', source: 'GDELT OSINT', icon: Anchor, color: 'text-blue-400' },
   { id: 'earthquakes', name: 'Earthquakes (24h)', source: 'USGS', icon: Activity, color: 'text-red-400' },

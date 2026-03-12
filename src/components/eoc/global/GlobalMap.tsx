@@ -110,9 +110,17 @@ interface GDELTIncident {
   source: string;
 }
 
+interface JammingZone {
+  lat: number;
+  lng: number;
+  count: number;
+  avgNacp: number;
+  severity: string;
+}
+
 interface Props {
   activeLayers: ActiveLayers;
-  flights?: { commercial: FlightData[]; military: FlightData[]; private: FlightData[] };
+  flights?: { commercial: FlightData[]; military: FlightData[]; private: FlightData[]; tracked?: FlightData[]; jammingZones?: JammingZone[] };
   earthquakes?: EarthquakeData[];
   fires?: FireData[];
   news?: NewsData[];
@@ -289,10 +297,41 @@ export function GlobalMap({
     return frontlines;
   }, [activeLayers.frontlines, frontlines]);
 
+  // GPS Jamming zones GeoJSON
+  const jammingGeoJSON = useMemo(() => {
+    if (!activeLayers.gps_jamming || !flights?.jammingZones?.length) return EMPTY_FC;
+    return {
+      type: 'FeatureCollection' as const,
+      features: flights.jammingZones.map((z, i) => ({
+        type: 'Feature' as const,
+        properties: { id: i, count: z.count, avgNacp: z.avgNacp, severity: z.severity },
+        geometry: {
+          type: 'Polygon' as const,
+          coordinates: [[
+            [z.lng - 0.5, z.lat - 0.5],
+            [z.lng + 0.5, z.lat - 0.5],
+            [z.lng + 0.5, z.lat + 0.5],
+            [z.lng - 0.5, z.lat + 0.5],
+            [z.lng - 0.5, z.lat - 0.5],
+          ]],
+        },
+      })),
+    };
+  }, [activeLayers.gps_jamming, flights?.jammingZones]);
+
   // Flight markers
   const flightMarkers = useMemo(() => {
     if (!flights) return [];
     const markers: { key: string; lat: number; lng: number; heading: number; color: string; label: string; alt: number; speed: number; model: string }[] = [];
+
+    // Tracked / POTUS fleet (always visible on top, bright pink)
+    if (activeLayers.tracked && flights.tracked) {
+      for (const f of flights.tracked) {
+        if (inView(f.lat, f.lng)) {
+          markers.push({ key: `trk-${f.icao24}`, lat: f.lat, lng: f.lng, heading: f.heading, color: '#ec4899', label: f.callsign || f.icao24, alt: f.alt, speed: f.speed, model: f.model });
+        }
+      }
+    }
 
     if (activeLayers.military && flights.military) {
       for (const f of flights.military) {
@@ -402,6 +441,51 @@ export function GlobalMap({
             />
           </Source>
         )}
+
+        {/* GPS Jamming Zones */}
+        <Source id="jamming-src" type="geojson" data={jammingGeoJSON}>
+          <Layer
+            id="jamming-fill"
+            type="fill"
+            paint={{
+              'fill-color': ['match', ['get', 'severity'],
+                'severe', '#ef4444',
+                'moderate', '#f97316',
+                '#eab308',
+              ],
+              'fill-opacity': ['match', ['get', 'severity'],
+                'severe', 0.3,
+                'moderate', 0.2,
+                0.12,
+              ],
+            }}
+          />
+          <Layer
+            id="jamming-outline"
+            type="line"
+            paint={{
+              'line-color': '#ef4444',
+              'line-width': 1,
+              'line-opacity': 0.4,
+              'line-dasharray': [3, 2],
+            }}
+          />
+          <Layer
+            id="jamming-label"
+            type="symbol"
+            layout={{
+              'text-field': ['concat', 'GPS JAM\n', ['to-string', ['get', 'count']], ' AC'],
+              'text-size': 9,
+              'text-font': ['Open Sans Regular'],
+            }}
+            paint={{
+              'text-color': '#ef4444',
+              'text-halo-color': '#000000',
+              'text-halo-width': 1,
+              'text-opacity': 0.7,
+            }}
+          />
+        </Source>
 
         {/* Ukraine Frontlines */}
         <Source id="frontlines-src" type="geojson" data={frontlinesGeoJSON}>
@@ -729,7 +813,7 @@ export function GlobalMap({
                 style={{ width: size, height: size, cursor: 'pointer' }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  const typeLabel = isMil ? 'MILITARY' : m.color === '#FF8C00' ? 'PRIVATE' : 'COMMERCIAL';
+                  const typeLabel = m.color === '#ec4899' ? 'TRACKED' : isMil ? 'MILITARY' : m.color === '#FF8C00' ? 'PRIVATE' : 'COMMERCIAL';
                   setPopup({
                     lat: m.lat,
                     lng: m.lng,
