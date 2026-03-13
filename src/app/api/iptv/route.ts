@@ -72,14 +72,20 @@ export async function GET(request: NextRequest) {
 
     let filtered = channels;
 
-    if (country) {
-      filtered = filtered.filter(ch => ch.group.toLowerCase() === country.toLowerCase());
+    if (country && !search) {
+      // Only apply country filter when not searching (search is global)
+      filtered = filtered.filter(ch =>
+        ch.group.toLowerCase() === country.toLowerCase() ||
+        ch.country.toLowerCase() === country.toLowerCase()
+      );
     }
 
     if (search) {
+      // When searching, search across all countries but prioritize current country
       filtered = filtered.filter(ch =>
         ch.name.toLowerCase().includes(search) ||
-        ch.group.toLowerCase().includes(search)
+        ch.group.toLowerCase().includes(search) ||
+        ch.country.toLowerCase().includes(search)
       );
     }
 

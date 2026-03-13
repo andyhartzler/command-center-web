@@ -7,10 +7,63 @@ const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 // Known stable channel IDs (hardcoded fallbacks)
 const KMBC_CHANNEL_ID = '47d92d1bd8e44e2383563530c2a305fd';
 
+// Proxy HLS manifests/segments to bypass CORS
+async function proxyStream(url: string): Promise<NextResponse> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': '*/*',
+      },
+    });
+    if (!res.ok) {
+      return new NextResponse(`Upstream ${res.status}`, { status: res.status });
+    }
+    const contentType = res.headers.get('content-type') || 'application/octet-stream';
+    const isManifest = url.endsWith('.m3u8') || contentType.includes('mpegurl') || contentType.includes('m3u');
+
+    if (isManifest) {
+      let manifest = await res.text();
+      // Rewrite relative URLs to absolute through our proxy
+      const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
+      manifest = manifest.replace(/^(?!#)(?!https?:\/\/)(.+)$/gm, (match) => {
+        const absolute = match.startsWith('/') ? new URL(match, url).href : baseUrl + match;
+        return `/api/livetv?proxy=${encodeURIComponent(absolute)}`;
+      });
+      return new NextResponse(manifest, {
+        headers: {
+          'Content-Type': 'application/vnd.apple.mpegurl',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-cache, no-store',
+        },
+      });
+    }
+
+    // Binary segment passthrough
+    const body = await res.arrayBuffer();
+    return new NextResponse(body, {
+      headers: {
+        'Content-Type': contentType,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache',
+      },
+    });
+  } catch (err) {
+    console.error('[LiveTV] proxy error:', err);
+    return NextResponse.json({ error: 'Proxy fetch failed' }, { status: 502 });
+  }
+}
+
 // Resolve dynamic channel URLs server-side (CORS-safe)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const channel = searchParams.get('channel');
+  const proxyUrl = searchParams.get('proxy');
+
+  // HLS proxy mode
+  if (proxyUrl) {
+    return proxyStream(proxyUrl);
+  }
 
   if (!channel) {
     return NextResponse.json({ error: 'Missing channel param' }, { status: 400 });

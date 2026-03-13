@@ -1063,7 +1063,7 @@ function IPTVChannelBrowser({ selectedName, onSelect }: {
   const [channels, setChannels] = useState<IPTVChannel[]>([]);
   const [countries, setCountries] = useState<string[]>([]);
   const [search, setSearch] = useState('');
-  const [country, setCountry] = useState('United States');
+  const [country, setCountry] = useState('USA');
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);

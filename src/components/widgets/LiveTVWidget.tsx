@@ -35,6 +35,7 @@ const ALL_CHANNELS: Channel[] = [
   { name: 'USA Today', url: 'https://lnc-usa-today.tubi.video/playlist.m3u8', category: 'US News' },
   { name: 'Reuters', url: 'https://reuters-reutersnow-1-eu.rakuten.wurl.tv/playlist.m3u8', category: 'US News' },
   { name: 'CNBC', url: 'https://content.uplynk.com/channel/3324f2467c414329b3b0cc5cd987b6be.m3u8', category: 'US News' },
+  { name: 'MS NOW (MSNBC)', url: 'https://llnw.stream.msnbc.com/live/MSNBC398a080a-ua/master.m3u8', category: 'US News' },
 
   // World News
   { name: 'BBC News', url: 'https://pb-iiczlgfysam0q.akamaized.net/v1/amcnetworks_bbcnews_1/samsungheadend_us/latest/main/hls/playlist.m3u8', category: 'World News' },
@@ -82,6 +83,23 @@ function buildPlutoUrl(channelId: string): string {
   return `https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv/stitch/hls/channel/${channelId}/master.m3u8?deviceType=web&deviceId=${sid}&deviceMake=Chrome&deviceModel=Chrome&deviceVersion=120&appVersion=7.0.0&sid=${sid}&deviceDNT=0`;
 }
 
+// URLs from these domains have proper CORS headers and can be played directly
+const CORS_SAFE_DOMAINS = [
+  'pluto.tv', 'prd.pluto.tv',
+  'akamaized.net', 'akamaihd.net',
+  'cbsnews.akamaized.net',
+  'uplynk.com',
+  'warnermediacdn.com',
+];
+
+function proxyUrl(url: string): string {
+  try {
+    const host = new URL(url).hostname;
+    if (CORS_SAFE_DOMAINS.some(d => host.endsWith(d))) return url;
+  } catch { /* invalid URL, proxy it */ }
+  return `/api/livetv?proxy=${encodeURIComponent(url)}`;
+}
+
 interface LiveTVWidgetProps {
   config: LiveTVConfig;
   style: WidgetStyle;
@@ -126,15 +144,17 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Get the effective URL for a channel
+  // Get the effective URL for a channel (proxied if needed for CORS)
   const getChannelUrl = useCallback((channel: Channel): string => {
+    let url = '';
     if (channel.resolver === 'pluto' && channel.plutoId) {
-      return resolvedUrls[`pluto-${channel.plutoId}`] || buildPlutoUrl(channel.plutoId);
+      url = resolvedUrls[`pluto-${channel.plutoId}`] || buildPlutoUrl(channel.plutoId);
+    } else if (channel.resolver) {
+      url = resolvedUrls[channel.resolver] || '';
+    } else {
+      url = channel.url;
     }
-    if (channel.resolver) {
-      return resolvedUrls[channel.resolver] || '';
-    }
-    return channel.url;
+    return url ? proxyUrl(url) : '';
   }, [resolvedUrls]);
 
   // Select initial channel
