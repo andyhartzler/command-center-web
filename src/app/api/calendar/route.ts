@@ -107,30 +107,68 @@ export async function GET(request: NextRequest) {
 
   try {
     const feeds: { name: string; url: string }[] = JSON.parse(feedsParam);
+    const validFeeds = feeds.filter(f => f.url && f.url.trim().length > 5);
+
+    if (validFeeds.length === 0) {
+      return NextResponse.json({ events: [], message: 'No valid feed URLs' });
+    }
+
     const allEvents: CalendarEvent[] = [];
+    const feedErrors: string[] = [];
 
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 86400000);
-    const monthAhead = new Date(now.getTime() + 30 * 86400000);
+    const monthsAhead = new Date(now.getTime() + 90 * 86400000);
 
     await Promise.all(
-      feeds.map(async (feed, idx) => {
+      validFeeds.map(async (feed, idx) => {
+        const feedName = feed.name || `Calendar ${idx + 1}`;
         try {
-          const res = await fetch(feed.url, { next: { revalidate: 300 } });
-          if (!res.ok) return;
+          // Follow redirects, set timeout, send browser-like headers
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 15000);
+
+          const res = await fetch(feed.url, {
+            signal: controller.signal,
+            redirect: 'follow',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; CalendarWidget/1.0)',
+              'Accept': 'text/calendar, text/plain, */*',
+            },
+          });
+          clearTimeout(timeout);
+
+          if (!res.ok) {
+            feedErrors.push(`${feedName}: HTTP ${res.status}`);
+            console.error(`[calendar] ${feedName} returned ${res.status}: ${feed.url}`);
+            return;
+          }
+
+          const contentType = res.headers.get('content-type') || '';
           const text = await res.text();
+
+          // Verify it looks like ICS data
+          if (!text.includes('BEGIN:VCALENDAR') && !text.includes('BEGIN:VEVENT')) {
+            feedErrors.push(`${feedName}: Not a valid ICS feed`);
+            console.error(`[calendar] ${feedName} is not ICS (content-type: ${contentType}, starts with: ${text.slice(0, 100)})`);
+            return;
+          }
+
           const color = CALENDAR_COLORS[idx % CALENDAR_COLORS.length];
-          const events = parseICS(text, feed.name, color);
+          const events = parseICS(text, feedName, color);
+          console.log(`[calendar] ${feedName}: parsed ${events.length} events from ${feed.url}`);
 
           // Filter to relevant date range
           for (const event of events) {
             const eventDate = new Date(event.start);
-            if (eventDate >= weekAgo && eventDate <= monthAhead) {
+            if (eventDate >= weekAgo && eventDate <= monthsAhead) {
               allEvents.push(event);
             }
           }
         } catch (err) {
-          console.error(`[calendar] Failed to fetch ${feed.name}:`, err);
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          feedErrors.push(`${feedName}: ${msg}`);
+          console.error(`[calendar] Failed to fetch ${feedName} (${feed.url}):`, err);
         }
       })
     );
@@ -138,9 +176,13 @@ export async function GET(request: NextRequest) {
     // Sort by start date
     allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
-    return NextResponse.json({ events: allEvents });
+    return NextResponse.json({
+      events: allEvents,
+      feedCount: validFeeds.length,
+      errors: feedErrors.length > 0 ? feedErrors : undefined,
+    });
   } catch (err) {
     console.error('[calendar] error:', err);
-    return NextResponse.json({ error: 'Failed to fetch calendar' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch calendar', details: String(err) }, { status: 500 });
   }
 }

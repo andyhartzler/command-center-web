@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import {
   Clock, CloudSun, Sun, Moon, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
-  Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu,
+  Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu, Wind,
   PlusCircle, Shield, MapPin, Search, X, PlaneTakeoff, Radar,
 } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
@@ -24,7 +24,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   'trending-up': TrendingUp, bitcoin: Bitcoin, 'bar-chart-3': BarChart3, activity: Activity,
   plane: Plane, 'alert-triangle': AlertTriangle, 'plane-landing': PlaneLanding,
   'plane-takeoff': PlaneTakeoff, radar: Radar,
-  flame: Flame, heart: Heart, home: Home, cpu: Cpu,
+  flame: Flame, heart: Heart, home: Home, cpu: Cpu, wind: Wind,
 };
 
 const CATEGORY_ORDER: WidgetCategory[] = [
@@ -75,6 +75,19 @@ export function WidgetSidebar() {
   };
 
   const handleAddWidget = (type: WidgetType, family: WidgetFamily) => {
+    // If requested family doesn't fit, try smaller supported families
+    if (currentPage && !hasSpaceForWidget(FAMILY_GRID_SIZE[family], currentPage)) {
+      const meta = WIDGET_TYPE_META[type];
+      const sizeOrder: WidgetFamily[] = ['small', 'medium', 'large', 'wide', 'extraLarge'];
+      const requestedIdx = sizeOrder.indexOf(family);
+      for (let i = requestedIdx - 1; i >= 0; i--) {
+        const smaller = sizeOrder[i];
+        if (meta.supportedFamilies.includes(smaller) && hasSpaceForWidget(FAMILY_GRID_SIZE[smaller], currentPage)) {
+          addWidget(type, smaller);
+          return;
+        }
+      }
+    }
     addWidget(type, family);
   };
 
@@ -181,7 +194,7 @@ export function WidgetSidebar() {
               <div className="grid grid-cols-1 gap-1.5">
                 {widgets.map(({ type, meta }) => {
                   const Icon = ICON_MAP[meta.icon] || Cpu;
-                  const canFit = currentPage ? hasSpaceForWidget(FAMILY_GRID_SIZE[meta.defaultFamily], currentPage) : false;
+                  const canFit = currentPage ? meta.supportedFamilies.some(f => hasSpaceForWidget(FAMILY_GRID_SIZE[f], currentPage)) : false;
 
                   return (
                     <div

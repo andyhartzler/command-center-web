@@ -133,10 +133,13 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            if (retryCount < 3) {
+            // Token likely expired - fetch a fresh stream URL immediately
+            const cam = cameras[currentIndex];
+            if (cam && retryCount < 5) {
               setRetryCount(prev => prev + 1);
-              setTimeout(() => hls.startLoad(), 3000);
+              loadStream(cam);
             } else if (cameras.length > 1) {
+              setRetryCount(0);
               setCurrentIndex(prev => (prev + 1) % cameras.length);
             }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -157,7 +160,7 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
         hlsRef.current = null;
       }
     };
-  }, [streamUrl, cameras.length, retryCount]);
+  }, [streamUrl, cameras, currentIndex, cameras.length, retryCount, loadStream]);
 
   // Auto-rotate cameras (only when in rotate mode)
   const rotateNext = useCallback(() => {
@@ -170,14 +173,14 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
     isRotating && cameras.length > 1 ? (config.rotateIntervalSeconds || 15) * 1000 : null
   );
 
-  // Token refresh every 45 minutes
+  // Token refresh every 90 seconds (KC Scout tokens expire after ~2 min)
   useInterval(
     () => {
       if (cameras.length > 0 && cameras[currentIndex]) {
         loadStream(cameras[currentIndex]);
       }
     },
-    cameras.length > 0 ? 2700_000 : null
+    cameras.length > 0 ? 90_000 : null
   );
 
   const goNext = () => {

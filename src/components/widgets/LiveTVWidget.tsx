@@ -22,11 +22,13 @@ const ALL_CHANNELS: Channel[] = [
   { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'KC Local' },
 
   // US News
-  { name: 'ABC News Live', url: 'https://lnc-abc-news.tubi.video/index.m3u8', category: 'US News' },
+  { name: 'ABC News Live', url: 'https://aegis-cloudfront-1.tubi.video/d6cbb0de-68e4-4f3b-82f9-bf5d526e0bde/index.m3u8', category: 'US News' },
   { name: 'CBS News', url: 'https://cbsnews.akamaized.net/hls/live/2020607/cbsnlineup_8/master.m3u8', category: 'US News' },
-  { name: 'NBC News NOW', url: 'https://dai2.xumo.com/amagi_hls_data_xumo1212A-xumo-nbcnewsnow/CDN/master.m3u8', category: 'US News' },
-  { name: 'CNN', url: 'https://tve-live-lln.warnermediacdn.com/hls/live/586495/cnngo/cnn_slate/VIDEO_0_3564000.m3u8', category: 'US News' },
-  { name: 'LiveNOW from FOX', url: 'https://lnc-fox-live-now.tubi.video/index.m3u8', category: 'US News' },
+  { name: 'NBC News NOW', url: 'https://xumo-drct-nbcnn-ir8ze.fast.nbcuni.com/live/master.m3u8', category: 'US News' },
+  { name: 'CNN', url: 'https://turnerlive.warnermediacdn.com/hls/live/586495/cnngo/cnn_slate/VIDEO_0_3564000.m3u8', category: 'US News' },
+  { name: 'LiveNOW from FOX', url: '', category: 'US News', resolver: 'pluto', plutoId: '63d025db4e83e700086eaa96' },
+  { name: 'Fox News Radio', url: 'https://radiovid.foxnews.com/hls/live/661547/RADIOVID/index.m3u8', category: 'US News' },
+  { name: 'Fox Weather', url: 'https://247wlive.foxweather.com/stream/index.m3u8', category: 'US News' },
   { name: 'Bloomberg', url: 'https://bloomberg.com/media-manifest/streams/us.m3u8', category: 'US News' },
   { name: 'Scripps News', url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8', category: 'US News' },
   { name: 'Newsmax', url: 'https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8', category: 'US News' },
@@ -35,7 +37,7 @@ const ALL_CHANNELS: Channel[] = [
   { name: 'CNBC', url: 'https://content.uplynk.com/channel/3324f2467c414329b3b0cc5cd987b6be.m3u8', category: 'US News' },
 
   // World News
-  { name: 'BBC News', url: 'https://vs-hls-push-uk.live.fastly.md.bbci.co.uk/x=4/i=urn:bbc:pips:service:bbc_news_channel_hd/iptv_hd_abr_v1.m3u8', category: 'World News' },
+  { name: 'BBC News', url: 'https://pb-iiczlgfysam0q.akamaized.net/v1/amcnetworks_bbcnews_1/samsungheadend_us/latest/main/hls/playlist.m3u8', category: 'World News' },
   { name: 'Sky News UK', url: 'https://ythls.armelin.one/channel/UCoMdktPbSTixAyNGwb-UYkQ.m3u8', category: 'World News' },
   { name: 'Al Jazeera', url: 'https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8', category: 'World News' },
   { name: 'France 24', url: 'https://raw.githubusercontent.com/AqFad2811/m3u8/main/france24/france24_en.m3u8', category: 'World News' },
