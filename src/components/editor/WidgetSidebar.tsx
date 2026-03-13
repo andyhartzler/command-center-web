@@ -4,7 +4,7 @@ import {
   Clock, CloudSun, Sun, Moon, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
   Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu, Wind,
-  PlusCircle, Shield, MapPin, Search, X, PlaneTakeoff, Radar,
+  PlusCircle, Shield, MapPin, Search, X, PlaneTakeoff, Radar, Music,
 } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import {
@@ -24,7 +24,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   'trending-up': TrendingUp, bitcoin: Bitcoin, 'bar-chart-3': BarChart3, activity: Activity,
   plane: Plane, 'alert-triangle': AlertTriangle, 'plane-landing': PlaneLanding,
   'plane-takeoff': PlaneTakeoff, radar: Radar,
-  flame: Flame, heart: Heart, home: Home, cpu: Cpu, wind: Wind,
+  flame: Flame, heart: Heart, home: Home, cpu: Cpu, wind: Wind, music: Music,
 };
 
 const CATEGORY_ORDER: WidgetCategory[] = [

@@ -35,7 +35,8 @@ export type WidgetType =
   | 'aircraftTracker'
   | 'health'
   | 'homeKit'
-  | 'airQuality';
+  | 'airQuality'
+  | 'appleMusic';
 
 export interface GridSize {
   columns: number;
@@ -194,7 +195,8 @@ export type WidgetConfig =
   | { type: 'reminders'; config: Record<string, never> }
   | { type: 'health'; config: Record<string, never> }
   | { type: 'homeKit'; config: Record<string, never> }
-  | { type: 'airQuality'; config: AirQualityConfig };
+  | { type: 'airQuality'; config: AirQualityConfig }
+  | { type: 'appleMusic'; config: Record<string, never> };
 
 export interface DashboardWidget {
   id: string;
@@ -256,6 +258,7 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
   airQuality: { displayName: 'Air Quality', category: 'Time & Location', icon: 'wind', color: '#34d399', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'] },
+  appleMusic: { displayName: 'Top Charts', category: 'Media', icon: 'music', color: '#fa2d48', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
 };
 
 export function defaultConfig(type: WidgetType): WidgetConfig {
@@ -285,5 +288,6 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'health': return { type: 'health', config: {} };
     case 'homeKit': return { type: 'homeKit', config: {} };
     case 'airQuality': return { type: 'airQuality', config: { latitude: 39.0997, longitude: -94.5786 } };
+    case 'appleMusic': return { type: 'appleMusic', config: {} };
   }
 }

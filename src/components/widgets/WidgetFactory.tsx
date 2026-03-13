@@ -24,6 +24,7 @@ const FlightStatusWidget = dynamic(() => import('./FlightStatusWidget').then(m =
 const AircraftTrackerWidget = dynamic(() => import('./AircraftTrackerWidget').then(m => ({ default: m.AircraftTrackerWidget })), { ssr: false });
 const CalendarWidget = dynamic(() => import('./CalendarWidget').then(m => ({ default: m.CalendarWidget })), { ssr: false });
 const AirQualityWidget = dynamic(() => import('./AirQualityWidget').then(m => ({ default: m.AirQualityWidget })), { ssr: false });
+const AppleMusicWidget = dynamic(() => import('./AppleMusicWidget').then(m => ({ default: m.AppleMusicWidget })), { ssr: false });
 const PlaceholderWidget = dynamic(() => import('./PlaceholderWidget').then(m => ({ default: m.PlaceholderWidget })), { ssr: false });
 
 interface WidgetFactoryProps {
@@ -56,6 +57,7 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
     case 'aircraftTracker': return <AircraftTrackerWidget config={widgetConfig.config} style={style} />;
     case 'calendar': return <CalendarWidget config={widgetConfig.config} style={style} />;
     case 'airQuality': return <AirQualityWidget config={widgetConfig.config} style={style} />;
+    case 'appleMusic': return <AppleMusicWidget config={widgetConfig.config} style={style} />;
     case 'reminders':
     case 'health':
     case 'homeKit': {
