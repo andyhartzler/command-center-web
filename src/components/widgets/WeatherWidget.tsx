@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Sun,
   Moon,
@@ -94,6 +94,24 @@ function wmoToSmallIcon(code: number): LucideIcon {
 export function WeatherWidget({ config }: Props) {
   const [data, setData] = useState<WeatherData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      // Base design: 200w x 280h. Scale to fill container.
+      const s = Math.min(w / 200, h / 280);
+      setScale(Math.max(0.5, Math.min(3, s)));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const fetchWeather = useCallback(async () => {
     try {
@@ -118,7 +136,7 @@ export function WeatherWidget({ config }: Props) {
 
   if (error) {
     return (
-      <div className="w-full h-full flex items-center justify-center p-4">
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center p-4">
         <span className="text-xs text-red-400/60">Unavailable</span>
       </div>
     );
@@ -126,7 +144,7 @@ export function WeatherWidget({ config }: Props) {
 
   if (!data) {
     return (
-      <div className="w-full h-full flex items-center justify-center p-4">
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center p-4">
         <div className="w-4 h-4 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
       </div>
     );
@@ -159,61 +177,68 @@ export function WeatherWidget({ config }: Props) {
     }
   }
 
+  const s = scale;
+  const pad = Math.max(8, 16 * s);
+
   return (
-    <div className="w-full h-full flex flex-col justify-between p-4" style={{ alignItems: 'flex-start' }}>
-      <div className="w-full">
-        {/* Location label - matches Swift */}
+    <div
+      ref={containerRef}
+      className="w-full h-full flex flex-col items-start justify-center overflow-hidden"
+      style={{ padding: pad, gap: `${8 * s}px` }}
+    >
+      <div className="w-full" style={{ display: 'flex', flexDirection: 'column', gap: `${2 * s}px` }}>
+        {/* Location label */}
         <div
-          className="text-[10px] font-bold text-white/30 uppercase mb-1.5"
-          style={{ letterSpacing: '4px' }}
+          className="font-bold text-white/30 uppercase"
+          style={{ letterSpacing: `${4 * s}px`, fontSize: `${Math.max(8, 10 * s)}px` }}
         >
           {config.locationName || 'KANSAS CITY'}
         </div>
 
         {/* Top row: temp + icon */}
         <div className="flex items-start justify-between w-full">
-          <div className="flex flex-col gap-0.5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: `${2 * s}px` }}>
             {/* Temperature hero */}
             <span
               className="font-extralight text-white/95"
-              style={{ fontSize: '48px', lineHeight: 1 }}
+              style={{ fontSize: `${48 * s}px`, lineHeight: 1 }}
             >
               {currentTemp}&deg;
             </span>
 
             {/* Condition */}
-            <span className="text-[13px] font-light text-white/50">
+            <span className="font-light text-white/50" style={{ fontSize: `${13 * s}px` }}>
               {conditionLabel}
             </span>
 
             {/* High/Low */}
-            <div className="flex items-center gap-2.5 mt-0.5">
-              <div className="flex items-center gap-0.5">
-                <ArrowUp size={10} className="text-white/30" strokeWidth={2} />
-                <span className="text-[10px] font-medium text-white/30">H:{high}&deg;</span>
+            <div className="flex items-center" style={{ gap: `${10 * s}px`, marginTop: `${2 * s}px` }}>
+              <div className="flex items-center" style={{ gap: `${2 * s}px` }}>
+                <ArrowUp size={Math.max(8, 10 * s)} className="text-white/30" strokeWidth={2} />
+                <span className="font-medium text-white/30" style={{ fontSize: `${10 * s}px` }}>H:{high}&deg;</span>
               </div>
-              <div className="flex items-center gap-0.5">
-                <ArrowDown size={10} className="text-white/30" strokeWidth={2} />
-                <span className="text-[10px] font-medium text-white/30">L:{low}&deg;</span>
+              <div className="flex items-center" style={{ gap: `${2 * s}px` }}>
+                <ArrowDown size={Math.max(8, 10 * s)} className="text-white/30" strokeWidth={2} />
+                <span className="font-medium text-white/30" style={{ fontSize: `${10 * s}px` }}>L:{low}&deg;</span>
               </div>
             </div>
           </div>
 
           {/* Weather icon */}
-          <ConditionIcon size={36} className="text-white/50 mt-1" strokeWidth={1} />
+          <ConditionIcon size={Math.max(20, 36 * s)} className="text-white/50" strokeWidth={1} style={{ marginTop: `${4 * s}px` }} />
         </div>
       </div>
 
       {/* Hourly forecast strip */}
       {forecastHours.length > 0 && (
-        <div className="flex items-center w-full">
+        <div className="flex items-center w-full" style={{ marginTop: `${4 * s}px` }}>
           {forecastHours.map((f, i) => {
             const FIcon = f.Icon;
             return (
-              <div key={i} className="flex flex-col items-center gap-1 flex-1 min-w-0">
-                <span className="text-[8px] font-medium text-white/25">{f.hour}</span>
-                <FIcon size={12} className="text-white/40" strokeWidth={1.5} />
-                <span className="text-[11px] font-light text-white/70">{f.temp}&deg;</span>
+              <div key={i} className="flex flex-col items-center flex-1 min-w-0" style={{ gap: `${3 * s}px` }}>
+                <span className="font-medium text-white/25" style={{ fontSize: `${Math.max(7, 8 * s)}px` }}>{f.hour}</span>
+                <FIcon size={Math.max(10, 12 * s)} className="text-white/40" strokeWidth={1.5} />
+                <span className="font-light text-white/70" style={{ fontSize: `${Math.max(9, 11 * s)}px` }}>{f.temp}&deg;</span>
               </div>
             );
           })}
