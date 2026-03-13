@@ -1,4 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SignJWT, importPKCS8 } from 'jose';
+
+// WeatherKit JWT generation
+let cachedToken: { jwt: string; exp: number } | null = null;
+
+async function getWeatherKitToken(): Promise<string> {
+  // Return cached token if still valid (with 5 min buffer)
+  if (cachedToken && Date.now() < cachedToken.exp - 300_000) {
+    return cachedToken.jwt;
+  }
+
+  const keyId = process.env.WEATHERKIT_KEY_ID;
+  const teamId = process.env.WEATHERKIT_TEAM_ID;
+  const serviceId = process.env.WEATHERKIT_SERVICE_ID;
+  const privateKeyPem = process.env.WEATHERKIT_PRIVATE_KEY;
+
+  if (!keyId || !teamId || !serviceId || !privateKeyPem) {
+    throw new Error('WeatherKit env vars not configured');
+  }
+
+  const privateKey = await importPKCS8(privateKeyPem, 'ES256');
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + 3600; // 1 hour
+
+  const jwt = await new SignJWT({})
+    .setProtectedHeader({
+      alg: 'ES256',
+      kid: keyId,
+      id: `${teamId}.${serviceId}`,
+    })
+    .setIssuer(teamId)
+    .setSubject(serviceId)
+    .setIssuedAt(now)
+    .setExpirationTime(exp)
+    .sign(privateKey);
+
+  cachedToken = { jwt, exp: exp * 1000 };
+  return jwt;
+}
+
+// Apple WeatherKit conditionCode -> WMO weather code
+function conditionToWMO(condition: string): number {
+  const map: Record<string, number> = {
+    Clear: 0,
+    MostlyClear: 1,
+    PartlyCloudy: 2,
+    MostlyCloudy: 3,
+    Cloudy: 3,
+    Overcast: 3,
+    Foggy: 45,
+    Haze: 48,
+    Smoky: 48,
+    Drizzle: 51,
+    HeavyDrizzle: 55,
+    Rain: 61,
+    HeavyRain: 65,
+    FreezingDrizzle: 56,
+    FreezingRain: 66,
+    Snow: 71,
+    HeavySnow: 75,
+    Sleet: 77,
+    Flurries: 71,
+    Blizzard: 75,
+    BlowingSnow: 75,
+    ScatteredThunderstorms: 95,
+    Thunderstorms: 95,
+    IsolatedThunderstorms: 95,
+    SevereThunderstorm: 96,
+    StrongStorms: 96,
+    Hail: 99,
+    Hurricane: 99,
+    TropicalStorm: 82,
+    Windy: 3,
+    Breezy: 2,
+    BlowingDust: 48,
+    SunShowers: 80,
+    WintryMix: 66,
+    SunFlurries: 71,
+  };
+  return map[condition] ?? 3;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -10,23 +91,66 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'lat and lon are required' }, { status: 400 });
   }
 
-  const tempUnit = units === 'celsius' ? 'celsius' : 'fahrenheit';
-
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&hourly=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=${tempUnit}&timezone=auto&forecast_days=2`;
-
   try {
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const token = await getWeatherKitToken();
+
+    const wkUrl = `https://weatherkit.apple.com/api/v1/weather/en/${lat}/${lon}?dataSets=currentWeather,forecastHourly,forecastDaily&hourlyStart=${new Date().toISOString()}&hourlyEnd=${new Date(Date.now() + 48 * 3600_000).toISOString()}`;
+
+    const res = await fetch(wkUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      next: { revalidate: 300 },
+    });
 
     if (!res.ok) {
+      const text = await res.text();
+      console.error(`[weather] WeatherKit ${res.status}: ${text}`);
       return NextResponse.json(
-        { error: `Open-Meteo returned ${res.status}` },
+        { error: `WeatherKit returned ${res.status}` },
         { status: 502 },
       );
     }
 
-    const data = await res.json();
+    const wk = await res.json();
+
+    // Transform WeatherKit response to match the format the widget expects
+    // (same shape as Open-Meteo so the widget doesn't need changes)
+    const isFahrenheit = units !== 'celsius';
+    const toUnit = (c: number) => isFahrenheit ? (c * 9) / 5 + 32 : c;
+
+    const currentWeather = wk.currentWeather || {};
+    const hourlyForecast = wk.forecastHourly?.hours || [];
+    const dailyForecast = wk.forecastDaily?.days || [];
+
+    const data = {
+      current: {
+        temperature_2m: Math.round(toUnit(currentWeather.temperature ?? 0) * 10) / 10,
+        weather_code: conditionToWMO(currentWeather.conditionCode || 'Clear'),
+        wind_speed_10m: Math.round((currentWeather.windSpeed ?? 0) * 10) / 10,
+      },
+      hourly: {
+        time: hourlyForecast.map((h: { forecastStart: string }) => h.forecastStart),
+        temperature_2m: hourlyForecast.map((h: { temperature: number }) =>
+          Math.round(toUnit(h.temperature ?? 0) * 10) / 10
+        ),
+        weather_code: hourlyForecast.map((h: { conditionCode: string }) =>
+          conditionToWMO(h.conditionCode || 'Clear')
+        ),
+      },
+      daily: {
+        temperature_2m_max: dailyForecast.map((d: { temperatureMax: number }) =>
+          Math.round(toUnit(d.temperatureMax ?? 0) * 10) / 10
+        ),
+        temperature_2m_min: dailyForecast.map((d: { temperatureMin: number }) =>
+          Math.round(toUnit(d.temperatureMin ?? 0) * 10) / 10
+        ),
+      },
+    };
+
     return NextResponse.json(data);
   } catch (err) {
+    console.error('[weather] error:', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to fetch weather' },
       { status: 500 },
