@@ -139,7 +139,6 @@ export function AirQualityWidget({ config }: Props) {
         <span className="text-[10px] font-medium text-center leading-tight" style={{ color }}>
           {label}
         </span>
-        <span className="text-[9px] text-white/25 uppercase tracking-wider">US AQI</span>
       </div>
 
       {/* Pollutant details (medium size) */}

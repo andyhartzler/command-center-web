@@ -173,7 +173,12 @@ function checkCollision(
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [pages, setPages] = useState<DashboardPage[]>([DEMO_PAGE]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [isDisplayMode, setDisplayMode] = useState(false);
+  const [isDisplayMode, setDisplayMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('commandcenter-displayMode') === 'true';
+    }
+    return false;
+  });
   const [appMode, setAppMode] = useState<AppMode>('dashboard');
   const [eocScope, setEocScope] = useState<EOCScope>('kc');
   const [eocServerURL, setEocServerURL] = useState('http://192.168.4.21:8080');
@@ -410,7 +415,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   return (
     <AppStateContext.Provider value={{
       pages, setPages, currentPageIndex, setCurrentPageIndex,
-      isDisplayMode, setDisplayMode, appMode, setAppMode,
+      isDisplayMode,
+      setDisplayMode: (v: boolean) => {
+        setDisplayMode(v);
+        try { localStorage.setItem('commandcenter-displayMode', String(v)); } catch {}
+      },
+      appMode, setAppMode,
       eocScope, setEocScope, eocServerURL, setEocServerURL,
       addPage, deletePage, duplicatePage, movePage, renamePage,
       addWidget, deleteWidget, moveWidget, updateWidget, resizeWidget,
