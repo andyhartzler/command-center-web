@@ -16,11 +16,15 @@ async function getWeatherKitToken(): Promise<string> {
   const privateKeyPem = process.env.WEATHERKIT_PRIVATE_KEY;
 
   if (!keyId || !teamId || !serviceId || !privateKeyPem) {
-    throw new Error('WeatherKit env vars not configured');
+    throw new Error(`WeatherKit env vars not configured: keyId=${!!keyId} teamId=${!!teamId} serviceId=${!!serviceId} pk=${!!privateKeyPem}`);
   }
+
+  console.log(`[weather] keyId=${keyId}, teamId=${teamId}, serviceId=${serviceId}, pkLen=${privateKeyPem.length}, pkStart=${privateKeyPem.substring(0, 30)}`);
 
   // Handle private keys where newlines are literal \n (common in env vars)
   const normalizedPem = privateKeyPem.replace(/\\n/g, '\n');
+  console.log(`[weather] normalized PK length=${normalizedPem.length}, hasNewlines=${normalizedPem.includes('\n')}, lines=${normalizedPem.split('\n').length}`);
+
   const privateKey = await importPKCS8(normalizedPem, 'ES256');
   const now = Math.floor(Date.now() / 1000);
   const exp = now + 3600; // 1 hour
@@ -37,6 +41,7 @@ async function getWeatherKitToken(): Promise<string> {
     .setExpirationTime(exp)
     .sign(privateKey);
 
+  console.log(`[weather] JWT generated, length=${jwt.length}`);
   cachedToken = { jwt, exp: exp * 1000 };
   return jwt;
 }
