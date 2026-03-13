@@ -28,7 +28,9 @@ async function getMusicToken(): Promise<string> {
     throw new Error('Apple developer key env vars not configured');
   }
 
-  const privateKey = await importPKCS8(privateKeyPem, 'ES256');
+  // Handle private keys where newlines are literal \n (common in env vars)
+  const normalizedPem = privateKeyPem.replace(/\\n/g, '\n');
+  const privateKey = await importPKCS8(normalizedPem, 'ES256');
   const now = Math.floor(Date.now() / 1000);
   const exp = now + 15777000; // ~6 months (Apple max)
 

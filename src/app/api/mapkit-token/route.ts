@@ -18,7 +18,9 @@ export async function GET() {
       return NextResponse.json({ error: 'MapKit not configured' }, { status: 500 });
     }
 
-    const privateKey = await importPKCS8(privateKeyPem, 'ES256');
+    // Handle private keys where newlines are literal \n (common in env vars)
+    const normalizedPem = privateKeyPem.replace(/\\n/g, '\n');
+    const privateKey = await importPKCS8(normalizedPem, 'ES256');
     const now = Math.floor(Date.now() / 1000);
     const exp = now + 7 * 24 * 3600; // 7 days (Apple max for MapKit)
 
