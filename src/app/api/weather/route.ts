@@ -112,9 +112,17 @@ export async function GET(request: NextRequest) {
 
     if (!res.ok) {
       const text = await res.text();
+      const keyId = process.env.WEATHERKIT_KEY_ID;
+      const teamId = process.env.WEATHERKIT_TEAM_ID;
+      const serviceId = process.env.WEATHERKIT_SERVICE_ID;
+      const pkLen = process.env.WEATHERKIT_PRIVATE_KEY?.length ?? 0;
+      const pkStart = process.env.WEATHERKIT_PRIVATE_KEY?.substring(0, 27) ?? '';
       console.error(`[weather] WeatherKit ${res.status}: ${text}`);
       return NextResponse.json(
-        { error: `WeatherKit returned ${res.status}` },
+        {
+          error: `WeatherKit returned ${res.status}`,
+          debug: { keyId, teamId, serviceId, pkLen, pkStart, wkResponse: text.substring(0, 200) },
+        },
         { status: 502 },
       );
     }
