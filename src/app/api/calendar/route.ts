@@ -124,11 +124,17 @@ export async function GET(request: NextRequest) {
       validFeeds.map(async (feed, idx) => {
         const feedName = feed.name || `Calendar ${idx + 1}`;
         try {
+          // Convert webcal:// to https:// (used by iCloud and some other providers)
+          let feedUrl = feed.url.trim();
+          if (feedUrl.startsWith('webcal://')) {
+            feedUrl = feedUrl.replace(/^webcal:\/\//, 'https://');
+          }
+
           // Follow redirects, set timeout, send browser-like headers
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 15000);
 
-          const res = await fetch(feed.url, {
+          const res = await fetch(feedUrl, {
             signal: controller.signal,
             redirect: 'follow',
             headers: {
@@ -140,7 +146,7 @@ export async function GET(request: NextRequest) {
 
           if (!res.ok) {
             feedErrors.push(`${feedName}: HTTP ${res.status}`);
-            console.error(`[calendar] ${feedName} returned ${res.status}: ${feed.url}`);
+            console.error(`[calendar] ${feedName} returned ${res.status}: ${feedUrl}`);
             return;
           }
 
@@ -150,13 +156,13 @@ export async function GET(request: NextRequest) {
           // Verify it looks like ICS data
           if (!text.includes('BEGIN:VCALENDAR') && !text.includes('BEGIN:VEVENT')) {
             feedErrors.push(`${feedName}: Not a valid ICS feed`);
-            console.error(`[calendar] ${feedName} is not ICS (content-type: ${contentType}, starts with: ${text.slice(0, 100)})`);
+            console.error(`[calendar] ${feedName} is not ICS (url: ${feedUrl}, content-type: ${contentType}, starts with: ${text.slice(0, 100)})`);
             return;
           }
 
           const color = CALENDAR_COLORS[idx % CALENDAR_COLORS.length];
           const events = parseICS(text, feedName, color);
-          console.log(`[calendar] ${feedName}: parsed ${events.length} events from ${feed.url}`);
+          console.log(`[calendar] ${feedName}: parsed ${events.length} events from ${feedUrl}`);
 
           // Filter to relevant date range
           for (const event of events) {
@@ -168,7 +174,7 @@ export async function GET(request: NextRequest) {
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           feedErrors.push(`${feedName}: ${msg}`);
-          console.error(`[calendar] Failed to fetch ${feedName} (${feed.url}):`, err);
+          console.error(`[calendar] Failed to fetch ${feedName} (${feed.url.trim()}):`, err);
         }
       })
     );
