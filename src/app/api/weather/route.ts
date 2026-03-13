@@ -16,15 +16,11 @@ async function getWeatherKitToken(): Promise<string> {
   const privateKeyPem = process.env.WEATHERKIT_PRIVATE_KEY;
 
   if (!keyId || !teamId || !serviceId || !privateKeyPem) {
-    throw new Error(`WeatherKit env vars not configured: keyId=${!!keyId} teamId=${!!teamId} serviceId=${!!serviceId} pk=${!!privateKeyPem}`);
+    throw new Error('WeatherKit env vars not configured');
   }
-
-  console.log(`[weather] keyId=${keyId}, teamId=${teamId}, serviceId=${serviceId}, pkLen=${privateKeyPem.length}, pkStart=${privateKeyPem.substring(0, 30)}`);
 
   // Handle private keys where newlines are literal \n (common in env vars)
   const normalizedPem = privateKeyPem.replace(/\\n/g, '\n');
-  console.log(`[weather] normalized PK length=${normalizedPem.length}, hasNewlines=${normalizedPem.includes('\n')}, lines=${normalizedPem.split('\n').length}`);
-
   const privateKey = await importPKCS8(normalizedPem, 'ES256');
   const now = Math.floor(Date.now() / 1000);
   const exp = now + 3600; // 1 hour
@@ -41,7 +37,6 @@ async function getWeatherKitToken(): Promise<string> {
     .setExpirationTime(exp)
     .sign(privateKey);
 
-  console.log(`[weather] JWT generated, length=${jwt.length}`);
   cachedToken = { jwt, exp: exp * 1000 };
   return jwt;
 }
@@ -112,17 +107,9 @@ export async function GET(request: NextRequest) {
 
     if (!res.ok) {
       const text = await res.text();
-      const keyId = process.env.WEATHERKIT_KEY_ID;
-      const teamId = process.env.WEATHERKIT_TEAM_ID;
-      const serviceId = process.env.WEATHERKIT_SERVICE_ID;
-      const pkLen = process.env.WEATHERKIT_PRIVATE_KEY?.length ?? 0;
-      const pkStart = process.env.WEATHERKIT_PRIVATE_KEY?.substring(0, 27) ?? '';
       console.error(`[weather] WeatherKit ${res.status}: ${text}`);
       return NextResponse.json(
-        {
-          error: `WeatherKit returned ${res.status}`,
-          debug: { keyId, teamId, serviceId, pkLen, pkStart, wkResponse: text.substring(0, 200) },
-        },
+        { error: `WeatherKit returned ${res.status}` },
         { status: 502 },
       );
     }
