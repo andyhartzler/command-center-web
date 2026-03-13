@@ -22,13 +22,14 @@ interface WebcamsWidgetProps {
 export function WebcamsWidget({ config }: WebcamsWidgetProps) {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
   const [isRotating, setIsRotating] = useState((config.viewMode || 'single') === 'rotate');
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const retryCountRef = useRef(0);
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval>>(null);
+  const stalledTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Fetch camera list
   useEffect(() => {
@@ -86,81 +87,142 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
     return () => { cancelled = true; };
   }, [config.cameraIds, config.cameraNames, config.corridorFilter, config.loadAllCameras]);
 
-  // Fetch stream URL for current camera
-  const loadStream = useCallback(async (camera: Camera) => {
+  // Fetch a fresh stream URL and load it into HLS (or create HLS if needed)
+  const loadStream = useCallback(async (camera: Camera, forceRecreate = false) => {
     try {
       const res = await fetch(
         `/api/webcams?action=stream&file=${encodeURIComponent(camera.streamFile)}`
       );
       if (!res.ok) throw new Error('Failed to get stream');
       const data = await res.json();
-      setStreamUrl(data.streamUrl);
-      setRetryCount(0);
+      const url: string = data.streamUrl;
+      if (!url) return;
+
+      retryCountRef.current = 0;
+      const video = videoRef.current;
+      if (!video) return;
+
+      // If HLS instance exists and we're just refreshing the token, swap the source
+      if (hlsRef.current && !forceRecreate) {
+        hlsRef.current.loadSource(url);
+        return;
+      }
+
+      // Otherwise create a fresh HLS instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 15,
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.muted = true;
+          video.play().catch(() => {});
+        });
+        hls.on(Hls.Events.ERROR, (_event, errData) => {
+          if (errData.fatal) {
+            if (errData.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              // Token likely expired - fetch a fresh stream URL
+              if (retryCountRef.current < 5) {
+                retryCountRef.current++;
+                loadStream(camera, true);
+              }
+            } else if (errData.type === Hls.ErrorTypes.MEDIA_ERROR) {
+              hls.recoverMediaError();
+            }
+          }
+        });
+        hlsRef.current = hls;
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+        video.muted = true;
+        video.play().catch(() => {});
+      }
     } catch {
-      setStreamUrl(null);
+      // Silently fail - token refresh will retry
     }
   }, []);
 
+  // Load stream when camera changes
   useEffect(() => {
     if (cameras.length === 0) return;
     const camera = cameras[currentIndex];
     if (!camera) return;
-    loadStream(camera);
+    retryCountRef.current = 0;
+    loadStream(camera, true); // Force recreate on camera change
   }, [cameras, currentIndex, loadStream]);
 
-  // Attach HLS player
+  // Cleanup HLS on unmount
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !streamUrl) return;
-
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 15,
-      });
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.muted = true;
-        video.play().catch(() => {});
-      });
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            // Token likely expired - fetch a fresh stream URL immediately
-            const cam = cameras[currentIndex];
-            if (cam && retryCount < 5) {
-              setRetryCount(prev => prev + 1);
-              loadStream(cam);
-            } else if (cameras.length > 1) {
-              setRetryCount(0);
-              setCurrentIndex(prev => (prev + 1) % cameras.length);
-            }
-          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            hls.recoverMediaError();
-          }
-        }
-      });
-      hlsRef.current = hls;
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl;
-      video.muted = true;
-      video.play().catch(() => {});
-    }
-
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [streamUrl, cameras, currentIndex, cameras.length, retryCount, loadStream]);
+  }, []);
+
+  // Proactive token refresh every 60 seconds
+  // Uses a raw setInterval so it doesn't depend on React state
+  useEffect(() => {
+    if (cameras.length === 0) return;
+
+    refreshTimerRef.current = setInterval(() => {
+      const cam = cameras[currentIndex];
+      if (cam) {
+        loadStream(cam, false); // Swap source, don't recreate
+      }
+    }, 60_000);
+
+    return () => {
+      if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
+    };
+  }, [cameras, currentIndex, loadStream]);
+
+  // Detect stalled video and force recovery
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleStalled = () => {
+      // If video stalls, give it 8 seconds then force a fresh stream
+      if (stalledTimerRef.current) clearTimeout(stalledTimerRef.current);
+      stalledTimerRef.current = setTimeout(() => {
+        const cam = cameras[currentIndex];
+        if (cam) {
+          loadStream(cam, true); // Force full recreate
+        }
+      }, 8000);
+    };
+
+    const handlePlaying = () => {
+      // Video recovered, cancel the stall timer
+      if (stalledTimerRef.current) {
+        clearTimeout(stalledTimerRef.current);
+        stalledTimerRef.current = null;
+      }
+    };
+
+    video.addEventListener('stalled', handleStalled);
+    video.addEventListener('waiting', handleStalled);
+    video.addEventListener('playing', handlePlaying);
+    video.addEventListener('timeupdate', handlePlaying);
+
+    return () => {
+      video.removeEventListener('stalled', handleStalled);
+      video.removeEventListener('waiting', handleStalled);
+      video.removeEventListener('playing', handlePlaying);
+      video.removeEventListener('timeupdate', handlePlaying);
+      if (stalledTimerRef.current) clearTimeout(stalledTimerRef.current);
+    };
+  }, [cameras, currentIndex, loadStream]);
 
   // Auto-rotate cameras (only when in rotate mode)
   const rotateNext = useCallback(() => {
@@ -171,16 +233,6 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
   useInterval(
     rotateNext,
     isRotating && cameras.length > 1 ? (config.rotateIntervalSeconds || 15) * 1000 : null
-  );
-
-  // Token refresh every 90 seconds (KC Scout tokens expire after ~2 min)
-  useInterval(
-    () => {
-      if (cameras.length > 0 && cameras[currentIndex]) {
-        loadStream(cameras[currentIndex]);
-      }
-    },
-    cameras.length > 0 ? 90_000 : null
   );
 
   const goNext = () => {
