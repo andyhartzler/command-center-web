@@ -127,9 +127,9 @@ export function AirQualityWidget({ config }: Props) {
       </div>
 
       {/* AQI display */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-1.5 px-3 pb-3">
+      <div className="flex-1 flex flex-col items-center justify-center gap-1 px-3">
         <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          className="w-14 h-14 rounded-xl flex items-center justify-center"
           style={{ backgroundColor: bg }}
         >
           <span className="text-2xl font-bold tabular-nums" style={{ color }}>

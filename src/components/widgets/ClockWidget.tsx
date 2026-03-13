@@ -45,13 +45,13 @@ export function ClockWidget({ config }: Props) {
   const minutes = new Intl.DateTimeFormat('en-US', {
     minute: '2-digit',
     timeZone: tz,
-  }).format(time);
+  }).format(time).padStart(2, '0');
 
   const seconds = config.showSeconds
     ? new Intl.DateTimeFormat('en-US', {
         second: '2-digit',
         timeZone: tz,
-      }).format(time)
+      }).format(time).padStart(2, '0')
     : '';
 
   const period = config.is24Hour

@@ -160,49 +160,49 @@ export function WeatherWidget({ config }: Props) {
   }
 
   return (
-    <div className="w-full h-full flex flex-col p-4" style={{ alignItems: 'flex-start' }}>
-      {/* Location label - matches Swift */}
-      <div
-        className="text-[10px] font-bold text-white/30 uppercase mb-1.5"
-        style={{ letterSpacing: '4px' }}
-      >
-        {config.locationName || 'KANSAS CITY'}
-      </div>
-
-      {/* Top row: temp + icon */}
-      <div className="flex items-start justify-between w-full">
-        <div className="flex flex-col gap-0.5">
-          {/* Temperature hero */}
-          <span
-            className="font-extralight text-white/95"
-            style={{ fontSize: '48px', lineHeight: 1 }}
-          >
-            {currentTemp}&deg;
-          </span>
-
-          {/* Condition */}
-          <span className="text-[13px] font-light text-white/50">
-            {conditionLabel}
-          </span>
-
-          {/* High/Low */}
-          <div className="flex items-center gap-2.5 mt-0.5">
-            <div className="flex items-center gap-0.5">
-              <ArrowUp size={10} className="text-white/30" strokeWidth={2} />
-              <span className="text-[10px] font-medium text-white/30">H:{high}&deg;</span>
-            </div>
-            <div className="flex items-center gap-0.5">
-              <ArrowDown size={10} className="text-white/30" strokeWidth={2} />
-              <span className="text-[10px] font-medium text-white/30">L:{low}&deg;</span>
-            </div>
-          </div>
+    <div className="w-full h-full flex flex-col justify-between p-4" style={{ alignItems: 'flex-start' }}>
+      <div className="w-full">
+        {/* Location label - matches Swift */}
+        <div
+          className="text-[10px] font-bold text-white/30 uppercase mb-1.5"
+          style={{ letterSpacing: '4px' }}
+        >
+          {config.locationName || 'KANSAS CITY'}
         </div>
 
-        {/* Weather icon */}
-        <ConditionIcon size={36} className="text-white/50 mt-1" strokeWidth={1} />
-      </div>
+        {/* Top row: temp + icon */}
+        <div className="flex items-start justify-between w-full">
+          <div className="flex flex-col gap-0.5">
+            {/* Temperature hero */}
+            <span
+              className="font-extralight text-white/95"
+              style={{ fontSize: '48px', lineHeight: 1 }}
+            >
+              {currentTemp}&deg;
+            </span>
 
-      <div className="flex-1" />
+            {/* Condition */}
+            <span className="text-[13px] font-light text-white/50">
+              {conditionLabel}
+            </span>
+
+            {/* High/Low */}
+            <div className="flex items-center gap-2.5 mt-0.5">
+              <div className="flex items-center gap-0.5">
+                <ArrowUp size={10} className="text-white/30" strokeWidth={2} />
+                <span className="text-[10px] font-medium text-white/30">H:{high}&deg;</span>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <ArrowDown size={10} className="text-white/30" strokeWidth={2} />
+                <span className="text-[10px] font-medium text-white/30">L:{low}&deg;</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Weather icon */}
+          <ConditionIcon size={36} className="text-white/50 mt-1" strokeWidth={1} />
+        </div>
+      </div>
 
       {/* Hourly forecast strip */}
       {forecastHours.length > 0 && (
