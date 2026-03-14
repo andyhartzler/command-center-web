@@ -24,10 +24,10 @@ export function ClockWidget({ config }: Props) {
     const update = () => {
       const w = el.clientWidth;
       const h = el.clientHeight;
-      // Base design: ~240 wide, content ~120 tall (label+time+date).
-      // Base design: time text ~240px wide, total content ~130px tall
-      const s = Math.min(w / 240, h / 130);
-      setScale(Math.max(0.4, Math.min(4, s)));
+      // Content at scale 1: label(10) + time(72) + date(14) + gaps(8) ≈ 104h
+      // Width: "12:00 PM" at 72px font ≈ 220w
+      const s = Math.min(w / 220, h / 104);
+      setScale(Math.max(0.4, Math.min(3.5, s)));
     };
     update();
     const ro = new ResizeObserver(update);
