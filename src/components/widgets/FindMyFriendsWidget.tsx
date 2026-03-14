@@ -52,11 +52,15 @@ export function FindMyFriendsWidget({ config, style: _style }: Props) {
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch('/api/findmy');
-      if (!res.ok) throw new Error(`${res.status}`);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text.includes('error') ? JSON.parse(text).error : `HTTP ${res.status}`);
+      }
       const json: FindMyData = await res.json();
       setData(json);
       setError(null);
     } catch (err) {
+      console.error('[FindMy] fetch error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
       setLoading(false);
