@@ -8,7 +8,7 @@ interface WidgetContainerProps {
   style?: CSSProperties;
 }
 
-const MAP_TYPES = new Set(['earthquakes', 'airTraffic', 'conflict', 'wildfires']);
+const MAP_TYPES = new Set(['earthquakes', 'airTraffic', 'conflict', 'wildfires', 'findMyFriends']);
 const VIDEO_TYPES = new Set(['webcams', 'camera', 'liveTV']);
 
 export function WidgetContainer({ widget, children, style }: WidgetContainerProps) {

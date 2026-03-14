@@ -36,7 +36,8 @@ export type WidgetType =
   | 'health'
   | 'homeKit'
   | 'airQuality'
-  | 'appleMusic';
+  | 'appleMusic'
+  | 'findMyFriends';
 
 export interface GridSize {
   columns: number;
@@ -170,6 +171,12 @@ export interface AirQualityConfig {
   longitude: number;
 }
 
+export interface FindMyFriendsConfig {
+  trackedHandles: string[];
+  displayMode: 'map' | 'pins' | 'list';
+  refreshInterval: number;
+}
+
 export type WidgetConfig =
   | { type: 'clock'; config: ClockConfig }
   | { type: 'weather'; config: WeatherConfig }
@@ -196,7 +203,8 @@ export type WidgetConfig =
   | { type: 'health'; config: Record<string, never> }
   | { type: 'homeKit'; config: Record<string, never> }
   | { type: 'airQuality'; config: AirQualityConfig }
-  | { type: 'appleMusic'; config: Record<string, never> };
+  | { type: 'appleMusic'; config: Record<string, never> }
+  | { type: 'findMyFriends'; config: FindMyFriendsConfig };
 
 export interface DashboardWidget {
   id: string;
@@ -259,6 +267,7 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
   airQuality: { displayName: 'Air Quality', category: 'Time & Location', icon: 'wind', color: '#34d399', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'] },
   appleMusic: { displayName: 'Top Charts', category: 'Media', icon: 'music', color: '#fa2d48', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
+  findMyFriends: { displayName: 'Find My', category: 'Productivity', icon: 'map-pin', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide'] },
 };
 
 export function defaultConfig(type: WidgetType): WidgetConfig {
@@ -289,5 +298,6 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'homeKit': return { type: 'homeKit', config: {} };
     case 'airQuality': return { type: 'airQuality', config: { latitude: 39.0997, longitude: -94.5786 } };
     case 'appleMusic': return { type: 'appleMusic', config: {} };
+    case 'findMyFriends': return { type: 'findMyFriends', config: { trackedHandles: [], displayMode: 'map', refreshInterval: 180 } };
   }
 }

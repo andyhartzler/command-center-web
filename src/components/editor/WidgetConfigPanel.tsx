@@ -4,7 +4,7 @@ import {
   Clock, CloudSun, Sun, Moon, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
   Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu, Wind,
-  Trash2, X, Plus, Minus, Radio, Search,
+  Trash2, X, Plus, Minus, Radio, Search, MapPin, Music,
 } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import {
@@ -22,7 +22,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   'trending-up': TrendingUp, bitcoin: Bitcoin, 'bar-chart-3': BarChart3,
   activity: Activity, plane: Plane, 'alert-triangle': AlertTriangle,
   'plane-landing': PlaneLanding, flame: Flame, heart: Heart,
-  home: Home, cpu: Cpu, wind: Wind,
+  home: Home, cpu: Cpu, wind: Wind, 'map-pin': MapPin, music: Music,
 };
 
 interface WidgetConfigPanelProps {
@@ -978,6 +978,47 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
         </ConfigSection>
       );
 
+    case 'findMyFriends':
+      return (
+        <ConfigSection title="Find My Settings">
+          <div className="space-y-3">
+            {/* Display mode selector */}
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-white/60">Display Mode</span>
+              <div className="flex gap-1">
+                {(['map', 'pins', 'list'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => updateConfig({ displayMode: mode })}
+                    className={`px-2 py-0.5 text-[10px] rounded ${
+                      (cfg.displayMode as string || 'map') === mode
+                        ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
+                        : 'bg-white/5 text-white/40 hover:bg-white/10'
+                    }`}
+                  >
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Friend picker */}
+            <FindMyFriendsPicker
+              trackedHandles={(cfg.trackedHandles as string[]) || []}
+              onChange={handles => updateConfig({ trackedHandles: handles })}
+            />
+
+            {/* Refresh interval */}
+            <ConfigNumberField
+              label="Refresh (sec)"
+              value={(cfg.refreshInterval as number) || 180}
+              onChange={v => updateConfig({ refreshInterval: v })}
+              min={60} max={600} step={30}
+            />
+          </div>
+        </ConfigSection>
+      );
+
     case 'reminders':
     case 'health':
     case 'homeKit':
@@ -1182,6 +1223,77 @@ function IPTVChannelBrowser({ selectedName, onSelect }: {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// --- Find My Friends Picker ---
+
+function FindMyFriendsPicker({ trackedHandles, onChange }: {
+  trackedHandles: string[];
+  onChange: (handles: string[]) => void;
+}) {
+  const [friends, setFriends] = useState<{ handle: string; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/findmy?action=friends-list')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setFriends(data.friends || []))
+      .catch(() => setFriends([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-1.5">
+        <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Friends</div>
+        <div className="flex items-center justify-center py-3">
+          <div className="w-3 h-3 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (friends.length === 0) {
+    return (
+      <div className="space-y-1.5">
+        <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Friends</div>
+        <p className="text-[10px] text-white/25 italic">No friends found. Check BlueBubbles connection.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">
+        Friends {trackedHandles.length > 0 ? `(${trackedHandles.length} selected)` : '(all)'}
+      </div>
+      {friends.map(f => {
+        const isTracked = trackedHandles.includes(f.handle);
+        return (
+          <ToggleRow
+            key={f.handle}
+            label={f.name}
+            value={isTracked}
+            onChange={v => {
+              if (v) {
+                onChange([...trackedHandles, f.handle]);
+              } else {
+                onChange(trackedHandles.filter(h => h !== f.handle));
+              }
+            }}
+          />
+        );
+      })}
+      {trackedHandles.length > 0 && (
+        <button
+          onClick={() => onChange([])}
+          className="text-[10px] text-[#6b8aab]/70 hover:text-[#6b8aab] transition-colors"
+        >
+          Show all friends
+        </button>
+      )}
     </div>
   );
 }
