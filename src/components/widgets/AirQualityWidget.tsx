@@ -31,7 +31,9 @@ interface Props {
 export function AirQualityWidget({ config }: Props) {
   const [data, setData] = useState<AirQualityData | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState<{ w: number; h: number }>({ w: 300, h: 100 });
+  const [scale, setScale] = useState(0);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -42,6 +44,19 @@ export function AirQualityWidget({ config }: Props) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Auto-scale content to fill container
+  useEffect(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+    const cw = content.offsetWidth;
+    const ch = content.offsetHeight;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (cw === 0 || ch === 0 || w === 0 || h === 0) return;
+    setScale(Math.min(w / cw, h / ch) * 0.88);
+  }, [dims, data]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -71,95 +86,96 @@ export function AirQualityWidget({ config }: Props) {
   const { label, color, bg } = getAqiCategory(data.aqi);
   const isWide = dims.w > dims.h * 2.5;
 
-  if (isWide) {
-    // Single-row wide layout. Content natural size: ~300w x 40h
-    const s = Math.max(0.5, Math.min(4, Math.min(dims.w / 300, dims.h / 40)));
-    const pad = 6 * s;
-    const badgeSize = 32 * s;
-
-    return (
-      <div ref={containerRef} className="w-full h-full flex items-center overflow-hidden" style={{ padding: `${pad}px ${pad * 1.5}px`, gap: `${8 * s}px` }}>
-        {/* Icon + label */}
-        <div className="flex items-center shrink-0" style={{ gap: `${5 * s}px` }}>
-          <Wind size={Math.max(8, 10 * s)} style={{ color, flexShrink: 0 }} />
-          <span className="font-semibold text-white/90 whitespace-nowrap" style={{ fontSize: `${9 * s}px` }}>Air Quality</span>
-        </div>
-
-        {/* AQI badge */}
-        <div className="flex items-center shrink-0" style={{ gap: `${5 * s}px` }}>
-          <div className="flex items-center justify-center" style={{ width: badgeSize, height: badgeSize, borderRadius: 6 * s, backgroundColor: bg }}>
-            <span className="font-bold tabular-nums" style={{ color, fontSize: `${16 * s}px` }}>{data.aqi}</span>
-          </div>
-          <span className="font-semibold" style={{ color, fontSize: `${9 * s}px` }}>{label}</span>
-        </div>
-
-        {/* Divider */}
-        <div style={{ width: 1, height: `${22 * s}px`, background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
-
-        {/* Pollutants — minimal: just label + value, no bg/unit */}
-        <div className="flex flex-1 min-w-0 justify-around">
-          <PollutantInline label="PM2.5" value={data.pm2_5} s={s} />
-          <PollutantInline label="PM10" value={data.pm10} s={s} />
-          <PollutantInline label="O₃" value={data.ozone} s={s} />
-          <PollutantInline label="CO" value={data.co} s={s} />
-          <PollutantInline label="NO₂" value={data.no2} s={s} />
-          <PollutantInline label="SO₂" value={data.so2} s={s} />
-        </div>
-      </div>
-    );
-  }
-
-  // Compact/square layout. Content natural size: ~140w x 140h
-  const s = Math.max(0.5, Math.min(4, Math.min(dims.w / 140, dims.h / 140)));
-  const badgeSize = 40 * s;
-
   return (
-    <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center overflow-hidden" style={{ padding: `${8 * s}px`, gap: `${6 * s}px` }}>
-      {/* Header */}
-      <div className="flex items-center" style={{ gap: `${6 * s}px` }}>
-        <Wind size={Math.max(8, 12 * s)} style={{ color }} />
-        <span className="font-semibold text-white/90" style={{ fontSize: `${10 * s}px` }}>Air Quality</span>
-      </div>
+    <div ref={containerRef} className="w-full h-full relative overflow-hidden">
+      {isWide ? (
+        <div
+          ref={contentRef}
+          className="absolute left-1/2 top-1/2 flex flex-col"
+          style={{
+            transform: `translate(-50%, -50%) scale(${scale})`,
+            transformOrigin: 'center center',
+            whiteSpace: 'nowrap',
+            gap: '6px',
+            opacity: scale > 0 ? 1 : 0,
+          }}
+        >
+          {/* Row 1: label left, badge right */}
+          <div className="flex items-center justify-between" style={{ gap: '24px' }}>
+            <div className="flex items-center" style={{ gap: '6px' }}>
+              <Wind size={14} style={{ color, flexShrink: 0 }} />
+              <span className="font-semibold text-white/90" style={{ fontSize: '11px' }}>Air Quality</span>
+            </div>
+            <div className="flex items-center" style={{ gap: '6px' }}>
+              <div
+                className="flex items-center justify-center"
+                style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: bg }}
+              >
+                <span className="font-bold tabular-nums" style={{ color, fontSize: '14px' }}>{data.aqi}</span>
+              </div>
+              <span className="font-semibold" style={{ color, fontSize: '11px' }}>{label}</span>
+            </div>
+          </div>
 
-      {/* AQI */}
-      <div className="flex items-center justify-center" style={{ width: badgeSize, height: badgeSize, borderRadius: 8 * s, backgroundColor: bg }}>
-        <span className="font-bold tabular-nums" style={{ color, fontSize: `${20 * s}px` }}>{data.aqi}</span>
-      </div>
-      <span className="font-medium text-center" style={{ color, fontSize: `${9 * s}px` }}>{label}</span>
+          {/* Row 2: pollutant boxes */}
+          <div className="flex" style={{ gap: '5px' }}>
+            <PollutantBox label="PM2.5" value={data.pm2_5} />
+            <PollutantBox label="PM10" value={data.pm10} />
+            <PollutantBox label="O₃" value={data.ozone} />
+            <PollutantBox label="CO" value={data.co} />
+            <PollutantBox label="NO₂" value={data.no2} />
+            <PollutantBox label="SO₂" value={data.so2} />
+          </div>
+        </div>
+      ) : (
+        <div
+          ref={contentRef}
+          className="absolute left-1/2 top-1/2 flex flex-col items-center"
+          style={{
+            transform: `translate(-50%, -50%) scale(${scale})`,
+            transformOrigin: 'center center',
+            whiteSpace: 'nowrap',
+            gap: '6px',
+            opacity: scale > 0 ? 1 : 0,
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center" style={{ gap: '6px' }}>
+            <Wind size={12} style={{ color }} />
+            <span className="font-semibold text-white/90" style={{ fontSize: '10px' }}>Air Quality</span>
+          </div>
 
-      {/* Pollutants if there's room */}
-      {dims.w > 180 && dims.h > 200 && (
-        <div className="grid grid-cols-3" style={{ gap: `${6 * s}px` }}>
-          <PollutantCell label="PM2.5" value={data.pm2_5} unit="ug/m3" s={s} />
-          <PollutantCell label="PM10" value={data.pm10} unit="ug/m3" s={s} />
-          <PollutantCell label="O3" value={data.ozone} unit="ug/m3" s={s} />
+          {/* AQI badge */}
+          <div
+            className="flex items-center justify-center"
+            style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: bg }}
+          >
+            <span className="font-bold tabular-nums" style={{ color, fontSize: '20px' }}>{data.aqi}</span>
+          </div>
+          <span className="font-medium text-center" style={{ color, fontSize: '9px' }}>{label}</span>
+
+          {/* Pollutant grid */}
+          <div className="grid grid-cols-3" style={{ gap: '5px' }}>
+            <PollutantBox label="PM2.5" value={data.pm2_5} />
+            <PollutantBox label="PM10" value={data.pm10} />
+            <PollutantBox label="O₃" value={data.ozone} />
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-/** Compact inline pollutant for wide layout — no bg, no unit */
-function PollutantInline({ label, value, s }: { label: string; value: number | null; s: number }) {
+function PollutantBox({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="flex flex-col items-center" style={{ gap: `${1 * s}px` }}>
-      <span className="text-white/25 uppercase" style={{ fontSize: `${6 * s}px`, letterSpacing: `${0.3 * s}px` }}>{label}</span>
-      <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: `${10 * s}px` }}>
+    <div
+      className="flex flex-col items-center bg-white/[0.04] rounded-md"
+      style={{ padding: '3px 8px', gap: '1px' }}
+    >
+      <span className="text-white/30 uppercase" style={{ fontSize: '7px', letterSpacing: '0.5px' }}>{label}</span>
+      <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: '12px' }}>
         {value !== null ? value.toFixed(1) : '--'}
       </span>
-    </div>
-  );
-}
-
-/** Card-style pollutant for compact/square layout */
-function PollutantCell({ label, value, unit, s }: { label: string; value: number | null; unit: string; s: number }) {
-  return (
-    <div className="flex flex-col items-center bg-white/[0.04] rounded-lg" style={{ padding: `${4 * s}px ${6 * s}px`, gap: `${1 * s}px` }}>
-      <span className="text-white/30 uppercase" style={{ fontSize: `${7 * s}px`, letterSpacing: `${0.5 * s}px` }}>{label}</span>
-      <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: `${11 * s}px` }}>
-        {value !== null ? value.toFixed(1) : '--'}
-      </span>
-      <span className="text-white/15" style={{ fontSize: `${6 * s}px` }}>{unit}</span>
     </div>
   );
 }
