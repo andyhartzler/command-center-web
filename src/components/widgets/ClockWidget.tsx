@@ -27,7 +27,7 @@ export function ClockWidget({ config }: Props) {
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (cw === 0 || ch === 0 || w === 0 || h === 0) return;
-    setScale(Math.min(w / cw, h / ch) * 0.85);
+    setScale(Math.min(w / cw, h / ch) * 0.92);
   }, []);
 
   useEffect(() => {
@@ -96,7 +96,7 @@ export function ClockWidget({ config }: Props) {
         {/* Location label */}
         <div
           className="font-bold text-white/30 uppercase"
-          style={{ letterSpacing: '4px', fontSize: '10px' }}
+          style={{ letterSpacing: '4px', fontSize: '10px', lineHeight: 1 }}
         >
           {config.label}
         </div>
@@ -150,7 +150,7 @@ export function ClockWidget({ config }: Props) {
         {/* Date */}
         <div
           className="font-light text-white/35"
-          style={{ fontSize: '14px', marginTop: '2px' }}
+          style={{ fontSize: '14px', marginTop: '2px', lineHeight: 1 }}
         >
           {dateString}
         </div>

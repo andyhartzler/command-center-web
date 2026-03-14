@@ -55,7 +55,7 @@ export function AirQualityWidget({ config }: Props) {
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (cw === 0 || ch === 0 || w === 0 || h === 0) return;
-    setScale(Math.min(w / cw, h / ch) * 0.88);
+    setScale(Math.min(w / cw, h / ch) * 0.92);
   }, [dims, data]);
 
   const fetchData = useCallback(async () => {
@@ -104,16 +104,16 @@ export function AirQualityWidget({ config }: Props) {
           <div className="flex items-center justify-between" style={{ gap: '24px' }}>
             <div className="flex items-center" style={{ gap: '6px' }}>
               <Wind size={14} style={{ color, flexShrink: 0 }} />
-              <span className="font-semibold text-white/90" style={{ fontSize: '11px' }}>Air Quality</span>
+              <span className="font-semibold text-white/90" style={{ fontSize: '11px', lineHeight: 1 }}>Air Quality</span>
             </div>
             <div className="flex items-center" style={{ gap: '6px' }}>
               <div
                 className="flex items-center justify-center"
                 style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: bg }}
               >
-                <span className="font-bold tabular-nums" style={{ color, fontSize: '14px' }}>{data.aqi}</span>
+                <span className="font-bold tabular-nums" style={{ color, fontSize: '14px', lineHeight: 1 }}>{data.aqi}</span>
               </div>
-              <span className="font-semibold" style={{ color, fontSize: '11px' }}>{label}</span>
+              <span className="font-semibold" style={{ color, fontSize: '11px', lineHeight: 1 }}>{label}</span>
             </div>
           </div>
 
@@ -142,7 +142,7 @@ export function AirQualityWidget({ config }: Props) {
           {/* Header */}
           <div className="flex items-center" style={{ gap: '6px' }}>
             <Wind size={12} style={{ color }} />
-            <span className="font-semibold text-white/90" style={{ fontSize: '10px' }}>Air Quality</span>
+            <span className="font-semibold text-white/90" style={{ fontSize: '10px', lineHeight: 1 }}>Air Quality</span>
           </div>
 
           {/* AQI badge */}
@@ -150,9 +150,9 @@ export function AirQualityWidget({ config }: Props) {
             className="flex items-center justify-center"
             style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: bg }}
           >
-            <span className="font-bold tabular-nums" style={{ color, fontSize: '20px' }}>{data.aqi}</span>
+            <span className="font-bold tabular-nums" style={{ color, fontSize: '20px', lineHeight: 1 }}>{data.aqi}</span>
           </div>
-          <span className="font-medium text-center" style={{ color, fontSize: '9px' }}>{label}</span>
+          <span className="font-medium text-center" style={{ color, fontSize: '9px', lineHeight: 1 }}>{label}</span>
 
           {/* Pollutant grid */}
           <div className="grid grid-cols-3" style={{ gap: '5px' }}>
@@ -170,10 +170,10 @@ function PollutantBox({ label, value }: { label: string; value: number | null })
   return (
     <div
       className="flex flex-col items-center bg-white/[0.04] rounded-md"
-      style={{ padding: '3px 8px', gap: '1px' }}
+      style={{ padding: '4px 12px', gap: '1px' }}
     >
-      <span className="text-white/30 uppercase" style={{ fontSize: '7px', letterSpacing: '0.5px' }}>{label}</span>
-      <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: '12px' }}>
+      <span className="text-white/30 uppercase" style={{ fontSize: '7px', letterSpacing: '0.5px', lineHeight: 1 }}>{label}</span>
+      <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: '12px', lineHeight: 1 }}>
         {value !== null ? value.toFixed(1) : '--'}
       </span>
     </div>
