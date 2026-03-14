@@ -10,12 +10,20 @@ const KMBC_CHANNEL_ID = '47d92d1bd8e44e2383563530c2a305fd';
 // Proxy HLS manifests/segments to bypass CORS
 async function proxyStream(url: string): Promise<NextResponse> {
   try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': '*/*',
-      },
-    });
+    // Some streams require specific referer headers
+    const headers: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      'Accept': '*/*',
+    };
+    try {
+      const host = new URL(url).hostname;
+      if (host.includes('usnlive.com')) {
+        headers['Referer'] = 'https://usnewson.com/';
+        headers['Origin'] = 'https://usnewson.com';
+      }
+    } catch { /* ignore */ }
+
+    const res = await fetch(url, { headers });
     if (!res.ok) {
       return new NextResponse(`Upstream ${res.status}`, { status: res.status });
     }

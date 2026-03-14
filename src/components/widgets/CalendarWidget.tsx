@@ -46,7 +46,7 @@ function isTomorrow(date: Date): boolean {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   return date.getFullYear() === tomorrow.getFullYear() &&
-    tomorrow.getMonth() === tomorrow.getMonth() &&
+    date.getMonth() === tomorrow.getMonth() &&
     date.getDate() === tomorrow.getDate();
 }
 
@@ -87,9 +87,16 @@ export function CalendarWidget({ config }: CalendarWidgetProps) {
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+      } else if (data.events?.length === 0 && data.errors?.length > 0) {
+        // All feeds failed - surface the per-feed errors
+        setError(data.errors.join('; '));
       } else {
         setEvents(data.events || []);
         setLastFetch(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
+        // If some feeds succeeded but others failed, log warnings
+        if (data.errors?.length > 0) {
+          console.warn('[Calendar] Some feeds had errors:', data.errors);
+        }
       }
     } catch (err) {
       console.error('[Calendar] fetch error', err);

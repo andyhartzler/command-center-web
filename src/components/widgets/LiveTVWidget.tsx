@@ -25,9 +25,9 @@ const ALL_CHANNELS: Channel[] = [
   { name: 'ABC News Live', url: 'https://aegis-cloudfront-1.tubi.video/d6cbb0de-68e4-4f3b-82f9-bf5d526e0bde/index.m3u8', category: 'US News' },
   { name: 'CBS News', url: 'https://cbsnews.akamaized.net/hls/live/2020607/cbsnlineup_8/master.m3u8', category: 'US News' },
   { name: 'NBC News NOW', url: 'https://xumo-drct-nbcnn-ir8ze.fast.nbcuni.com/live/master.m3u8', category: 'US News' },
-  { name: 'CNN', url: 'https://turnerlive.warnermediacdn.com/hls/live/586495/cnngo/cnn_slate/VIDEO_0_3564000.m3u8', category: 'US News' },
+  { name: 'CNN', url: 'https://s13.usnlive.com/stream/cnn.m3u8', category: 'US News' },
+  { name: 'Fox News', url: 'https://s13.usnlive.com/stream/foxnews.m3u8', category: 'US News' },
   { name: 'LiveNOW from FOX', url: '', category: 'US News', resolver: 'pluto', plutoId: '63d025db4e83e700086eaa96' },
-  { name: 'Fox News Radio', url: 'https://radiovid.foxnews.com/hls/live/661547/RADIOVID/index.m3u8', category: 'US News' },
   { name: 'Fox Weather', url: 'https://247wlive.foxweather.com/stream/index.m3u8', category: 'US News' },
   { name: 'Bloomberg', url: 'https://bloomberg.com/media-manifest/streams/us.m3u8', category: 'US News' },
   { name: 'Scripps News', url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8', category: 'US News' },
@@ -35,7 +35,7 @@ const ALL_CHANNELS: Channel[] = [
   { name: 'USA Today', url: 'https://lnc-usa-today.tubi.video/playlist.m3u8', category: 'US News' },
   { name: 'Reuters', url: 'https://reuters-reutersnow-1-eu.rakuten.wurl.tv/playlist.m3u8', category: 'US News' },
   { name: 'CNBC', url: 'https://content.uplynk.com/channel/3324f2467c414329b3b0cc5cd987b6be.m3u8', category: 'US News' },
-  { name: 'MS NOW (MSNBC)', url: 'https://llnw.stream.msnbc.com/live/MSNBC398a080a-ua/master.m3u8', category: 'US News' },
+  { name: 'MS NOW (MSNBC)', url: 'https://s13.usnlive.com/stream/msnbc.m3u8', category: 'US News' },
 
   // World News
   { name: 'BBC News', url: 'https://pb-iiczlgfysam0q.akamaized.net/v1/amcnetworks_bbcnews_1/samsungheadend_us/latest/main/hls/playlist.m3u8', category: 'World News' },
