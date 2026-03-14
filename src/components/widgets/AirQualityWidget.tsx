@@ -72,36 +72,38 @@ export function AirQualityWidget({ config }: Props) {
   const isWide = dims.w > dims.h * 2.5;
 
   if (isWide) {
-    // Single-row wide layout. Content natural size: ~340w x 48h
-    const s = Math.max(0.5, Math.min(4, Math.min(dims.w / 340, dims.h / 48)));
-    const pad = 8 * s;
-    const badgeSize = 36 * s;
+    // Single-row wide layout. Content natural size: ~300w x 40h
+    const s = Math.max(0.5, Math.min(4, Math.min(dims.w / 300, dims.h / 40)));
+    const pad = 6 * s;
+    const badgeSize = 32 * s;
 
     return (
-      <div ref={containerRef} className="w-full h-full flex items-center overflow-hidden" style={{ padding: `${pad}px ${pad * 1.5}px`, gap: `${10 * s}px` }}>
-        {/* AQI badge + label */}
-        <div className="flex items-center shrink-0" style={{ gap: `${8 * s}px` }}>
-          <Wind size={Math.max(8, 11 * s)} style={{ color, flexShrink: 0 }} />
-          <div className="flex items-center justify-center" style={{ width: badgeSize, height: badgeSize, borderRadius: 8 * s, backgroundColor: bg }}>
-            <span className="font-bold tabular-nums" style={{ color, fontSize: `${18 * s}px` }}>{data.aqi}</span>
+      <div ref={containerRef} className="w-full h-full flex items-center overflow-hidden" style={{ padding: `${pad}px ${pad * 1.5}px`, gap: `${8 * s}px` }}>
+        {/* Icon + label */}
+        <div className="flex items-center shrink-0" style={{ gap: `${5 * s}px` }}>
+          <Wind size={Math.max(8, 10 * s)} style={{ color, flexShrink: 0 }} />
+          <span className="font-semibold text-white/90 whitespace-nowrap" style={{ fontSize: `${9 * s}px` }}>Air Quality</span>
+        </div>
+
+        {/* AQI badge */}
+        <div className="flex items-center shrink-0" style={{ gap: `${5 * s}px` }}>
+          <div className="flex items-center justify-center" style={{ width: badgeSize, height: badgeSize, borderRadius: 6 * s, backgroundColor: bg }}>
+            <span className="font-bold tabular-nums" style={{ color, fontSize: `${16 * s}px` }}>{data.aqi}</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span className="font-semibold" style={{ color, fontSize: `${11 * s}px` }}>{label}</span>
-            <span className="text-white/30" style={{ fontSize: `${7 * s}px` }}>Air Quality Index</span>
-          </div>
+          <span className="font-semibold" style={{ color, fontSize: `${9 * s}px` }}>{label}</span>
         </div>
 
         {/* Divider */}
-        <div style={{ width: 1, height: `${28 * s}px`, background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
+        <div style={{ width: 1, height: `${22 * s}px`, background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
 
-        {/* Pollutants - flex-1 so they fill remaining space */}
-        <div className="flex flex-1 min-w-0" style={{ gap: `${4 * s}px` }}>
-          <PollutantCell label="PM2.5" value={data.pm2_5} unit="ug/m3" s={s} />
-          <PollutantCell label="PM10" value={data.pm10} unit="ug/m3" s={s} />
-          <PollutantCell label="O3" value={data.ozone} unit="ug/m3" s={s} />
-          <PollutantCell label="CO" value={data.co} unit="ug/m3" s={s} />
-          <PollutantCell label="NO2" value={data.no2} unit="ug/m3" s={s} />
-          <PollutantCell label="SO2" value={data.so2} unit="ug/m3" s={s} />
+        {/* Pollutants — minimal: just label + value, no bg/unit */}
+        <div className="flex flex-1 min-w-0 justify-around">
+          <PollutantInline label="PM2.5" value={data.pm2_5} s={s} />
+          <PollutantInline label="PM10" value={data.pm10} s={s} />
+          <PollutantInline label="O₃" value={data.ozone} s={s} />
+          <PollutantInline label="CO" value={data.co} s={s} />
+          <PollutantInline label="NO₂" value={data.no2} s={s} />
+          <PollutantInline label="SO₂" value={data.so2} s={s} />
         </div>
       </div>
     );
@@ -137,9 +139,22 @@ export function AirQualityWidget({ config }: Props) {
   );
 }
 
+/** Compact inline pollutant for wide layout — no bg, no unit */
+function PollutantInline({ label, value, s }: { label: string; value: number | null; s: number }) {
+  return (
+    <div className="flex flex-col items-center" style={{ gap: `${1 * s}px` }}>
+      <span className="text-white/25 uppercase" style={{ fontSize: `${6 * s}px`, letterSpacing: `${0.3 * s}px` }}>{label}</span>
+      <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: `${10 * s}px` }}>
+        {value !== null ? value.toFixed(1) : '--'}
+      </span>
+    </div>
+  );
+}
+
+/** Card-style pollutant for compact/square layout */
 function PollutantCell({ label, value, unit, s }: { label: string; value: number | null; unit: string; s: number }) {
   return (
-    <div className="flex flex-col items-center bg-white/[0.04] rounded-lg flex-1 min-w-0" style={{ padding: `${4 * s}px ${6 * s}px`, gap: `${1 * s}px` }}>
+    <div className="flex flex-col items-center bg-white/[0.04] rounded-lg" style={{ padding: `${4 * s}px ${6 * s}px`, gap: `${1 * s}px` }}>
       <span className="text-white/30 uppercase" style={{ fontSize: `${7 * s}px`, letterSpacing: `${0.5 * s}px` }}>{label}</span>
       <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: `${11 * s}px` }}>
         {value !== null ? value.toFixed(1) : '--'}

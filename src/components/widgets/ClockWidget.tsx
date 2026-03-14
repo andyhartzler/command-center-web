@@ -24,9 +24,9 @@ export function ClockWidget({ config }: Props) {
     const update = () => {
       const w = el.clientWidth;
       const h = el.clientHeight;
-      // Content at scale 1: label(10) + time(72) + date(14) + gaps(8) ≈ 104h
-      // Width: "12:00 PM" at 72px font ≈ 220w
-      const s = Math.min(w / 220, h / 104);
+      // Content at scale 1: label(8) + gap(1) + time(72) + gap(1) + date(12) ≈ 94h
+      // Width: "12:00 PM" at 72px font ≈ 200w
+      const s = Math.min(w / 200, h / 94);
       setScale(Math.max(0.4, Math.min(3.5, s)));
     };
     update();
@@ -74,11 +74,11 @@ export function ClockWidget({ config }: Props) {
   }).format(time);
 
   return (
-    <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center overflow-hidden" style={{ gap: `${2 * scale}px` }}>
+    <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center overflow-hidden" style={{ gap: `${1 * scale}px` }}>
       {/* Location label */}
       <div
         className="font-bold text-white/30 uppercase"
-        style={{ letterSpacing: `${4 * scale}px`, fontSize: `${Math.max(8, 10 * scale)}px` }}
+        style={{ letterSpacing: `${3 * scale}px`, fontSize: `${Math.max(6, 8 * scale)}px` }}
       >
         {config.label}
       </div>
@@ -132,7 +132,7 @@ export function ClockWidget({ config }: Props) {
       {/* Date */}
       <div
         className="font-light text-white/35"
-        style={{ fontSize: `${14 * scale}px`, marginTop: `${2 * scale}px` }}
+        style={{ fontSize: `${12 * scale}px`, marginTop: `${1 * scale}px` }}
       >
         {dateString}
       </div>
