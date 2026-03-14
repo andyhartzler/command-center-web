@@ -28,7 +28,10 @@ export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get('action');
 
   try {
-    if (cache && Date.now() - cache.ts < CACHE_TTL) {
+    // Refresh action bypasses cache to get latest data
+    const skipCache = action === 'refresh';
+
+    if (!skipCache && cache && Date.now() - cache.ts < CACHE_TTL) {
       const data = cache.data as { friends: { handle: string; name: string }[] };
       if (action === 'friends-list') {
         return NextResponse.json({

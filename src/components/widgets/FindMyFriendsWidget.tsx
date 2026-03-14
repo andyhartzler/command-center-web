@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Users, Loader2 } from 'lucide-react';
+import { MapPin, Users, Loader2, RefreshCw } from 'lucide-react';
 import { useAppleMap } from '@/hooks/useAppleMap';
 import type { FindMyFriendsConfig, WidgetStyle } from '@/types/widget';
 
@@ -45,13 +45,15 @@ interface Props {
 export function FindMyFriendsWidget({ config, style: _style }: Props) {
   const [data, setData] = useState<FindMyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (refresh = false) => {
     try {
-      const res = await fetch('/api/findmy');
+      const url = refresh ? '/api/findmy?action=refresh' : '/api/findmy';
+      const res = await fetch(url);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text.includes('error') ? JSON.parse(text).error : `HTTP ${res.status}`);
@@ -64,8 +66,14 @@ export function FindMyFriendsWidget({ config, style: _style }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchData(true);
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();
@@ -131,6 +139,16 @@ export function FindMyFriendsWidget({ config, style: _style }: Props) {
       {mode === 'list' && (
         <ListMode friends={friends} avatars={avatars} />
       )}
+
+      {/* Refresh button */}
+      <button
+        onClick={handleRefresh}
+        disabled={refreshing}
+        className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors"
+        title="Refresh locations"
+      >
+        <RefreshCw size={13} className={`text-white/60 ${refreshing ? 'animate-spin' : ''}`} />
+      </button>
     </div>
   );
 }
@@ -143,28 +161,41 @@ function MapMode({ friends, avatars, containerSize }: {
   containerSize: { w: number; h: number };
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const annotationsAdded = useRef(false);
+  const prevFriendsKey = useRef('');
 
-  // Calculate center from friends
-  const centerLat = friends.reduce((s, f) => s + f.lat, 0) / friends.length;
-  const centerLng = friends.reduce((s, f) => s + f.lng, 0) / friends.length;
+  // Only show friends with valid coordinates on the map
+  const mappable = friends.filter(f => f.lat !== 0 || f.lng !== 0);
+
+  // Default center to KC area if no mappable friends
+  const centerLat = mappable.length > 0
+    ? mappable.reduce((s, f) => s + f.lat, 0) / mappable.length
+    : 39.0997;
+  const centerLng = mappable.length > 0
+    ? mappable.reduce((s, f) => s + f.lng, 0) / mappable.length
+    : -94.5786;
 
   const { map, isReady } = useAppleMap(mapContainerRef, {
     center: [centerLat, centerLng],
-    zoom: 10,
+    zoom: 8,
     interactive: false,
   });
 
-  // Add annotations when map is ready
+  // Add/update annotations when map is ready or friends change
   useEffect(() => {
-    if (!isReady() || annotationsAdded.current) return;
-
+    if (!isReady()) return;
     const m = map.current;
     if (!m) return;
 
-    // Add custom annotations for each friend
-    const annotations: mapkit.Annotation[] = [];
-    for (const friend of friends) {
+    // Build a key to detect changes
+    const key = mappable.map(f => `${f.handle}:${f.lat}:${f.lng}:${f.status}`).join('|');
+    if (key === prevFriendsKey.current) return;
+    prevFriendsKey.current = key;
+
+    // Clear previous annotations
+    m.removeAnnotations(m.annotations);
+
+    // Add photo annotations for each mappable friend
+    for (const friend of mappable) {
       const coord = new mapkit.Coordinate(friend.lat, friend.lng);
       const avatarUrl = avatars[friend.handle];
       const color = statusColor(friend.status);
@@ -173,64 +204,75 @@ function MapMode({ friends, avatars, containerSize }: {
         coord,
         () => {
           const el = document.createElement('div');
-          el.style.cssText = 'position:relative;';
+          el.style.cssText = 'position:relative;cursor:default;';
 
           if (avatarUrl) {
             const img = document.createElement('img');
             img.src = avatarUrl;
-            img.style.cssText = 'width:44px;height:44px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);object-fit:cover;';
+            img.style.cssText = 'width:44px;height:44px;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.5);object-fit:cover;';
             el.appendChild(img);
           } else {
             const placeholder = document.createElement('div');
-            placeholder.style.cssText = `width:44px;height:44px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);background:#374151;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;font-weight:600;`;
+            placeholder.style.cssText = `width:44px;height:44px;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.5);background:#374151;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;font-weight:600;`;
             placeholder.textContent = friend.name.charAt(0).toUpperCase();
             el.appendChild(placeholder);
           }
 
           // Status dot
           const dot = document.createElement('div');
-          dot.style.cssText = `position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #1a1a1c;`;
+          dot.style.cssText = `position:absolute;bottom:0px;right:0px;width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);`;
           el.appendChild(dot);
+
+          // Name label below photo
+          const label = document.createElement('div');
+          label.textContent = friend.name.split(' ')[0];
+          label.style.cssText = 'text-align:center;font-size:10px;font-weight:600;color:white;text-shadow:0 1px 4px rgba(0,0,0,0.8);margin-top:2px;white-space:nowrap;';
+          el.appendChild(label);
 
           return el;
         },
-        { anchorOffset: { x: 0, y: 0 } }
+        { anchorOffset: { x: 0, y: -8 } }
       );
 
-      annotations.push(annotation);
+      m.addAnnotation(annotation);
     }
 
-    m.addAnnotations(annotations);
-    annotationsAdded.current = true;
-
     // Auto-zoom to fit all friends
-    if (friends.length > 1) {
-      const lats = friends.map(f => f.lat);
-      const lngs = friends.map(f => f.lng);
+    if (mappable.length > 1) {
+      const lats = mappable.map(f => f.lat);
+      const lngs = mappable.map(f => f.lng);
       const minLat = Math.min(...lats);
       const maxLat = Math.max(...lats);
       const minLng = Math.min(...lngs);
       const maxLng = Math.max(...lngs);
-      const centerLat2 = (minLat + maxLat) / 2;
-      const centerLng2 = (minLng + maxLng) / 2;
-      const latSpan = Math.max((maxLat - minLat) * 1.5, 0.01);
-      const lngSpan = Math.max((maxLng - minLng) * 1.5, 0.01);
+      const cLat = (minLat + maxLat) / 2;
+      const cLng = (minLng + maxLng) / 2;
+      const latSpan = Math.max((maxLat - minLat) * 1.6, 0.05);
+      const lngSpan = Math.max((maxLng - minLng) * 1.6, 0.05);
       m.setRegionAnimated(
         new mapkit.CoordinateRegion(
-          new mapkit.Coordinate(centerLat2, centerLng2),
+          new mapkit.Coordinate(cLat, cLng),
           new mapkit.CoordinateSpan(latSpan, lngSpan)
         ),
         false
       );
+    } else if (mappable.length === 1) {
+      m.setRegionAnimated(
+        new mapkit.CoordinateRegion(
+          new mapkit.Coordinate(mappable[0].lat, mappable[0].lng),
+          new mapkit.CoordinateSpan(0.05, 0.05)
+        ),
+        false
+      );
     }
-  }, [isReady, map, friends, avatars, containerSize]);
+  }, [isReady, map, mappable, avatars, containerSize]);
 
   return (
     <div className="w-full h-full relative">
       <div ref={mapContainerRef} className="absolute inset-0" />
 
-      {/* Overlay card */}
-      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md rounded-xl px-3 py-2 max-w-[180px]">
+      {/* Overlay list — shows ALL friends including those without coords */}
+      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md rounded-xl px-3 py-2 max-w-[200px]">
         {friends.map(f => (
           <div key={f.handle} className="flex items-center gap-2 py-0.5">
             {avatars[f.handle] ? (
