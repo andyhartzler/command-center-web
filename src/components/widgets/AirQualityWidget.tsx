@@ -170,7 +170,7 @@ function PollutantBox({ label, value }: { label: string; value: number | null })
   return (
     <div
       className="flex flex-col items-center bg-white/[0.04] rounded-md"
-      style={{ padding: '4px 12px', gap: '1px' }}
+      style={{ padding: '3px 6px', gap: '1px' }}
     >
       <span className="text-white/30 uppercase" style={{ fontSize: '7px', letterSpacing: '0.5px', lineHeight: 1 }}>{label}</span>
       <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: '12px', lineHeight: 1 }}>
