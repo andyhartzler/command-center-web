@@ -300,25 +300,6 @@ function WeightView({ data }: { data: WithingsData }) {
         <CompositionBar label="Hydration" value={l.hydration} max={100} color="#38bdf8" />
       </div>
 
-      {/* Vitals section */}
-      <div className="space-y-1 pt-1 border-t border-white/5">
-        <div className="text-[9px] text-white/20 uppercase tracking-wider mb-1.5">Vitals</div>
-        {l.systolic !== null && l.diastolic !== null ? (
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] text-white/40">Blood Pressure</span>
-            <span className="text-[10px] font-mono text-white/60">{l.systolic}/{l.diastolic} mmHg</span>
-          </div>
-        ) : (
-          <MetricRow label="Blood Pressure" value={null} />
-        )}
-        <MetricRow label="Heart Rate" value={l.heartRate} unit=" bpm" color="#ef4444" />
-        <MetricRow label="SpO2" value={l.spo2} unit="%" color="#38bdf8" />
-        <MetricRow label="Body Temp" value={l.bodyTemp} unit="°F" color="#fb923c" />
-        <MetricRow label="Skin Temp" value={l.skinTemp} unit="°F" />
-        <MetricRow label="Pulse Wave" value={l.pulseWaveVelocity} unit=" m/s" />
-        <MetricRow label="VO2max" value={l.vo2max} unit=" ml/min/kg" color="#22c55e" />
-        <MetricRow label="Vascular Age" value={l.vascularAge} unit=" yrs" />
-      </div>
     </div>
   );
 }
