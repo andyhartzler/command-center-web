@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   if (tokenData.status !== 0) {
     console.error('[Withings] Token exchange failed:', JSON.stringify(tokenData));
-    const redirectUrl = new URL('/editor', origin);
+    const redirectUrl = new URL('/', origin);
     redirectUrl.searchParams.set('withings_error', `status_${tokenData.status}`);
     const response = NextResponse.redirect(redirectUrl);
     response.cookies.delete('withings_state');
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
     userId: userid,
   });
 
-  const redirectUrl = new URL('/editor', origin);
+  const redirectUrl = new URL('/', origin);
   redirectUrl.searchParams.set('withings', 'connected');
   const response = NextResponse.redirect(redirectUrl);
   response.cookies.delete('withings_state');
