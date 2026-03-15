@@ -9,7 +9,7 @@ interface YahooQuote {
 
 export async function GET(request: NextRequest) {
   const symbols = request.nextUrl.searchParams.get('symbols') || 'SPY,QQQ,AAPL';
-  const symbolList = symbols.split(',').map(s => s.trim().toUpperCase());
+  const symbolList = symbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
 
   try {
     // Use Yahoo Finance v8 quote endpoint (no API key needed)

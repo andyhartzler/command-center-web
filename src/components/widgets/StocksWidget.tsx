@@ -37,8 +37,9 @@ export function StocksWidget({ config }: StocksWidgetProps) {
 
   const fetchStocks = useCallback(async () => {
     try {
-      const symbols = config.symbols.join(',');
-      const res = await fetch(`/api/stocks?symbols=${symbols}`);
+      const validSymbols = config.symbols.filter(s => s.trim().length > 0);
+      if (validSymbols.length === 0) return;
+      const res = await fetch(`/api/stocks?symbols=${validSymbols.join(',')}`);
       if (!res.ok) return;
       const data: StockData[] = await res.json();
       if (Array.isArray(data)) setStocks(data);
@@ -99,20 +100,26 @@ export function StocksWidget({ config }: StocksWidgetProps) {
                     {stock.symbol}
                   </span>
                   <div className="flex-1" />
-                  <span className="font-light text-white/60 tabular-nums" style={{ fontSize: `${fontSize}px` }}>
-                    {formatPrice(stock.price)}
-                  </span>
-                  <div
-                    className={`flex items-center gap-0.5 justify-end ${
-                      isUp ? 'text-green-500/80' : 'text-red-500/80'
-                    }`}
-                    style={{ width: `${Math.max(46, 60 * scale)}px` }}
-                  >
-                    <ArrowIcon size={Math.max(7, 8 * scale)} strokeWidth={3} />
-                    <span className="font-medium tabular-nums" style={{ fontSize: `${Math.max(9, 11 * scale)}px` }}>
-                      {Math.abs(stock.changePercent).toFixed(1)}%
-                    </span>
-                  </div>
+                  {stock.price > 0 ? (
+                    <>
+                      <span className="font-light text-white/60 tabular-nums" style={{ fontSize: `${fontSize}px` }}>
+                        {formatPrice(stock.price)}
+                      </span>
+                      <div
+                        className={`flex items-center gap-0.5 justify-end ${
+                          isUp ? 'text-green-500/80' : 'text-red-500/80'
+                        }`}
+                        style={{ width: `${Math.max(46, 60 * scale)}px` }}
+                      >
+                        <ArrowIcon size={Math.max(7, 8 * scale)} strokeWidth={3} />
+                        <span className="font-medium tabular-nums" style={{ fontSize: `${Math.max(9, 11 * scale)}px` }}>
+                          {Math.abs(stock.changePercent).toFixed(1)}%
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-white/20 tabular-nums" style={{ fontSize: `${fontSize}px` }}>--</span>
+                  )}
                 </div>
                 {!useGrid && i < stocks.length - 1 && (
                   <div className="h-px bg-white/[0.04]" />
