@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Users, Loader2, RefreshCw } from 'lucide-react';
+import { MapPin, Users, Loader2 } from 'lucide-react';
 import { useAppleMap } from '@/hooks/useAppleMap';
 import type { FindMyFriendsConfig, WidgetStyle } from '@/types/widget';
 
@@ -45,10 +45,8 @@ interface Props {
 export function FindMyFriendsWidget({ config, style: _style }: Props) {
   const [data, setData] = useState<FindMyData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
   const fetchData = useCallback(async (refresh = false) => {
     try {
@@ -66,32 +64,14 @@ export function FindMyFriendsWidget({ config, style: _style }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchData(true);
-  }, [fetchData]);
-
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, (config.refreshInterval || 180) * 1000);
+    const interval = setInterval(fetchData, 20 * 60 * 1000); // every 20 minutes
     return () => clearInterval(interval);
-  }, [fetchData, config.refreshInterval]);
-
-  // ResizeObserver for container dimensions
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect;
-      setContainerSize({ w: width, h: height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  }, [fetchData]);
 
   // Filter friends
   const friends = data?.friends.filter(f =>
@@ -139,16 +119,6 @@ export function FindMyFriendsWidget({ config, style: _style }: Props) {
       {mode === 'list' && (
         <ListMode friends={friends} avatars={avatars} />
       )}
-
-      {/* Refresh button */}
-      <button
-        onClick={handleRefresh}
-        disabled={refreshing}
-        className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors"
-        title="Refresh locations"
-      >
-        <RefreshCw size={13} className={`text-white/60 ${refreshing ? 'animate-spin' : ''}`} />
-      </button>
     </div>
   );
 }
@@ -345,34 +315,61 @@ function ListMode({ friends, avatars }: {
   friends: FriendLocation[];
   avatars: Record<string, string>;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+    const ro = new ResizeObserver(() => {
+      const ch = container.clientHeight;
+      const cw = container.clientWidth;
+      const sh = content.scrollHeight;
+      const sw = content.scrollWidth;
+      if (sh > 0 && sw > 0) {
+        setScale(Math.min(ch / sh, cw / sw, 1));
+      }
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [friends.length]);
+
   return (
-    <div className="w-full h-full bg-[#1a1a1c] overflow-y-auto px-3 py-2">
-      {friends.map(f => (
-        <div key={f.handle} className="flex items-center gap-2.5 py-1.5 border-b border-white/[0.04] last:border-0">
-          <div className="relative shrink-0">
-            {avatars[f.handle] ? (
-              <img
-                src={avatars[f.handle]}
-                className="w-8 h-8 rounded-full object-cover"
-                alt=""
+    <div ref={containerRef} className="w-full h-full bg-[#1a1a1c] overflow-hidden flex items-center justify-center">
+      <div
+        ref={contentRef}
+        className="w-full px-3 py-2 origin-center"
+        style={{ transform: `scale(${scale})` }}
+      >
+        {friends.map(f => (
+          <div key={f.handle} className="flex items-center gap-2.5 py-1.5 border-b border-white/[0.04] last:border-0">
+            <div className="relative shrink-0">
+              {avatars[f.handle] ? (
+                <img
+                  src={avatars[f.handle]}
+                  className="w-8 h-8 rounded-full object-cover"
+                  alt=""
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 text-sm font-semibold">
+                  {f.name.charAt(0)}
+                </div>
+              )}
+              <div
+                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-[1.5px] border-[#1a1a1c]"
+                style={{ background: statusColor(f.status) }}
               />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 text-sm font-semibold">
-                {f.name.charAt(0)}
-              </div>
-            )}
-            <div
-              className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-[1.5px] border-[#1a1a1c]"
-              style={{ background: statusColor(f.status) }}
-            />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] text-white/80 font-medium truncate">{f.name}</div>
+              <div className="text-[9px] text-white/30 truncate">{f.address || f.subtitle || 'Location unavailable'}</div>
+            </div>
+            <div className="text-[9px] text-white/25 shrink-0">{timeAgo(f.lastUpdated)}</div>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] text-white/80 font-medium truncate">{f.name}</div>
-            <div className="text-[9px] text-white/30 truncate">{f.address || f.subtitle || 'Location unavailable'}</div>
-          </div>
-          <div className="text-[9px] text-white/25 shrink-0">{timeAgo(f.lastUpdated)}</div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
