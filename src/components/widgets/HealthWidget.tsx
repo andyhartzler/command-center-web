@@ -328,110 +328,223 @@ function WeightView({ data, size }: { data: WithingsData; size: Size }) {
   );
 }
 
-// Sleep mode: dynamically fits all content
+// Sleep score arc gauge
+function SleepScoreArc({ score, radius }: { score: number | null; radius: number }) {
+  const val = score ?? 0;
+  const strokeWidth = Math.max(radius * 0.14, 4);
+  const r = radius - strokeWidth / 2;
+  const cx = radius;
+  const cy = radius;
+
+  // Arc from 180deg to 0deg (left to right, semicircle)
+  const startAngle = Math.PI;
+  const endAngle = 0;
+  const sweepAngle = startAngle - endAngle;
+  const fillAngle = startAngle - (sweepAngle * Math.min(val, 100)) / 100;
+
+  const arcPath = (angle: number) => {
+    const x = cx + r * Math.cos(angle);
+    const y = cy - r * Math.sin(angle);
+    return `${x},${y}`;
+  };
+
+  const trackD = `M ${arcPath(startAngle)} A ${r} ${r} 0 0 1 ${arcPath(endAngle)}`;
+  const fillD = val > 0
+    ? `M ${arcPath(startAngle)} A ${r} ${r} 0 ${val > 50 ? 1 : 0} 1 ${arcPath(fillAngle)}`
+    : '';
+
+  // Color: red < 50, orange 50-65, yellow 65-80, green 80+
+  const color = val >= 80 ? '#22c55e' : val >= 65 ? '#eab308' : val >= 50 ? '#fb923c' : '#ef4444';
+  const glowColor = val >= 80 ? '#22c55e40' : val >= 65 ? '#eab30840' : val >= 50 ? '#fb923c40' : '#ef444440';
+
+  const fontSize = Math.max(radius * 0.55, 14);
+  const labelSize = Math.max(radius * 0.18, 8);
+
+  return (
+    <svg width={radius * 2} height={radius + strokeWidth / 2 + labelSize + 2} viewBox={`0 0 ${radius * 2} ${radius + strokeWidth / 2 + labelSize + 2}`}>
+      {/* Track */}
+      <path d={trackD} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} strokeLinecap="round" />
+      {/* Glow */}
+      {fillD && <path d={fillD} fill="none" stroke={glowColor} strokeWidth={strokeWidth + 4} strokeLinecap="round" />}
+      {/* Fill */}
+      {fillD && <path d={fillD} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />}
+      {/* Score text */}
+      <text x={cx} y={cy - radius * 0.05} textAnchor="middle" dominantBaseline="central"
+        fill={score !== null ? color : 'rgba(255,255,255,0.2)'}
+        fontSize={fontSize} fontWeight="700" fontFamily="system-ui, sans-serif">
+        {score ?? '--'}
+      </text>
+      {/* Label */}
+      <text x={cx} y={cy + radius * 0.35} textAnchor="middle"
+        fill="rgba(255,255,255,0.25)" fontSize={labelSize} fontFamily="system-ui, sans-serif">
+        Sleep Score
+      </text>
+    </svg>
+  );
+}
+
+// Sleep stage vertical pill bars
+function SleepStagePills({ data, height }: { data: NonNullable<SleepData['lastNight']>; height: number }) {
+  const stages = [
+    { label: 'Deep', value: data.deepSleep ?? 0, color: '#6366f1' },
+    { label: 'Light', value: data.lightSleep ?? 0, color: '#38bdf8' },
+    { label: 'REM', value: data.remSleep ?? 0, color: '#a855f7' },
+    { label: 'Awake', value: data.awake ?? 0, color: '#ef4444' },
+  ];
+
+  const maxVal = Math.max(...stages.map(s => s.value), 1);
+  const barHeight = Math.max(height - 28, 16);
+
+  return (
+    <div className="flex items-end justify-center gap-3">
+      {stages.map(s => {
+        const pct = (s.value / maxVal) * 100;
+        return (
+          <div key={s.label} className="flex flex-col items-center gap-1">
+            <div className="relative" style={{ height: barHeight, width: 20 }}>
+              <div className="absolute inset-0 rounded-full bg-white/[0.04]" />
+              <div
+                className="absolute bottom-0 left-0 right-0 rounded-full transition-all"
+                style={{ height: `${Math.max(pct, 8)}%`, backgroundColor: s.color, opacity: s.value > 0 ? 1 : 0.2 }}
+              />
+            </div>
+            <span className="text-[8px] text-white/30 leading-none">{s.label}</span>
+            <span className="text-[9px] font-mono text-white/50 leading-none">{formatDuration(s.value)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Vital range bar (shows min/avg/max on a range)
+function VitalRange({ label, min, avg, max, unit, color }: {
+  label: string; min: number | null; avg: number | null; max: number | null; unit: string; color: string;
+}) {
+  if (min === null && avg === null && max === null) return null;
+  const lo = min ?? avg ?? 0;
+  const hi = max ?? avg ?? 0;
+  const mid = avg ?? 0;
+  const rangeMin = Math.floor(lo * 0.85);
+  const rangeMax = Math.ceil(hi * 1.15) || 1;
+  const span = rangeMax - rangeMin || 1;
+
+  const loP = ((lo - rangeMin) / span) * 100;
+  const hiP = ((hi - rangeMin) / span) * 100;
+  const midP = ((mid - rangeMin) / span) * 100;
+
+  return (
+    <div className="space-y-0.5">
+      <div className="flex justify-between items-center">
+        <span className="text-[9px] text-white/30">{label}</span>
+        <span className="text-[9px] font-mono text-white/40">{lo} / <span style={{ color }}>{mid}</span> / {hi} {unit}</span>
+      </div>
+      <div className="h-1.5 bg-white/[0.04] rounded-full relative">
+        {/* Range bar */}
+        <div className="absolute top-0 h-full rounded-full" style={{
+          left: `${loP}%`,
+          width: `${Math.max(hiP - loP, 2)}%`,
+          backgroundColor: color,
+          opacity: 0.25,
+        }} />
+        {/* Avg dot */}
+        <div className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border border-black/30" style={{
+          left: `${midP}%`,
+          marginLeft: -4,
+          backgroundColor: color,
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// Sleep metric mini card
+function SleepStat({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
+  return (
+    <div className="text-center">
+      <div className="text-[11px] font-semibold font-mono" style={{ color: color || 'rgba(255,255,255,0.7)' }}>
+        {value}
+      </div>
+      <div className="text-[8px] text-white/25 leading-tight">{label}</div>
+      {sub && <div className="text-[7px] text-white/15 leading-tight">{sub}</div>}
+    </div>
+  );
+}
+
+// Sleep mode: redesigned from scratch
 function SleepView({ data, size }: { data: WithingsData; size: Size }) {
   const s = data.sleep?.lastNight;
   if (!s) return <div className="w-full h-full flex items-center justify-center text-white/30 text-xs">No sleep data</div>;
 
-  const scoreColor = (s.sleepScore ?? 0) >= 80 ? '#22c55e' : (s.sleepScore ?? 0) >= 60 ? '#eab308' : '#ef4444';
-  const effColor = (s.sleepEfficiency ?? 0) >= 85 ? '#22c55e' : (s.sleepEfficiency ?? 0) >= 75 ? '#eab308' : '#ef4444';
+  // Responsive sizing
+  const compact = size.h < 220;
+  const medium = size.h >= 280;
+  const tall = size.h >= 380;
+  const wide = size.w >= 280;
 
-  // Responsive tiers
-  const tall = size.h >= 350;
-  const medium = size.h >= 250;
-  const compact = size.h < 200;
+  // Arc gauge size scales with container
+  const arcRadius = compact ? Math.min(size.w * 0.2, 40) : Math.min(size.w * 0.25, 60);
+
+  const effColor = (s.sleepEfficiency ?? 0) >= 85 ? '#22c55e' : (s.sleepEfficiency ?? 0) >= 75 ? '#eab308' : '#ef4444';
+  const pillHeight = compact ? 50 : medium ? 70 : 55;
 
   return (
-    <div className="flex flex-col h-full p-3 gap-1.5">
-      {/* Score and efficiency header */}
-      <div className="flex items-center justify-center gap-5 shrink-0">
-        <div className="text-center">
-          <div className={`${compact ? 'text-xl' : 'text-3xl'} font-bold`} style={{ color: scoreColor }}>
-            {s.sleepScore ?? '--'}
-          </div>
-          <div className="text-[9px] text-white/30">Score</div>
+    <div className="flex flex-col h-full p-2.5 gap-1.5 overflow-hidden">
+
+      {/* Row 1: Score arc + total sleep + stage pills */}
+      <div className="flex items-center shrink-0" style={{ minHeight: compact ? 60 : 80 }}>
+        {/* Score arc */}
+        <div className="flex-shrink-0 flex items-center justify-center" style={{ width: arcRadius * 2 + 8 }}>
+          <SleepScoreArc score={s.sleepScore} radius={arcRadius} />
         </div>
-        <div className="w-px h-8 bg-white/10" />
-        <div className="text-center">
-          <div className={`${compact ? 'text-lg' : 'text-2xl'} font-bold`} style={{ color: effColor }}>
-            {s.sleepEfficiency !== null ? `${Math.round(s.sleepEfficiency)}%` : '--'}
-          </div>
-          <div className="text-[9px] text-white/30">Efficiency</div>
+
+        {/* Stage pills fill remaining width */}
+        <div className="flex-1 min-w-0">
+          <SleepStagePills data={s} height={pillHeight} />
         </div>
       </div>
 
-      {/* Sleep stages bar */}
-      <div className="shrink-0">
-        <SleepStagesBar data={s} compact={compact} />
+      {/* Row 2: Key stats row */}
+      <div className={`flex justify-evenly shrink-0 py-1 border-y border-white/[0.04] ${compact ? 'gap-1' : 'gap-2'}`}>
+        <SleepStat label="Total Sleep" value={formatDuration(s.totalSleep)} />
+        <SleepStat label="In Bed" value={formatDuration(s.timeInBed)} />
+        <SleepStat label="Efficiency" value={s.sleepEfficiency !== null ? `${Math.round(s.sleepEfficiency)}%` : '--'} color={effColor} />
+        {wide && <SleepStat label="Asleep In" value={s.sleepLatency !== null ? `${Math.round(s.sleepLatency / 60)}m` : '--'} />}
       </div>
 
-      {/* Flexible content area */}
-      <div className="flex-1 min-h-0 flex flex-col justify-evenly">
-        {/* Duration row */}
-        <div className="grid grid-cols-2 gap-x-4">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] text-white/40">Total Sleep</span>
-            <span className="text-[10px] font-mono text-white/60">{formatDuration(s.totalSleep)}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] text-white/40">In Bed</span>
-            <span className="text-[10px] font-mono text-white/60">{formatDuration(s.timeInBed)}</span>
-          </div>
+      {/* Row 3: Flexible detail area */}
+      <div className="flex-1 min-h-0 flex flex-col justify-evenly gap-0.5">
+
+        {/* Vitals: HR and RR range bars */}
+        <div className="space-y-1">
+          <VitalRange label="Heart Rate" min={s.hrMin} avg={s.hrAvg} max={s.hrMax} unit="bpm" color="#ef4444" />
+          <VitalRange label="Respiratory" min={s.rrMin} avg={s.rrAvg} max={s.rrMax} unit="br/m" color="#38bdf8" />
         </div>
 
-        {/* Timing section */}
+        {/* Sleep quality metrics - 2 col grid */}
         {medium && (
-          <div className="space-y-0.5">
-            <MetricRow label="Fell asleep in" value={s.sleepLatency !== null ? Math.round(s.sleepLatency / 60) : null} unit=" min" />
-            <MetricRow label="Wakeup latency" value={s.wakeupLatency !== null ? Math.round(s.wakeupLatency / 60) : null} unit=" min" />
-            <div className="grid grid-cols-2 gap-x-4">
-              <MetricRow label="Woke up" value={s.wakeupCount} unit="x" />
-              <MetricRow label="Out of bed" value={s.outOfBedCount} unit="x" />
-            </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+            <MetricRow label="Wakeup latency" value={s.wakeupLatency !== null ? Math.round(s.wakeupLatency / 60) : null} unit="m" />
+            <MetricRow label="Woke up" value={s.wakeupCount} unit="x" />
+            <MetricRow label="Awake time" value={s.wakeDuration !== null ? Math.round(s.wakeDuration / 60) : null} unit="m" color="#ef4444" />
+            <MetricRow label="Out of bed" value={s.outOfBedCount} unit="x" />
+            {s.remEpisodes !== null && <MetricRow label="REM cycles" value={s.remEpisodes} />}
           </div>
         )}
 
-        {/* Heart & Respiratory */}
-        <div className="space-y-0.5">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] text-white/40">Heart Rate</span>
-            <span className="text-[10px] font-mono text-white/60">
-              {s.hrMin ?? '--'} / <span style={{ color: '#ef4444' }}>{s.hrAvg ?? '--'}</span> / {s.hrMax ?? '--'} bpm
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] text-white/40">Respiratory</span>
-            <span className="text-[10px] font-mono text-white/60">
-              {s.rrMin ?? '--'} / {s.rrAvg ?? '--'} / {s.rrMax ?? '--'} br/m
-            </span>
-          </div>
-        </div>
-
-        {/* Extra details when tall */}
-        {tall && (
-          <div className="space-y-0.5">
-            {s.breathingDisturbances !== null && (
-              <MetricRow label="Breathing dist." value={Math.round(s.breathingDisturbances)} />
-            )}
-            {s.snoringEpisodes !== null && s.snoringEpisodes > 0 && (
-              <MetricRow label="Snoring episodes" value={s.snoringEpisodes} />
-            )}
-            {s.snoring !== null && s.snoring > 0 && (
-              <MetricRow label="Snoring duration" value={Math.round(s.snoring / 60)} unit=" min" />
-            )}
-            {s.apneaIndex !== null && (
-              <MetricRow label="Apnea index" value={Math.round(s.apneaIndex * 10) / 10} />
-            )}
-            {s.remEpisodes !== null && (
-              <div className="text-[9px] text-white/20 text-center">
-                {s.remEpisodes} REM episodes
-              </div>
-            )}
+        {/* Breathing & snoring - only when tall */}
+        {tall && (s.breathingDisturbances !== null || (s.snoringEpisodes !== null && s.snoringEpisodes > 0) || s.apneaIndex !== null) && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 pt-0.5 border-t border-white/[0.04]">
+            {s.breathingDisturbances !== null && <MetricRow label="Breathing dist." value={Math.round(s.breathingDisturbances)} />}
+            {s.snoringEpisodes !== null && s.snoringEpisodes > 0 && <MetricRow label="Snoring" value={s.snoringEpisodes} unit=" episodes" />}
+            {s.snoring !== null && s.snoring > 0 && <MetricRow label="Snore duration" value={Math.round(s.snoring / 60)} unit="m" />}
+            {s.apneaIndex !== null && <MetricRow label="Apnea index" value={Math.round(s.apneaIndex * 10) / 10} />}
           </div>
         )}
       </div>
 
-      <div className="text-[9px] text-white/20 text-center shrink-0">{s.date}</div>
+      {/* Date footer */}
+      <div className="text-[8px] text-white/15 text-center shrink-0">{s.date}</div>
     </div>
   );
 }
