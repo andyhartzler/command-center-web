@@ -102,10 +102,13 @@ export function WeatherWidget({ config }: Props) {
     const update = () => {
       const w = el.clientWidth;
       const h = el.clientHeight;
-      // Content natural size at scale 1:
-      // label(10) + temp(48) + condition(13) + hilo(10) + gap(6) + hourly(30) + padding(24) ≈ 141h
-      // width: temp+icon ≈ 160w
-      const s = Math.min(w / 160, h / 141);
+      // Fixed padding of 12px on each side; scale from the inner area
+      const pad = 12;
+      const innerW = w - pad * 2;
+      const innerH = h - pad * 2;
+      // Natural content height at scale=1 (no padding):
+      // label(10) + gap(4) + temp(48) + condition(13) + hilo(12) + gap(8) + hourly(33) ≈ 128
+      const s = Math.min(innerW / 160, innerH / 128);
       setScale(Math.max(0.4, Math.min(4, s)));
     };
     update();
@@ -178,13 +181,11 @@ export function WeatherWidget({ config }: Props) {
     }
   }
 
-  const pad = Math.max(6, 12 * s);
-
   return (
     <div
       ref={containerRef}
       className="w-full h-full flex flex-col justify-center overflow-hidden"
-      style={{ padding: `${pad}px`, gap: `${4 * s}px` }}
+      style={{ padding: '12px', gap: `${4 * s}px` }}
     >
       {/* Location label */}
       <div
