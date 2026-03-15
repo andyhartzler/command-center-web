@@ -35,25 +35,68 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   unknown: { bg: 'bg-gray-500/20', text: 'text-gray-400', label: 'Unknown' },
 };
 
-function formatTime(iso: string | null): string {
-  if (!iso) return '--:--';
+function formatTime(timeStr: string | null): string {
+  if (!timeStr) return '--:--';
+  // If already a short time like "02:56a CDT" or "3:23PM CST", clean it up
+  const rawMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*(a|p|am|pm)\s*\w*$/i);
+  if (rawMatch) {
+    let hour = parseInt(rawMatch[1]);
+    const min = rawMatch[2];
+    const ampm = rawMatch[3].toLowerCase().startsWith('p') ? 'PM' : 'AM';
+    if (hour === 0) hour = 12;
+    return `${hour}:${min} ${ampm}`;
+  }
+  // Try as ISO date
   try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const d = new Date(timeStr);
+    if (isNaN(d.getTime())) return timeStr;
+    return d.toLocaleTimeString('en-US', {
+      hour: 'numeric', minute: '2-digit', hour12: true,
+      timeZone: 'America/Chicago',
+    });
   } catch {
     return '--:--';
   }
 }
 
-function AirlineBadge({ iata, airline }: { iata: string; airline: string }) {
-  const bg = AIRLINE_COLORS[iata] || '#475569';
-  const initials = iata || airline.slice(0, 2).toUpperCase();
+// Map ICAO 3-letter codes to IATA 2-letter codes for logo lookup
+const ICAO_TO_IATA: Record<string, string> = {
+  SWA: 'WN', AAL: 'AA', DAL: 'DL', UAL: 'UA', NKS: 'NK',
+  ASA: 'AS', JBU: 'B6', FFT: 'F9', AAY: 'G4', SKW: 'OO',
+  ASH: 'YV', RPA: 'YX', QXE: 'QX', ENY: 'MQ', JIA: 'OH',
+  AWI: 'ZW', EDV: '9E', UPS: '5X', FDX: 'FX',
+};
+
+function AirlineBadge({ iata, airline, icaoIdent }: { iata: string; airline: string; icaoIdent?: string }) {
+  // Try to resolve IATA code from ICAO ident prefix
+  const resolvedIata = iata || (icaoIdent ? ICAO_TO_IATA[icaoIdent.replace(/[0-9]/g, '')] : '') || '';
+  const bg = AIRLINE_COLORS[resolvedIata] || '#475569';
+  const initials = resolvedIata || airline.slice(0, 2).toUpperCase();
+  // Use logo.clearbit.com for airline logos
+  const logoUrl = resolvedIata
+    ? `https://pics.avs.io/60/60/${resolvedIata}.png`
+    : '';
+
   return (
     <div
-      className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+      className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden"
       style={{ backgroundColor: bg }}
     >
-      {initials}
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt={resolvedIata}
+          className="w-full h-full object-contain"
+          onError={(e) => {
+            // Fallback to initials if logo fails
+            const el = e.currentTarget;
+            el.style.display = 'none';
+            el.parentElement!.textContent = initials;
+          }}
+        />
+      ) : (
+        initials
+      )}
     </div>
   );
 }
@@ -154,7 +197,7 @@ export function FlightStatusWidget({ config }: FlightStatusWidgetProps) {
                   i !== flights.length - 1 ? 'border-b border-white/[0.04]' : ''
                 }`}
               >
-                <AirlineBadge iata={flight.airlineIata} airline={flight.airline} />
+                <AirlineBadge iata={flight.airlineIata} airline={flight.airline} icaoIdent={flight.flightNumber} />
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">

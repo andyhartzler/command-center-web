@@ -232,6 +232,14 @@ async function scrapeFlightAwareAirport(icao: string, type: string, limit: numbe
         // Determine airline from ICAO ident (e.g., SWA3824 -> SWA)
         const identPrefix = ident.replace(/[0-9]/g, '');
         const airlineName = AIRLINE_NAMES[identPrefix] || AIRLINE_NAMES[identPrefix.slice(0, 2)] || identPrefix;
+        // Map ICAO prefix to IATA code for logos
+        const icaoToIata: Record<string, string> = {
+          SWA: 'WN', AAL: 'AA', DAL: 'DL', UAL: 'UA', NKS: 'NK',
+          ASA: 'AS', JBU: 'B6', FFT: 'F9', AAY: 'G4', SKW: 'OO',
+          ASH: 'YV', RPA: 'YX', QXE: 'QX', ENY: 'MQ', JIA: 'OH',
+          AWI: 'ZW', EDV: '9E', UPS: '5X', FDX: 'FX', ATN: '8C',
+        };
+        const iataCode = icaoToIata[identPrefix] || identPrefix.slice(0, 2);
 
         // Determine status based on which time columns have data
         let status: FlightInfo['status'] = 'scheduled';
@@ -241,7 +249,7 @@ async function scrapeFlightAwareAirport(icao: string, type: string, limit: numbe
         flights.push({
           flightNumber: ident,
           airline: airlineName,
-          airlineIata: identPrefix.slice(0, 2),
+          airlineIata: iataCode,
           origin: type === 'arrivals' ? locationCode : icao.replace(/^K/, ''),
           destination: type === 'arrivals' ? icao.replace(/^K/, '') : locationCode,
           scheduledTime: depTimeStr || arrTimeStr,
