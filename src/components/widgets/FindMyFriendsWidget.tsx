@@ -131,7 +131,7 @@ export function FindMyFriendsWidget({ config, style: _style }: Props) {
   return (
     <div ref={containerRef} className="w-full h-full overflow-hidden relative">
       {mode === 'map' && (
-        <MapMode friends={friends} avatars={avatars} containerSize={containerSize} />
+        <MapMode friends={friends} avatars={avatars} />
       )}
       {mode === 'pins' && (
         <PinsMode friends={friends} avatars={avatars} />
@@ -155,10 +155,9 @@ export function FindMyFriendsWidget({ config, style: _style }: Props) {
 
 // --- Map Mode ---
 
-function MapMode({ friends, avatars, containerSize }: {
+function MapMode({ friends, avatars }: {
   friends: FriendLocation[];
   avatars: Record<string, string>;
-  containerSize: { w: number; h: number };
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const prevFriendsKey = useRef('');
@@ -180,9 +179,6 @@ function MapMode({ friends, avatars, containerSize }: {
     interactive: false,
   });
 
-  // How much space the friend list takes
-  const listHeight = Math.min(friends.length * 28 + 8, containerSize.h * 0.4);
-
   // Add/update annotations when map is ready or friends change
   useEffect(() => {
     if (!ready || !isReady()) return;
@@ -197,8 +193,23 @@ function MapMode({ friends, avatars, containerSize }: {
     // Clear previous annotations
     m.removeAnnotations(m.annotations);
 
+    // Offset overlapping pins (same lat/lng) so they don't stack
+    const coordCounts: Record<string, number> = {};
+    const coordIndex: Record<string, number> = {};
+    for (const f of mappable) {
+      const key = `${f.lat.toFixed(4)},${f.lng.toFixed(4)}`;
+      coordCounts[key] = (coordCounts[key] || 0) + 1;
+      coordIndex[key] = 0;
+    }
+
     // Add photo annotations for each mappable friend
     for (const friend of mappable) {
+      const key = `${friend.lat.toFixed(4)},${friend.lng.toFixed(4)}`;
+      const total = coordCounts[key];
+      const idx = coordIndex[key]++;
+      // Offset overlapping pins horizontally
+      const offsetX = total > 1 ? (idx - (total - 1) / 2) * 28 : 0;
+
       const coord = new mapkit.Coordinate(friend.lat, friend.lng);
       const avatarUrl = avatars[friend.handle];
 
@@ -206,29 +217,23 @@ function MapMode({ friends, avatars, containerSize }: {
         coord,
         () => {
           const el = document.createElement('div');
-          el.style.cssText = 'position:relative;cursor:default;';
+          el.style.cssText = 'cursor:default;overflow:visible;';
 
           if (avatarUrl) {
             const img = document.createElement('img');
             img.src = avatarUrl;
-            img.style.cssText = 'width:44px;height:44px;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.5);object-fit:cover;';
+            img.style.cssText = 'width:36px;height:36px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);object-fit:cover;display:block;';
             el.appendChild(img);
           } else {
             const placeholder = document.createElement('div');
-            placeholder.style.cssText = `width:44px;height:44px;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.5);background:#374151;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;font-weight:600;`;
+            placeholder.style.cssText = `width:36px;height:36px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);background:#374151;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:600;`;
             placeholder.textContent = friend.name.charAt(0).toUpperCase();
             el.appendChild(placeholder);
           }
 
-          // Name label below photo
-          const label = document.createElement('div');
-          label.textContent = friend.name.split(' ')[0];
-          label.style.cssText = 'text-align:center;font-size:10px;font-weight:600;color:white;text-shadow:0 1px 4px rgba(0,0,0,0.8);margin-top:2px;white-space:nowrap;';
-          el.appendChild(label);
-
           return el;
         },
-        { anchorOffset: new DOMPoint(0, -8) }
+        { anchorOffset: new DOMPoint(offsetX, 0) }
       );
 
       m.addAnnotation(annotation);
@@ -263,36 +268,29 @@ function MapMode({ friends, avatars, containerSize }: {
         false
       );
     }
-  }, [ready, isReady, map, mappable, avatars, containerSize]);
+  }, [ready, isReady, map, mappable, avatars]);
 
   return (
-    <div className="w-full h-full flex flex-col">
-      {/* Map area */}
-      <div className="relative flex-1 min-h-0">
-        <div ref={mapContainerRef} className="absolute inset-0" />
-      </div>
+    <div className="w-full h-full relative">
+      {/* Full-bleed map */}
+      <div ref={mapContainerRef} className="absolute inset-0" />
 
-      {/* Friend list below map */}
-      <div
-        className="shrink-0 bg-black/80 backdrop-blur-md overflow-y-auto px-3 py-1"
-        style={{ maxHeight: `${listHeight}px` }}
-      >
+      {/* Friend list overlay — bottom left */}
+      <div className="absolute bottom-2 left-2 z-10 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
         {friends.map(f => (
-          <div key={f.handle} className="flex items-center gap-2 py-1 border-b border-white/[0.04] last:border-0">
+          <div key={f.handle} className="flex items-center gap-2 py-0.5">
             {avatars[f.handle] ? (
-              <img src={avatars[f.handle]} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
+              <img src={avatars[f.handle]} className="w-4 h-4 rounded-full object-cover shrink-0" alt="" />
             ) : (
-              <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[9px] text-white/60 font-semibold shrink-0">
+              <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] text-white/60 font-semibold shrink-0">
                 {f.name.charAt(0)}
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] text-white/80 font-medium truncate block">{f.name}</span>
-              {f.subtitle && (
-                <span className="text-[9px] text-white/35 truncate block">{f.subtitle}</span>
-              )}
-            </div>
-            <span className="text-[9px] text-white/25 shrink-0">{timeAgo(f.lastUpdated)}</span>
+            <span className="text-[10px] text-white/80 font-medium whitespace-nowrap">{f.name.split(' ')[0]}</span>
+            {f.subtitle && (
+              <span className="text-[9px] text-white/35 whitespace-nowrap">{f.subtitle}</span>
+            )}
+            <span className="text-[8px] text-white/20 whitespace-nowrap">{timeAgo(f.lastUpdated)}</span>
           </div>
         ))}
       </div>
