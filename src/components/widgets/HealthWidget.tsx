@@ -490,23 +490,20 @@ function SleepView({ data, size }: { data: WithingsData; size: Size }) {
   const pillHeight = compact ? 50 : medium ? 70 : 55;
 
   return (
-    <div className="flex flex-col h-full p-2.5 gap-1.5 overflow-hidden">
+    <div className="flex flex-col h-full p-1.5 gap-1 overflow-hidden">
 
-      {/* Row 1: Score arc + total sleep + stage pills */}
-      <div className="flex items-end shrink-0" style={{ minHeight: compact ? 70 : 100 }}>
-        {/* Score arc */}
-        <div className="flex-shrink-0 flex items-end justify-center" style={{ width: arcRadius * 2 + 8 }}>
+      {/* Row 1: Score arc + stage pills */}
+      <div className="flex items-end shrink-0">
+        <div className="flex-shrink-0 flex items-end justify-center" style={{ width: arcRadius * 2 + 4 }}>
           <SleepScoreArc score={s.sleepScore} radius={arcRadius} />
         </div>
-
-        {/* Stage pills fill remaining width, aligned to bottom so bars grow upward */}
-        <div className="flex-1 min-w-0 pb-0.5">
-          <SleepStagePills data={s} height={compact ? 60 : medium ? 85 : 70} />
+        <div className="flex-1 min-w-0">
+          <SleepStagePills data={s} height={compact ? 55 : medium ? 80 : 65} />
         </div>
       </div>
 
       {/* Row 2: Key stats row */}
-      <div className={`flex justify-evenly shrink-0 py-1 border-y border-white/[0.04] ${compact ? 'gap-1' : 'gap-2'}`}>
+      <div className={`flex justify-evenly shrink-0 py-0.5 border-y border-white/[0.04] ${compact ? 'gap-1' : 'gap-2'}`}>
         <SleepStat label="Total Sleep" value={formatDuration(s.totalSleep)} />
         <SleepStat label="In Bed" value={formatDuration(s.timeInBed)} />
         <SleepStat label="Efficiency" value={s.sleepEfficiency !== null ? `${efficiency}%` : '--'} color={effColor} />
@@ -514,7 +511,7 @@ function SleepView({ data, size }: { data: WithingsData; size: Size }) {
       </div>
 
       {/* Row 3: Flexible detail area */}
-      <div className="flex-1 min-h-0 flex flex-col justify-evenly gap-0.5">
+      <div className="flex-1 min-h-0 flex flex-col justify-start gap-1">
 
         {/* Vitals: HR and RR range bars */}
         <div className="space-y-1">
