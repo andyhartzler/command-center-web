@@ -180,6 +180,9 @@ function MapMode({ friends, avatars, containerSize }: {
     interactive: false,
   });
 
+  // How much space the friend list takes
+  const listHeight = Math.min(friends.length * 28 + 8, containerSize.h * 0.4);
+
   // Add/update annotations when map is ready or friends change
   useEffect(() => {
     if (!ready || !isReady()) return;
@@ -237,7 +240,7 @@ function MapMode({ friends, avatars, containerSize }: {
       m.addAnnotation(annotation);
     }
 
-    // Auto-zoom to fit all friends
+    // Auto-zoom to fit all friends with generous padding
     if (mappable.length > 1) {
       const lats = mappable.map(f => f.lat);
       const lngs = mappable.map(f => f.lng);
@@ -247,8 +250,9 @@ function MapMode({ friends, avatars, containerSize }: {
       const maxLng = Math.max(...lngs);
       const cLat = (minLat + maxLat) / 2;
       const cLng = (minLng + maxLng) / 2;
-      const latSpan = Math.max((maxLat - minLat) * 1.6, 0.05);
-      const lngSpan = Math.max((maxLng - minLng) * 1.6, 0.05);
+      // 2x padding so pins at edges aren't clipped
+      const latSpan = Math.max((maxLat - minLat) * 2.0, 0.08);
+      const lngSpan = Math.max((maxLng - minLng) * 2.0, 0.08);
       m.setRegionAnimated(
         new mapkit.CoordinateRegion(
           new mapkit.Coordinate(cLat, cLng),
@@ -268,13 +272,19 @@ function MapMode({ friends, avatars, containerSize }: {
   }, [ready, isReady, map, mappable, avatars, containerSize]);
 
   return (
-    <div className="w-full h-full relative">
-      <div ref={mapContainerRef} className="absolute inset-0" />
+    <div className="w-full h-full flex flex-col">
+      {/* Map area */}
+      <div className="relative flex-1 min-h-0">
+        <div ref={mapContainerRef} className="absolute inset-0" />
+      </div>
 
-      {/* Overlay list — shows ALL friends including those without coords */}
-      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md rounded-xl px-3 py-2 max-w-[200px]">
+      {/* Friend list below map */}
+      <div
+        className="shrink-0 bg-black/80 backdrop-blur-md overflow-y-auto px-3 py-1"
+        style={{ maxHeight: `${listHeight}px` }}
+      >
         {friends.map(f => (
-          <div key={f.handle} className="flex items-center gap-2 py-0.5">
+          <div key={f.handle} className="flex items-center gap-2 py-1 border-b border-white/[0.04] last:border-0">
             {avatars[f.handle] ? (
               <img src={avatars[f.handle]} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
             ) : (
@@ -282,8 +292,13 @@ function MapMode({ friends, avatars, containerSize }: {
                 {f.name.charAt(0)}
               </div>
             )}
-            <span className="text-[10px] text-white/80 truncate flex-1">{f.name}</span>
-            <span className="text-[9px] text-white/30 shrink-0">{timeAgo(f.lastUpdated)}</span>
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] text-white/80 font-medium truncate block">{f.name}</span>
+              {f.subtitle && (
+                <span className="text-[9px] text-white/35 truncate block">{f.subtitle}</span>
+              )}
+            </div>
+            <span className="text-[9px] text-white/25 shrink-0">{timeAgo(f.lastUpdated)}</span>
           </div>
         ))}
       </div>
