@@ -336,21 +336,17 @@ function SleepScoreArc({ score, radius }: { score: number | null; radius: number
   const cx = radius;
   const cy = radius;
 
-  // Arc from 180deg to 0deg (left to right, semicircle)
-  const startAngle = Math.PI;
-  const endAngle = 0;
-  const sweepAngle = startAngle - endAngle;
-  const fillAngle = startAngle - (sweepAngle * Math.min(val, 100)) / 100;
+  // Semicircular arc: left (cx-r, cy) to right (cx+r, cy), curving upward
+  const trackD = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
 
-  const arcPath = (angle: number) => {
-    const x = cx + r * Math.cos(angle);
-    const y = cy - r * Math.sin(angle);
-    return `${x},${y}`;
-  };
-
-  const trackD = `M ${arcPath(startAngle)} A ${r} ${r} 0 0 1 ${arcPath(endAngle)}`;
+  // Fill arc: sweep val% of the semicircle from left
+  const sweepRad = (Math.min(val, 100) / 100) * Math.PI;
+  const endAngle = Math.PI - sweepRad; // math angle from right horizontal
+  const endX = cx + r * Math.cos(endAngle);
+  const endY = cy - r * Math.sin(endAngle);
+  // Always large-arc-flag=0: max sweep is 180deg (semicircle), never exceeds 180deg of ellipse
   const fillD = val > 0
-    ? `M ${arcPath(startAngle)} A ${r} ${r} 0 ${val > 50 ? 1 : 0} 1 ${arcPath(fillAngle)}`
+    ? `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${endX} ${endY}`
     : '';
 
   // Color: red < 50, orange 50-65, yellow 65-80, green 80+
@@ -359,9 +355,11 @@ function SleepScoreArc({ score, radius }: { score: number | null; radius: number
 
   const fontSize = Math.max(radius * 0.55, 14);
   const labelSize = Math.max(radius * 0.18, 8);
+  const labelPad = labelSize + 6;
+  const svgH = radius + strokeWidth / 2 + labelPad;
 
   return (
-    <svg width={radius * 2} height={radius + strokeWidth / 2 + labelSize + 2} viewBox={`0 0 ${radius * 2} ${radius + strokeWidth / 2 + labelSize + 2}`}>
+    <svg width={radius * 2} height={svgH} viewBox={`0 0 ${radius * 2} ${svgH}`}>
       {/* Track */}
       <path d={trackD} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} strokeLinecap="round" />
       {/* Glow */}
@@ -369,13 +367,13 @@ function SleepScoreArc({ score, radius }: { score: number | null; radius: number
       {/* Fill */}
       {fillD && <path d={fillD} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />}
       {/* Score text */}
-      <text x={cx} y={cy - radius * 0.05} textAnchor="middle" dominantBaseline="central"
+      <text x={cx} y={cy - radius * 0.08} textAnchor="middle" dominantBaseline="central"
         fill={score !== null ? color : 'rgba(255,255,255,0.2)'}
         fontSize={fontSize} fontWeight="700" fontFamily="system-ui, sans-serif">
         {score ?? '--'}
       </text>
       {/* Label */}
-      <text x={cx} y={cy + radius * 0.35} textAnchor="middle"
+      <text x={cx} y={cy + labelSize + 2} textAnchor="middle"
         fill="rgba(255,255,255,0.25)" fontSize={labelSize} fontFamily="system-ui, sans-serif">
         Sleep Score
       </text>
@@ -485,7 +483,10 @@ function SleepView({ data, size }: { data: WithingsData; size: Size }) {
   // Arc gauge size scales with container
   const arcRadius = compact ? Math.min(size.w * 0.2, 40) : Math.min(size.w * 0.25, 60);
 
-  const effColor = (s.sleepEfficiency ?? 0) >= 85 ? '#22c55e' : (s.sleepEfficiency ?? 0) >= 75 ? '#eab308' : '#ef4444';
+  // Withings may return efficiency as 0-1 decimal or 0-100 percentage
+  const rawEff = s.sleepEfficiency ?? 0;
+  const efficiency = rawEff > 0 && rawEff <= 1 ? Math.round(rawEff * 100) : Math.round(rawEff);
+  const effColor = efficiency >= 85 ? '#22c55e' : efficiency >= 75 ? '#eab308' : '#ef4444';
   const pillHeight = compact ? 50 : medium ? 70 : 55;
 
   return (
@@ -508,7 +509,7 @@ function SleepView({ data, size }: { data: WithingsData; size: Size }) {
       <div className={`flex justify-evenly shrink-0 py-1 border-y border-white/[0.04] ${compact ? 'gap-1' : 'gap-2'}`}>
         <SleepStat label="Total Sleep" value={formatDuration(s.totalSleep)} />
         <SleepStat label="In Bed" value={formatDuration(s.timeInBed)} />
-        <SleepStat label="Efficiency" value={s.sleepEfficiency !== null ? `${Math.round(s.sleepEfficiency)}%` : '--'} color={effColor} />
+        <SleepStat label="Efficiency" value={s.sleepEfficiency !== null ? `${efficiency}%` : '--'} color={effColor} />
         {wide && <SleepStat label="Asleep In" value={s.sleepLatency !== null ? `${Math.round(s.sleepLatency / 60)}m` : '--'} />}
       </div>
 
