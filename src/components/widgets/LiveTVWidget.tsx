@@ -22,60 +22,49 @@ const ALL_CHANNELS: Channel[] = [
   { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'KC Local' },
 
   // US News
+  { name: 'CNN', url: '', category: 'US News', resolver: 'pluto', plutoId: '623aaa3cfe498e0007d33dab' },
+  { name: 'Fox News', url: '', category: 'US News', resolver: 'pluto', plutoId: '63d025db4e83e700086eaa96' },
+  { name: 'MSNBC', url: '', category: 'US News', resolver: 'pluto', plutoId: '623aaab9f2bd280007ecc1cb' },
   { name: 'ABC News Live', url: 'https://aegis-cloudfront-1.tubi.video/d6cbb0de-68e4-4f3b-82f9-bf5d526e0bde/index.m3u8', category: 'US News' },
   { name: 'CBS News', url: 'https://cbsnews.akamaized.net/hls/live/2020607/cbsnlineup_8/master.m3u8', category: 'US News' },
   { name: 'NBC News NOW', url: 'https://xumo-drct-nbcnn-ir8ze.fast.nbcuni.com/live/master.m3u8', category: 'US News' },
-  { name: 'CNN', url: 'https://s13.usnlive.com/stream/cnn.m3u8', category: 'US News' },
-  { name: 'Fox News', url: 'https://s13.usnlive.com/stream/foxnews.m3u8', category: 'US News' },
-  { name: 'LiveNOW from FOX', url: '', category: 'US News', resolver: 'pluto', plutoId: '63d025db4e83e700086eaa96' },
-  { name: 'Fox Weather', url: 'https://247wlive.foxweather.com/stream/index.m3u8', category: 'US News' },
   { name: 'Bloomberg', url: 'https://bloomberg.com/media-manifest/streams/us.m3u8', category: 'US News' },
+  { name: 'Fox Weather', url: 'https://247wlive.foxweather.com/stream/index.m3u8', category: 'US News' },
   { name: 'Scripps News', url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8', category: 'US News' },
   { name: 'Newsmax', url: 'https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8', category: 'US News' },
-  { name: 'USA Today', url: 'https://lnc-usa-today.tubi.video/playlist.m3u8', category: 'US News' },
-  { name: 'Reuters', url: 'https://reuters-reutersnow-1-eu.rakuten.wurl.tv/playlist.m3u8', category: 'US News' },
-  { name: 'CNBC', url: 'https://content.uplynk.com/channel/3324f2467c414329b3b0cc5cd987b6be.m3u8', category: 'US News' },
-  { name: 'MS NOW (MSNBC)', url: 'https://s13.usnlive.com/stream/msnbc.m3u8', category: 'US News' },
+  { name: 'CNBC', url: '', category: 'US News', resolver: 'pluto', plutoId: '62bd0e3a05f7720007f90fe5' },
+  { name: 'USA Today', url: '', category: 'US News', resolver: 'pluto', plutoId: '5eb1ea5ce6523b00073ade2e' },
+  { name: 'Reuters', url: '', category: 'US News', resolver: 'pluto', plutoId: '5c73a81e14ee6a00099d44d2' },
 
   // World News
   { name: 'BBC News', url: 'https://pb-iiczlgfysam0q.akamaized.net/v1/amcnetworks_bbcnews_1/samsungheadend_us/latest/main/hls/playlist.m3u8', category: 'World News' },
   { name: 'Sky News UK', url: 'https://ythls.armelin.one/channel/UCoMdktPbSTixAyNGwb-UYkQ.m3u8', category: 'World News' },
   { name: 'Al Jazeera', url: 'https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8', category: 'World News' },
-  { name: 'France 24', url: 'https://raw.githubusercontent.com/AqFad2811/m3u8/main/france24/france24_en.m3u8', category: 'World News' },
+  { name: 'France 24', url: 'https://ythls.armelin.one/channel/UCQfwfsi5VrQ8yKZ-UWmAEFg.m3u8', category: 'World News' },
   { name: 'DW News', url: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', category: 'World News' },
-  { name: 'Euronews', url: 'https://raw.githubusercontent.com/AqFad2811/m3u8/main/euronews/euronews.m3u8', category: 'World News' },
+  { name: 'Euronews', url: 'https://ythls.armelin.one/channel/UCW2QcKZiU8aUGg4yxCIditg.m3u8', category: 'World News' },
   { name: 'CGTN', url: 'https://news.cgtn.com/resource/live/english/cgtn-news.m3u8', category: 'World News' },
-  { name: 'NHK World', url: 'https://nhkworld.webcdn.stream.ne.jp/www11/nhkworld-tv/domestic/263942/live_wa_s.m3u8', category: 'World News' },
-  { name: 'i24 News', url: 'https://bcovlive-a.akamaihd.net/6e3dd61ac4c34d6f8fb9698b565b9f50/eu-central-1/5377161796001/playlist-all_dvr.m3u8', category: 'World News' },
   { name: 'India Today', url: 'https://indiatodaylive.akamaized.net/hls/live/2014320/indiatoday/indiatodaylive/playlist.m3u8', category: 'World News' },
-  { name: 'CBC News', url: 'https://dai2.xumo.com/amagi_hls_data_xumo1212A-redboxcbcnews/CDN/playlist.m3u8', category: 'World News' },
+  { name: 'CBC News', url: 'https://ythls.armelin.one/channel/UCuFFtHWoLl5fauMMD5Ww2jA.m3u8', category: 'World News' },
   { name: 'RT', url: 'https://rt-glb.rttv.com/live/rtnews/playlist.m3u8', category: 'World News' },
-  { name: 'TRT World', url: 'https://tv-trtworld.live.trt.com.tr/master.m3u8', category: 'World News' },
   { name: 'GB News', url: 'https://ythls.armelin.one/channel/UC0vn8ISa4LKMunLbzaXLnOQ.m3u8', category: 'World News' },
 
+  // Sports
+  { name: 'ESPN (CBS Sports HQ)', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5db99dd42c724f00099da498' },
+  { name: 'Fox Sports', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5fd69f5b2e21d80007ad2f82' },
+  { name: 'NFL Channel', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5a4d3a00ad95e4718ae8d8db' },
+  { name: 'beIN SPORTS XTRA', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5d8d180092e97a5e107638d3' },
+  { name: 'PGA Tour', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5fd1dcafdb95b600071e3b4f' },
+
   // Public / Government
-  { name: 'NASA TV', url: 'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master_2000.m3u8', category: 'Public' },
+  { name: 'NASA TV', url: 'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8', category: 'Public' },
   { name: 'PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'Public' },
-  { name: 'C-SPAN', url: 'https://www.c-span.org/networks/?channel=c-span', category: 'Public' },
   { name: 'Univision', url: 'https://streaming-live-fcdn.api.prd.univisionnow.com/kuvn/kuvn.isml/hls/kuvn.m3u8', category: 'Public' },
   { name: 'Telemundo', url: 'https://cdn.igocast.com/wkrp_channel1_hls/wkrp_channel1_master.m3u8', category: 'Public' },
 
-  // Entertainment
-  { name: 'Buzzr', url: 'https://buzzrota-ono.amagi.tv/playlist1080.m3u8', category: 'Entertainment' },
-  { name: 'Retro TV', url: 'https://bcovlive-a.akamaihd.net/5e531be3ed6c41229b2af2d9bffba88d/us-east-1/6183977686001/profile_1/chunklist.m3u8', category: 'Entertainment' },
-  { name: 'Drybar Comedy', url: 'https://drybar-drybarcomedy-1-ca.samsung.wurl.com/manifest/playlist.m3u8', category: 'Entertainment' },
-  { name: 'Docurama', url: 'https://cinedigm.vo.llnwd.net/conssui/amagi_hls_data_xumo1234A-docuramaA/CDN/master.m3u8', category: 'Entertainment' },
-  { name: 'Heartland', url: 'https://bcovlive-a.akamaihd.net/1ad942d15d9643bea6d199b729e79e48/us-east-1/6183977686001/profile_1/chunklist.m3u8', category: 'Entertainment' },
-  { name: 'BBC Food', url: 'https://service-stitcher.clusters.pluto.tv/v1/stitch/embed/hls/channel/5fb5844bf5514d0007945bda/master.m3u8?deviceId=channel&deviceModel=web&deviceVersion=1.0&appVersion=1.0&deviceType=rokuChannel&deviceMake=rokuChannel', category: 'Entertainment' },
-  { name: 'BBC Home', url: 'https://service-stitcher.clusters.pluto.tv/v1/stitch/embed/hls/channel/5fb5836fe745b600070fc743/master.m3u8?deviceId=channel&deviceModel=web&deviceVersion=1.0&appVersion=1.0&deviceType=rokuChannel&deviceMake=rokuChannel', category: 'Entertainment' },
-
-  // Sports
-  { name: 'Stadium', url: 'https://bcovlive-a.akamaihd.net/e64d564b9275484f85981d8c146fb915/us-east-1/5994000126001/profile_1/976f34cf5a614518b7b539cbf9812080/chunklist_ssaiV.m3u8', category: 'Sports' },
-
-  // Pluto TV
-  { name: 'CBS News (Pluto)', url: '', category: 'Pluto TV', resolver: 'pluto', plutoId: '5a6b92f6e22a617379789618' },
-  { name: 'ABC News (Pluto)', url: '', category: 'Pluto TV', resolver: 'pluto', plutoId: '6508be683a0d700008c534e4' },
-  { name: 'FOX News / LiveNOW (Pluto)', url: '', category: 'Pluto TV', resolver: 'pluto', plutoId: '63d025db4e83e700086eaa96' },
+  // Entertainment (Pluto TV)
+  { name: 'BBC Food', url: '', category: 'Entertainment', resolver: 'pluto', plutoId: '5fb5844bf5514d0007945bda' },
+  { name: 'BBC Home', url: '', category: 'Entertainment', resolver: 'pluto', plutoId: '5fb5836fe745b600070fc743' },
 ];
 
 function buildPlutoUrl(channelId: string): string {

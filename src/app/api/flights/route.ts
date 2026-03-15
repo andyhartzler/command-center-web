@@ -248,8 +248,8 @@ async function scrapeFlightAwareAirport(icao: string, type: string, limit: numbe
           const codeMatch = location.match(/\(\s*(\w+)\s*\)/);
           const locationCode = codeMatch ? codeMatch[1] : location.slice(0, 4);
 
-          const depTimeStr = cells[3].trim();
-          const arrTimeStr = cells[5].trim();
+          const depTimeStr = normalizeFlightTime(cells[3].trim());
+          const arrTimeStr = normalizeFlightTime(cells[5].trim());
 
           const identPrefix = ident.replace(/[0-9]/g, '');
           const airlineName = AIRLINE_NAMES[identPrefix] || AIRLINE_NAMES[identPrefix.slice(0, 2)] || identPrefix;
@@ -278,6 +278,32 @@ async function scrapeFlightAwareAirport(icao: string, type: string, limit: numbe
     console.error('[flights] FlightAware scrape error', err);
     return [];
   }
+}
+
+// Normalize FlightAware scraped times like "Wed 02:56PM CDT" or "03:13PM CDT" to "3:13 PM"
+function normalizeFlightTime(t: string): string {
+  if (!t) return '';
+  // Strip day prefixes like "Wed ", "Sat "
+  const stripped = t.replace(/^[A-Za-z]{3}\s+/, '');
+  // Match time pattern: 02:56PM CDT or 3:23AM CST
+  const m = stripped.match(/^0?(\d{1,2}):(\d{2})\s*(AM|PM|am|pm|a|p)\s*/i);
+  if (m) {
+    const ampm = m[3].length === 1
+      ? (m[3].toLowerCase() === 'p' ? 'PM' : 'AM')
+      : m[3].toUpperCase();
+    return `${parseInt(m[1])}:${m[2]} ${ampm}`;
+  }
+  // Try ISO date → Central time
+  try {
+    const d = new Date(stripped);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit', hour12: true,
+        timeZone: 'America/Chicago',
+      });
+    }
+  } catch { /* ignore */ }
+  return t;
 }
 
 function mapStatus(status: string): FlightInfo['status'] {
