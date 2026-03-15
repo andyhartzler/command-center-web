@@ -44,7 +44,19 @@ function formatDuration(mins: number): string {
 }
 
 function formatCentralTime(timeStr: string): string {
-  if (!timeStr || timeStr === '(?)') return '';
+  if (!timeStr || timeStr === '(?)' || timeStr.includes('?')) return '';
+  // Handle FlightAware raw times like "02:56a CDT", "3:23PM CST", "3:23 PM CDT"
+  const rawMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*(a|p|am|pm)\s*\w*$/i);
+  if (rawMatch) {
+    let hour = parseInt(rawMatch[1]);
+    const min = rawMatch[2];
+    const isPM = rawMatch[3].toLowerCase().startsWith('p');
+    if (isPM && hour < 12) hour += 12;
+    if (!isPM && hour === 12) hour = 0;
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    return `${displayHour}:${min} ${ampm}`;
+  }
   // If it's already a formatted time like "3:23 PM", return as-is
   if (/\d{1,2}:\d{2}\s*(AM|PM)/i.test(timeStr)) return timeStr;
   // If ISO date string, convert to Central time
@@ -99,13 +111,15 @@ export function AircraftTrackerWidget({ config }: AircraftTrackerWidgetProps) {
           <div className="w-6 h-6 rounded-md bg-violet-500/20 flex items-center justify-center">
             <Plane size={12} className="text-violet-400" />
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-semibold text-white/90 tracking-wide">
-              {config.ownerLabel}
-            </span>
-            <span className="text-[9px] text-white/40 font-mono">{config.tailNumber}</span>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-white/90 tracking-wide">
+                {config.ownerLabel}
+              </span>
+              <span className="text-[9px] text-white/40 font-mono">{config.tailNumber}</span>
+            </div>
             {data?.aircraftType && (
-              <span className="text-[9px] text-white/30 font-mono">{data.aircraftType}</span>
+              <span className="text-[8px] text-white/30 font-mono leading-tight">{data.aircraftType}</span>
             )}
           </div>
         </div>

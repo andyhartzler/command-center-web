@@ -72,15 +72,15 @@ function AirlineBadge({ iata, airline, icaoIdent }: { iata: string; airline: str
   const resolvedIata = iata || (icaoIdent ? ICAO_TO_IATA[icaoIdent.replace(/[0-9]/g, '')] : '') || '';
   const bg = AIRLINE_COLORS[resolvedIata] || '#475569';
   const initials = resolvedIata || airline.slice(0, 2).toUpperCase();
-  // Use logo.clearbit.com for airline logos
+  // Google Flights dark-background logos - high quality, consistent style
   const logoUrl = resolvedIata
-    ? `https://pics.avs.io/60/60/${resolvedIata}.png`
+    ? `https://www.gstatic.com/flights/airline_logos/70px/dark/${resolvedIata}.png`
     : '';
 
   return (
     <div
       className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden"
-      style={{ backgroundColor: bg }}
+      style={{ backgroundColor: logoUrl ? 'transparent' : bg }}
     >
       {logoUrl ? (
         <img
@@ -91,7 +91,10 @@ function AirlineBadge({ iata, airline, icaoIdent }: { iata: string; airline: str
             // Fallback to initials if logo fails
             const el = e.currentTarget;
             el.style.display = 'none';
-            el.parentElement!.textContent = initials;
+            if (el.parentElement) {
+              el.parentElement.style.backgroundColor = bg;
+              el.parentElement.textContent = initials;
+            }
           }}
         />
       ) : (
