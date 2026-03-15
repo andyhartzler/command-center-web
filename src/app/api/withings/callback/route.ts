@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getNonce, signRequest } from '../signing';
-import { saveTokens } from '../token-store';
+import { saveTokens, setTokensCookie } from '../token-store';
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code');
@@ -53,16 +53,19 @@ export async function GET(req: NextRequest) {
 
   const { access_token, refresh_token, expires_in, userid } = tokenData.body;
 
-  await saveTokens({
+  const tokens = {
     accessToken: access_token,
     refreshToken: refresh_token,
     expiresAt: Date.now() + expires_in * 1000,
     userId: userid,
-  });
+  };
+
+  await saveTokens(tokens);
 
   const redirectUrl = new URL('/', origin);
   redirectUrl.searchParams.set('withings', 'connected');
   const response = NextResponse.redirect(redirectUrl);
   response.cookies.delete('withings_state');
+  setTokensCookie(response, tokens);
   return response;
 }

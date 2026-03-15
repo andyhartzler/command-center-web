@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getNonce, signRequest } from './signing';
-import { readTokens, saveTokens, type StoredTokens } from './token-store';
+import { readTokens, saveTokens, setTokensCookie, type StoredTokens } from './token-store';
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -65,8 +65,8 @@ async function refreshAccessToken(tokens: StoredTokens): Promise<StoredTokens> {
 // Dedup concurrent refresh requests to prevent race condition
 let refreshPromise: Promise<StoredTokens> | null = null;
 
-async function getValidToken(): Promise<{ token: string } | { error: string }> {
-  let tokens = await readTokens();
+async function getValidToken(req: NextRequest): Promise<{ token: string; refreshed?: StoredTokens } | { error: string }> {
+  let tokens = await readTokens(req);
   if (!tokens) return { error: 'not_connected' };
 
   // Refresh if expired or expiring within 5 minutes
@@ -76,6 +76,7 @@ async function getValidToken(): Promise<{ token: string } | { error: string }> {
     }
     try {
       tokens = await refreshPromise;
+      return { token: tokens.accessToken, refreshed: tokens };
     } catch (err) {
       console.error('[Withings] Token refresh failed:', err);
       return { error: 'token_refresh_failed' };
@@ -324,16 +325,24 @@ async function fetchActivity(token: string) {
   };
 }
 
+// Helper to attach refreshed token cookie to any response
+function withRefreshedCookie(response: NextResponse, refreshed?: StoredTokens): NextResponse {
+  if (refreshed) {
+    setTokensCookie(response, refreshed);
+  }
+  return response;
+}
+
 export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get('action') || 'all';
 
-  // Status check - no token needed for this response shape
+  // Status check
   if (action === 'status') {
-    const tokens = await readTokens();
+    const tokens = await readTokens(req);
     return NextResponse.json({ connected: !!tokens });
   }
 
-  const tokenResult = await getValidToken();
+  const tokenResult = await getValidToken(req);
   if ('error' in tokenResult) {
     if (tokenResult.error === 'not_connected') {
       return NextResponse.json({ connected: false });
@@ -341,36 +350,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: tokenResult.error }, { status: 500 });
   }
 
-  const token = tokenResult.token;
+  const { token, refreshed } = tokenResult;
 
   try {
     if (action === 'measures') {
       const cached = getCached('measures');
-      if (cached) return NextResponse.json(cached);
+      if (cached) return withRefreshedCookie(NextResponse.json(cached), refreshed);
       const measures = await fetchMeasures(token);
       if (measures) setCache('measures', measures);
-      return NextResponse.json(measures);
+      return withRefreshedCookie(NextResponse.json(measures), refreshed);
     }
 
     if (action === 'sleep') {
       const cached = getCached('sleep');
-      if (cached) return NextResponse.json(cached);
+      if (cached) return withRefreshedCookie(NextResponse.json(cached), refreshed);
       const sleep = await fetchSleep(token);
       if (sleep) setCache('sleep', sleep);
-      return NextResponse.json(sleep);
+      return withRefreshedCookie(NextResponse.json(sleep), refreshed);
     }
 
     if (action === 'activity') {
       const cached = getCached('activity');
-      if (cached) return NextResponse.json(cached);
+      if (cached) return withRefreshedCookie(NextResponse.json(cached), refreshed);
       const activity = await fetchActivity(token);
       if (activity) setCache('activity', activity);
-      return NextResponse.json(activity);
+      return withRefreshedCookie(NextResponse.json(activity), refreshed);
     }
 
     // Default: fetch all
     const cached = getCached('all');
-    if (cached) return NextResponse.json(cached);
+    if (cached) return withRefreshedCookie(NextResponse.json(cached), refreshed);
 
     const [measures, sleep, activity] = await Promise.all([
       fetchMeasures(token),
@@ -386,7 +395,7 @@ export async function GET(req: NextRequest) {
     };
 
     setCache('all', result);
-    return NextResponse.json(result);
+    return withRefreshedCookie(NextResponse.json(result), refreshed);
   } catch (err) {
     console.error('[Withings] API error:', err);
     return NextResponse.json({ error: 'Failed to fetch Withings data' }, { status: 500 });
