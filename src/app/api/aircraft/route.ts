@@ -244,10 +244,25 @@ async function scrapeFlightAwareHistory(tail: string): Promise<TrackerData | nul
         const originMatch = origin.match(/\(\s*(\w+)\s*\)/);
         const destMatch = destination.match(/\(\s*(\w+)\s*\)/);
 
-        // Clean up unknown values - FlightAware uses "(?) " for unknown destinations/times
-        const cleanDest = destMatch ? destMatch[1] : destination.replace(/\(\?\)/g, '').slice(0, 4).trim();
-        const cleanArrival = arrival === '(?)' ? '' : arrival;
-        const cleanDeparture = departure === '(?)' ? '' : departure;
+        // Clean up unknown values - FlightAware uses "(?) " or "( ? )" for unknowns
+        // Also strip "( ? )" from time strings like "03:48PM  CDT  ( ? )"
+        const stripQ = (s: string) => s.replace(/\(\s*\?\s*\)/g, '').trim();
+        const cleanDest = destMatch ? destMatch[1] : stripQ(destination).slice(0, 4).trim();
+        const cleanArrival = stripQ(arrival) || '';
+        const cleanDeparture = stripQ(departure) || '';
+
+        // Normalize times: "03:13PM  CDT" → "3:13 PM"
+        const normalizeTime = (t: string) => {
+          if (!t) return '';
+          const m = t.match(/^0?(\d{1,2}):(\d{2})\s*(AM|PM|am|pm|a|p)\s*/i);
+          if (m) {
+            const ampm = m[3].length === 1
+              ? (m[3].toLowerCase() === 'p' ? 'PM' : 'AM')
+              : m[3].toUpperCase();
+            return `${parseInt(m[1])}:${m[2]} ${ampm}`;
+          }
+          return t;
+        };
 
         // Determine status
         let status: FlightLog['status'] = 'completed';
@@ -256,11 +271,11 @@ async function scrapeFlightAwareHistory(tail: string): Promise<TrackerData | nul
 
         flights.push({
           date,
-          departure: originMatch ? originMatch[1] : origin.replace(/\(\?\)/g, '').slice(0, 4).trim(),
+          departure: originMatch ? originMatch[1] : stripQ(origin).slice(0, 4).trim(),
           arrival: cleanDest || '',
-          departureTime: cleanDeparture,
-          arrivalTime: cleanArrival,
-          duration: duration === '(?)' ? '' : duration,
+          departureTime: normalizeTime(cleanDeparture),
+          arrivalTime: normalizeTime(cleanArrival),
+          duration: stripQ(duration) || '',
           status,
         });
       }

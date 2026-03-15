@@ -190,79 +190,87 @@ async function scrapeFlightAwareAirport(icao: string, type: string, limit: numbe
 
     const html = await res.text();
 
-    // Find the arrivals or departures table
-    const tableType = type === 'arrivals' ? 'arrivals' : 'departures';
-    const tableRegex = new RegExp(`data-type="${tableType}">([\\s\\S]*?)</table>`);
-    const tableMatch = html.match(tableRegex);
-    if (!tableMatch) return [];
+    // ICAO-to-IATA mapping for logos
+    const icaoToIata: Record<string, string> = {
+      SWA: 'WN', AAL: 'AA', DAL: 'DL', UAL: 'UA', NKS: 'NK',
+      ASA: 'AS', JBU: 'B6', FFT: 'F9', AAY: 'G4', SKW: 'OO',
+      ASH: 'YV', RPA: 'YX', QXE: 'QX', ENY: 'MQ', JIA: 'OH',
+      AWI: 'ZW', EDV: '9E', UPS: '5X', FDX: 'FX', ATN: '8C', SCX: 'XQ',
+    };
 
-    const tableHtml = tableMatch[1];
+    // FlightAware has 4 tables: arrivals, departures, enroute, scheduled
+    // For "departures" view: show scheduled (upcoming) + departures (recent) + enroute (in air)
+    // For "arrivals" view: show enroute (incoming) + arrivals (recently landed)
+    const tablesToScrape: { tableType: string; defaultStatus: FlightInfo['status'] }[] =
+      type === 'departures'
+        ? [
+            { tableType: 'scheduled', defaultStatus: 'scheduled' },
+            { tableType: 'enroute', defaultStatus: 'en_route' },
+            { tableType: 'departures', defaultStatus: 'landed' },
+          ]
+        : [
+            { tableType: 'enroute', defaultStatus: 'en_route' },
+            { tableType: 'arrivals', defaultStatus: 'landed' },
+          ];
 
-    // Extract rows (skip header rows)
-    const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
     const flights: FlightInfo[] = [];
-    let match;
 
-    while ((match = rowRegex.exec(tableHtml)) !== null) {
-      const row = match[1];
-      const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/g;
-      const cells: string[] = [];
-      let cellMatch;
-
-      while ((cellMatch = cellRegex.exec(row)) !== null) {
-        // Strip HTML tags
-        const text = cellMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-        cells.push(text);
-      }
-
-      // FlightAware airport table has 6 columns: Ident, Type, Origin/Dest, Depart, En Route, Arrival
-      if (cells.length >= 6) {
-        const ident = cells[0];
-        const aircraft = cells[1];
-        const location = cells[2];
-
-        // Extract airport code from "City Name ( CODE )"
-        const codeMatch = location.match(/\(\s*(\w+)\s*\)/);
-        const locationCode = codeMatch ? codeMatch[1] : location.slice(0, 4);
-
-        // Parse times
-        const depTimeStr = cells[3].trim();
-        const arrTimeStr = cells[5].trim();
-
-        // Determine airline from ICAO ident (e.g., SWA3824 -> SWA)
-        const identPrefix = ident.replace(/[0-9]/g, '');
-        const airlineName = AIRLINE_NAMES[identPrefix] || AIRLINE_NAMES[identPrefix.slice(0, 2)] || identPrefix;
-        // Map ICAO prefix to IATA code for logos
-        const icaoToIata: Record<string, string> = {
-          SWA: 'WN', AAL: 'AA', DAL: 'DL', UAL: 'UA', NKS: 'NK',
-          ASA: 'AS', JBU: 'B6', FFT: 'F9', AAY: 'G4', SKW: 'OO',
-          ASH: 'YV', RPA: 'YX', QXE: 'QX', ENY: 'MQ', JIA: 'OH',
-          AWI: 'ZW', EDV: '9E', UPS: '5X', FDX: 'FX', ATN: '8C',
-        };
-        const iataCode = icaoToIata[identPrefix] || identPrefix.slice(0, 2);
-
-        // Determine status based on which time columns have data
-        let status: FlightInfo['status'] = 'scheduled';
-        if (arrTimeStr && depTimeStr) status = 'landed';
-        else if (depTimeStr && cells[4].trim()) status = 'en_route';
-
-        flights.push({
-          flightNumber: ident,
-          airline: airlineName,
-          airlineIata: iataCode,
-          origin: type === 'arrivals' ? locationCode : icao.replace(/^K/, ''),
-          destination: type === 'arrivals' ? icao.replace(/^K/, '') : locationCode,
-          scheduledTime: depTimeStr || arrTimeStr,
-          estimatedTime: null,
-          actualTime: arrTimeStr || null,
-          status,
-          aircraft,
-          gate: null,
-          terminal: null,
-        });
-      }
-
+    for (const { tableType, defaultStatus } of tablesToScrape) {
       if (flights.length >= limit) break;
+
+      const tableRegex = new RegExp(`data-type="${tableType}">([\\s\\S]*?)</table>`);
+      const tableMatch = html.match(tableRegex);
+      if (!tableMatch) continue;
+
+      const tableHtml = tableMatch[1];
+      const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
+      let match;
+
+      while ((match = rowRegex.exec(tableHtml)) !== null) {
+        if (flights.length >= limit) break;
+
+        const row = match[1];
+        const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/g;
+        const cells: string[] = [];
+        let cellMatch;
+
+        while ((cellMatch = cellRegex.exec(row)) !== null) {
+          const text = cellMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+          cells.push(text);
+        }
+
+        // 6 columns: Ident, Type, Origin/Dest, Depart, En Route, Arrival
+        if (cells.length >= 6) {
+          const ident = cells[0];
+          const aircraft = cells[1];
+          const location = cells[2];
+
+          const codeMatch = location.match(/\(\s*(\w+)\s*\)/);
+          const locationCode = codeMatch ? codeMatch[1] : location.slice(0, 4);
+
+          const depTimeStr = cells[3].trim();
+          const arrTimeStr = cells[5].trim();
+
+          const identPrefix = ident.replace(/[0-9]/g, '');
+          const airlineName = AIRLINE_NAMES[identPrefix] || AIRLINE_NAMES[identPrefix.slice(0, 2)] || identPrefix;
+          const iataCode = icaoToIata[identPrefix] || identPrefix.slice(0, 2);
+
+          flights.push({
+            flightNumber: ident,
+            airline: airlineName,
+            airlineIata: iataCode,
+            origin: type === 'arrivals' ? locationCode : icao.replace(/^K/, ''),
+            destination: type === 'arrivals' ? icao.replace(/^K/, '') : locationCode,
+            scheduledTime: depTimeStr || arrTimeStr,
+            estimatedTime: null,
+            actualTime: defaultStatus === 'landed' ? (arrTimeStr || null) : null,
+            status: defaultStatus,
+            aircraft,
+            gate: null,
+            terminal: null,
+          });
+        }
+      }
     }
 
     return flights;

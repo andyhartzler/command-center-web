@@ -69,7 +69,7 @@ export function FindMyFriendsWidget({ config, style: _style }: Props) {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 20 * 60 * 1000); // every 20 minutes
+    const interval = setInterval(() => fetchData(true), 20 * 60 * 1000); // refresh every 20 minutes
     return () => clearInterval(interval);
   }, [fetchData]);
 
