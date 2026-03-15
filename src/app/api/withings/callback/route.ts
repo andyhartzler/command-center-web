@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { getNonce, signRequest } from '../signing';
-
-const TOKENS_PATH = path.join(process.cwd(), 'data', 'withings-tokens.json');
+import { saveTokens } from '../token-store';
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code');
@@ -46,24 +43,26 @@ export async function GET(req: NextRequest) {
   const tokenData = await tokenRes.json();
 
   if (tokenData.status !== 0) {
-    console.error('[Withings] Token exchange failed:', tokenData);
-    return NextResponse.json({ error: 'Token exchange failed' }, { status: 502 });
+    console.error('[Withings] Token exchange failed:', JSON.stringify(tokenData));
+    const redirectUrl = new URL('/editor', origin);
+    redirectUrl.searchParams.set('withings_error', `status_${tokenData.status}`);
+    const response = NextResponse.redirect(redirectUrl);
+    response.cookies.delete('withings_state');
+    return response;
   }
 
   const { access_token, refresh_token, expires_in, userid } = tokenData.body;
 
-  const tokens = {
+  await saveTokens({
     accessToken: access_token,
     refreshToken: refresh_token,
     expiresAt: Date.now() + expires_in * 1000,
     userId: userid,
-  };
+  });
 
-  // Ensure data directory exists
-  await fs.mkdir(path.dirname(TOKENS_PATH), { recursive: true });
-  await fs.writeFile(TOKENS_PATH, JSON.stringify(tokens, null, 2));
-
-  const response = NextResponse.redirect(new URL('/editor', origin));
+  const redirectUrl = new URL('/editor', origin);
+  redirectUrl.searchParams.set('withings', 'connected');
+  const response = NextResponse.redirect(redirectUrl);
   response.cookies.delete('withings_state');
   return response;
 }

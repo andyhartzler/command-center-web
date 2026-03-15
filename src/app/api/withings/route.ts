@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { getNonce, signRequest } from './signing';
+import { readTokens, saveTokens, type StoredTokens } from './token-store';
 
-const TOKENS_PATH = path.join(process.cwd(), 'data', 'withings-tokens.json');
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-interface StoredTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-  userId: string;
-}
 
 interface CacheEntry {
   data: unknown;
@@ -28,20 +19,6 @@ function getCached(key: string): unknown | null {
 
 function setCache(key: string, data: unknown) {
   cache.set(key, { data, timestamp: Date.now() });
-}
-
-async function readTokens(): Promise<StoredTokens | null> {
-  try {
-    const raw = await fs.readFile(TOKENS_PATH, 'utf-8');
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-async function saveTokens(tokens: StoredTokens): Promise<void> {
-  await fs.mkdir(path.dirname(TOKENS_PATH), { recursive: true });
-  await fs.writeFile(TOKENS_PATH, JSON.stringify(tokens, null, 2));
 }
 
 async function refreshAccessToken(tokens: StoredTokens): Promise<StoredTokens> {
