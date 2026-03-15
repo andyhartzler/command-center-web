@@ -31,7 +31,7 @@ interface TrackerData {
 
 // In-memory cache
 let aircraftCache: { key: string; data: TrackerData; ts: number } | null = null;
-const CACHE_TTL = 2 * 60 * 1000; // 2 minutes (check for live flights often)
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 export async function GET(request: NextRequest) {
   const tail = request.nextUrl.searchParams.get('tail') || '';
@@ -159,18 +159,23 @@ async function scrapeFlightAwareHistory(tail: string): Promise<TrackerData | nul
         const originMatch = origin.match(/\(\s*(\w+)\s*\)/);
         const destMatch = destination.match(/\(\s*(\w+)\s*\)/);
 
+        // Clean up unknown values - FlightAware uses "(?) " for unknown destinations/times
+        const cleanDest = destMatch ? destMatch[1] : destination.replace(/\(\?\)/g, '').slice(0, 4).trim();
+        const cleanArrival = arrival === '(?)' ? '' : arrival;
+        const cleanDeparture = departure === '(?)' ? '' : departure;
+
         // Determine status
         let status: FlightLog['status'] = 'completed';
-        if (!arrival && departure) status = 'in_progress';
-        if (!departure && !arrival) status = 'planned';
+        if (!cleanArrival && cleanDeparture) status = 'in_progress';
+        if (!cleanDeparture && !cleanArrival) status = 'planned';
 
         flights.push({
           date,
-          departure: originMatch ? originMatch[1] : origin.slice(0, 4).trim(),
-          arrival: destMatch ? destMatch[1] : destination.slice(0, 4).trim(),
-          departureTime: departure,
-          arrivalTime: arrival,
-          duration,
+          departure: originMatch ? originMatch[1] : origin.replace(/\(\?\)/g, '').slice(0, 4).trim(),
+          arrival: cleanDest || '',
+          departureTime: cleanDeparture,
+          arrivalTime: cleanArrival,
+          duration: duration === '(?)' ? '' : duration,
           status,
         });
       }
@@ -243,8 +248,8 @@ async function fetchFromAeroAPI(tail: string, apiKey: string): Promise<TrackerDa
         date: depDate ? depDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
         departure: origin?.code_iata || origin?.code || '',
         arrival: dest?.code_iata || dest?.code || '',
-        departureTime: depDate ? depDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '',
-        arrivalTime: arrDate ? arrDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '',
+        departureTime: depDate ? depDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago' }) : '',
+        arrivalTime: arrDate ? arrDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago' }) : '',
         duration,
         status: (!f.actual_in && f.actual_out ? 'in_progress' : 'completed') as FlightLog['status'],
       };

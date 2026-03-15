@@ -43,6 +43,25 @@ function formatDuration(mins: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+function formatCentralTime(timeStr: string): string {
+  if (!timeStr || timeStr === '(?)') return '';
+  // If it's already a formatted time like "3:23 PM", return as-is
+  if (/\d{1,2}:\d{2}\s*(AM|PM)/i.test(timeStr)) return timeStr;
+  // If ISO date string, convert to Central time
+  try {
+    const d = new Date(timeStr);
+    if (isNaN(d.getTime())) return timeStr;
+    return d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Chicago',
+    });
+  } catch {
+    return timeStr;
+  }
+}
+
 export function AircraftTrackerWidget({ config }: AircraftTrackerWidgetProps) {
   const [data, setData] = useState<TrackerData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,7 +87,7 @@ export function AircraftTrackerWidget({ config }: AircraftTrackerWidgetProps) {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60_000); // check every minute
+    const interval = setInterval(fetchData, 15 * 60_000); // check every 15 minutes
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -80,11 +99,14 @@ export function AircraftTrackerWidget({ config }: AircraftTrackerWidgetProps) {
           <div className="w-6 h-6 rounded-md bg-violet-500/20 flex items-center justify-center">
             <Plane size={12} className="text-violet-400" />
           </div>
-          <div>
+          <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-semibold text-white/90 tracking-wide">
               {config.ownerLabel}
             </span>
-            <span className="text-[9px] text-white/40 ml-1.5 font-mono">{config.tailNumber}</span>
+            <span className="text-[9px] text-white/40 font-mono">{config.tailNumber}</span>
+            {data?.aircraftType && (
+              <span className="text-[9px] text-white/30 font-mono">{data.aircraftType}</span>
+            )}
           </div>
         </div>
         {data?.isAirborne && (
@@ -167,11 +189,14 @@ export function AircraftTrackerWidget({ config }: AircraftTrackerWidgetProps) {
                   <Plane size={8} className="text-violet-400/60 mx-0.5" />
                   <div className="w-4 h-px bg-white/15" />
                 </div>
-                <span className="text-[11px] font-semibold text-white/80">{flight.arrival}</span>
+                <span className="text-[11px] font-semibold text-white/80">{flight.arrival || '---'}</span>
                 <div className="flex-1" />
                 <div className="flex items-center gap-1 text-[9px] text-white/30">
                   <Clock size={8} />
-                  <span>{flight.departureTime} - {flight.arrivalTime}</span>
+                  <span>
+                    {formatCentralTime(flight.departureTime)}
+                    {formatCentralTime(flight.arrivalTime) ? ` - ${formatCentralTime(flight.arrivalTime)}` : ''}
+                  </span>
                 </div>
               </div>
             </div>
@@ -179,13 +204,6 @@ export function AircraftTrackerWidget({ config }: AircraftTrackerWidgetProps) {
         )}
       </div>
 
-      {/* Footer */}
-      {data && (
-        <div className="flex items-center justify-between px-3 py-1 border-t border-white/5 shrink-0">
-          <span className="text-[8px] text-white/20">{data.aircraftType || config.tailNumber}</span>
-          <span className="text-[8px] text-white/15">via {data.source}</span>
-        </div>
-      )}
     </div>
   );
 }
