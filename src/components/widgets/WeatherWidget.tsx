@@ -107,8 +107,8 @@ export function WeatherWidget({ config }: Props) {
       const innerW = w - pad * 2;
       const innerH = h - pad * 2;
       // Natural content height at scale=1 (no padding):
-      // label(10) + gap(4) + temp(48) + condition(13) + hilo(12) + gap(8) + hourly(33) ≈ 128
-      const s = Math.min(innerW / 160, innerH / 128);
+      // label(10) + gap(4) + temp(48) + condition(13) + hilo(12) + gap(4) + gap(4) + hourly(33) + margins ≈ 145
+      const s = Math.min(innerW / 160, innerH / 145);
       setScale(Math.max(0.4, Math.min(4, s)));
     };
     update();

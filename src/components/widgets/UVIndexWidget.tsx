@@ -240,14 +240,18 @@ export function UVIndexWidget({ config, style: _style }: Props) {
     );
   }
 
-  const gaugeRadius = Math.min(size.w * 0.32, size.h * 0.42, 100);
+  // The SVG total size is radius*2 + labelPad*2, so to fit in container height (minus padding):
+  // radius*2 + labelPad*2 <= availH, where labelPad ~ radius*0.22
+  // radius * (2 + 0.44) <= availH => radius <= availH / 2.44
+  const availH = size.h - 8; // account for outer padding
+  const gaugeRadius = Math.min(size.w * 0.32, availH / 2.44, 100);
   const compact = size.h < 180;
 
   // Current segment color for the header
   const catColor = UV_SEGMENTS.find(s => data.uvIndex < s.range[1])?.color ?? '#7c3aed';
 
   return (
-    <div ref={containerRef} className="w-full h-full overflow-hidden flex items-center p-3 gap-3">
+    <div ref={containerRef} className="w-full h-full overflow-hidden flex items-center p-1.5 gap-2">
       {/* Left: Gauge */}
       <div className="flex-shrink-0 flex items-center justify-center">
         <UVGauge uvIndex={data.uvIndex} radius={gaugeRadius} />
