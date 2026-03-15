@@ -174,7 +174,7 @@ function MapMode({ friends, avatars, containerSize }: {
     ? mappable.reduce((s, f) => s + f.lng, 0) / mappable.length
     : -94.5786;
 
-  const { map, isReady } = useAppleMap(mapContainerRef, {
+  const { map, ready, isReady } = useAppleMap(mapContainerRef, {
     center: [centerLat, centerLng],
     zoom: 8,
     interactive: false,
@@ -182,7 +182,7 @@ function MapMode({ friends, avatars, containerSize }: {
 
   // Add/update annotations when map is ready or friends change
   useEffect(() => {
-    if (!isReady()) return;
+    if (!ready || !isReady()) return;
     const m = map.current;
     if (!m) return;
 
@@ -265,7 +265,7 @@ function MapMode({ friends, avatars, containerSize }: {
         false
       );
     }
-  }, [isReady, map, mappable, avatars, containerSize]);
+  }, [ready, isReady, map, mappable, avatars, containerSize]);
 
   return (
     <div className="w-full h-full relative">

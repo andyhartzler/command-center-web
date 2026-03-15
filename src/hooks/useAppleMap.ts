@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 
 // Track global MapKit JS initialization state
 let mapkitInitialized = false;
@@ -62,7 +62,7 @@ export function useAppleMap(
   options: UseAppleMapOptions
 ) {
   const mapRef = useRef<mapkit.Map | null>(null);
-  const readyRef = useRef(false);
+  const [ready, setReady] = useState(false);
 
   // Initialize map
   useEffect(() => {
@@ -94,7 +94,7 @@ export function useAppleMap(
       });
 
       mapRef.current = map;
-      readyRef.current = true;
+      setReady(true);
     }).catch((err) => {
       console.error('[useAppleMap] init failed:', err);
     });
@@ -104,7 +104,7 @@ export function useAppleMap(
       if (mapRef.current) {
         mapRef.current.destroy();
         mapRef.current = null;
-        readyRef.current = false;
+        setReady(false);
       }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -182,7 +182,8 @@ export function useAppleMap(
 
   return {
     map: mapRef,
-    isReady: () => readyRef.current && mapRef.current !== null,
+    ready,
+    isReady: () => ready && mapRef.current !== null,
     addDotAnnotation,
     clearAnnotations,
     setRegion,
