@@ -46,7 +46,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Try FlightAware AeroAPI first (if key provided)
+    // Primary: Cloudflare Worker with email-based flight alerts
+    const alertResult = await fetchFromAlertWorker(tail);
+    if (alertResult && alertResult.recentFlights.length > 0) {
+      aircraftCache = { key: tail, data: alertResult, ts: Date.now() };
+      return NextResponse.json(alertResult);
+    }
+
+    // Try FlightAware AeroAPI (if key provided)
     const flightAwareKey = process.env.FLIGHTAWARE_KEY;
     if (flightAwareKey) {
       const result = await fetchFromAeroAPI(tail, flightAwareKey);
@@ -89,6 +96,84 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ...aircraftCache.data, cached: true, stale: true });
     }
     return NextResponse.json({ error: 'Failed to fetch aircraft data' }, { status: 500 });
+  }
+}
+
+async function fetchFromAlertWorker(tail: string): Promise<TrackerData | null> {
+  try {
+    const res = await fetch('https://flight-alerts.hartzler.workers.dev/api/events', {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+
+    interface AlertEvent {
+      type: 'departure' | 'arrival' | 'unknown';
+      tailNumber: string;
+      origin: string;
+      destination: string;
+      time: string;
+      rawSubject: string;
+      receivedAt: string;
+    }
+
+    const data: { events: AlertEvent[]; lastUpdated: string | null } = await res.json();
+    if (!data.events || data.events.length === 0) return null;
+
+    // Group consecutive departure+arrival into flight legs
+    const flights: FlightLog[] = [];
+    const events = data.events.filter(e => e.tailNumber === tail);
+
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      const date = new Date(ev.receivedAt);
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+      if (ev.type === 'arrival') {
+        // Look for matching departure (next event chronologically, which is i+1 since events are newest-first)
+        const dep = events[i + 1]?.type === 'departure' ? events[i + 1] : null;
+        flights.push({
+          date: dateStr,
+          departure: dep?.origin || '',
+          arrival: ev.destination || '',
+          departureTime: dep?.time || '',
+          arrivalTime: ev.time || '',
+          duration: '',
+          status: 'completed',
+        });
+        if (dep) i++; // skip the departure event we consumed
+      } else if (ev.type === 'departure') {
+        // Departure without a following arrival = currently in flight
+        flights.push({
+          date: dateStr,
+          departure: ev.origin || '',
+          arrival: '',
+          departureTime: ev.time || '',
+          arrivalTime: '',
+          duration: '',
+          status: 'in_progress',
+        });
+      }
+    }
+
+    const isAirborne = flights.length > 0 && flights[0].status === 'in_progress';
+
+    return {
+      tailNumber: tail,
+      owner: '',
+      aircraftType: 'S22T',
+      lastSeen: flights[0]?.date || null,
+      isAirborne,
+      currentFlight: isAirborne ? {
+        departure: flights[0].departure,
+        arrival: flights[0].arrival,
+        altitude: 0, speed: 0, heading: 0, lat: 0, lon: 0,
+      } : null,
+      recentFlights: flights,
+      source: 'flight-alerts',
+    };
+  } catch (err) {
+    console.error('[aircraft] alert worker fetch error', err);
+    return null;
   }
 }
 
