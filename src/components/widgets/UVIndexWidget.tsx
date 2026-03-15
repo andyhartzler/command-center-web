@@ -73,7 +73,6 @@ function UVGauge({ uvIndex, radius }: { uvIndex: number; radius: number }) {
   const gapDeg = 90; // gap size in degrees
   const arcDeg = 360 - gapDeg; // 270 degrees of arc
   const startDeg = 90 + gapDeg / 2; // start at 135deg (in SVG coords, 0=right, clockwise)
-  const startRad = (startDeg * Math.PI) / 180;
 
   const degToXY = (deg: number) => {
     const rad = (deg * Math.PI) / 180;
@@ -111,14 +110,19 @@ function UVGauge({ uvIndex, radius }: { uvIndex: number; radius: number }) {
 
   const fontSize = Math.max(radius * 0.5, 16);
 
-  // Place labels on segments
+  // Padding for labels that extend outside the arc
+  const labelPad = Math.max(radius * 0.22, 14);
+  const svgSize = radius * 2 + labelPad * 2;
+  const offsetX = labelPad;
+  const offsetY = labelPad;
+
+  // Place labels on segments (offset by padding)
   const labelElements = UV_SEGMENTS.map(seg => {
     const midUV = (seg.range[0] + seg.range[1]) / 2;
     const labelDeg = (midUV / maxUV) * arcDeg + startDeg;
     const labelR = r + strokeWidth / 2 + Math.max(radius * 0.12, 6);
-    const lx = cx + labelR * Math.cos((labelDeg * Math.PI) / 180);
-    const ly = cy + labelR * Math.sin((labelDeg * Math.PI) / 180);
-    // Rotate text to follow the arc
+    const lx = offsetX + cx + labelR * Math.cos((labelDeg * Math.PI) / 180);
+    const ly = offsetY + cy + labelR * Math.sin((labelDeg * Math.PI) / 180);
     const textAngle = labelDeg + 90;
     return (
       <text
@@ -138,54 +142,55 @@ function UVGauge({ uvIndex, radius }: { uvIndex: number; radius: number }) {
     );
   });
 
-  const svgSize = radius * 2;
-
   return (
     <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`}>
-      {/* Background track */}
-      {segmentPaths.map((seg, i) => (
-        <path key={i} d={seg.d} fill="none" stroke={seg.color} strokeWidth={strokeWidth} strokeLinecap="butt" opacity={0.3} />
-      ))}
-      {/* Filled segments up to current value */}
-      {segmentPaths.map((seg, i) => {
-        const s = UV_SEGMENTS[i];
-        if (uvIndex <= s.range[0]) return null;
-        const fillEnd = Math.min(uvIndex, s.range[1]);
-        const segStartDeg = (s.range[0] / maxUV) * arcDeg + startDeg;
-        const segEndDeg = (fillEnd / maxUV) * arcDeg + startDeg;
-        const sPos = degToXY(segStartDeg);
-        const ePos = degToXY(segEndDeg);
-        const arcSpan = segEndDeg - segStartDeg;
-        if (arcSpan < 0.5) return null;
-        const largeArc = arcSpan > 180 ? 1 : 0;
-        return (
-          <path
-            key={`fill-${i}`}
-            d={`M ${sPos.x} ${sPos.y} A ${r} ${r} 0 ${largeArc} 1 ${ePos.x} ${ePos.y}`}
-            fill="none"
-            stroke={seg.color}
-            strokeWidth={strokeWidth}
-            strokeLinecap="butt"
-          />
-        );
-      })}
-      {/* Needle dot */}
-      <circle cx={needlePos.x} cy={needlePos.y} r={strokeWidth * 0.45} fill={currentColor} stroke="#000" strokeWidth={1.5} />
-      {/* Labels */}
+      {/* Offset all arc content by label padding */}
+      <g transform={`translate(${offsetX}, ${offsetY})`}>
+        {/* Background track */}
+        {segmentPaths.map((seg, i) => (
+          <path key={i} d={seg.d} fill="none" stroke={seg.color} strokeWidth={strokeWidth} strokeLinecap="butt" opacity={0.3} />
+        ))}
+        {/* Filled segments up to current value */}
+        {segmentPaths.map((seg, i) => {
+          const s = UV_SEGMENTS[i];
+          if (uvIndex <= s.range[0]) return null;
+          const fillEnd = Math.min(uvIndex, s.range[1]);
+          const segStartDeg = (s.range[0] / maxUV) * arcDeg + startDeg;
+          const segEndDeg = (fillEnd / maxUV) * arcDeg + startDeg;
+          const sPos = degToXY(segStartDeg);
+          const ePos = degToXY(segEndDeg);
+          const arcSpan = segEndDeg - segStartDeg;
+          if (arcSpan < 0.5) return null;
+          const largeArc = arcSpan > 180 ? 1 : 0;
+          return (
+            <path
+              key={`fill-${i}`}
+              d={`M ${sPos.x} ${sPos.y} A ${r} ${r} 0 ${largeArc} 1 ${ePos.x} ${ePos.y}`}
+              fill="none"
+              stroke={seg.color}
+              strokeWidth={strokeWidth}
+              strokeLinecap="butt"
+            />
+          );
+        })}
+        {/* Needle dot */}
+        <circle cx={needlePos.x} cy={needlePos.y} r={strokeWidth * 0.45} fill={currentColor} stroke="#000" strokeWidth={1.5} />
+        {/* Center value */}
+        <text
+          x={cx}
+          y={cy - radius * 0.05}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={currentColor}
+          fontSize={fontSize}
+          fontWeight="700"
+          fontFamily="system-ui, sans-serif"
+        >
+          {uvIndex.toFixed(1)}
+        </text>
+      </g>
+      {/* Labels are already in padded coordinates */}
       {labelElements}
-      {/* Center value */}
-      <text
-        x={cx}
-        y={cy - radius * 0.05}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={currentColor}
-        fontSize={fontSize}
-        fontWeight="700"
-        fontFamily="system-ui, sans-serif"
-      >
-        {uvIndex.toFixed(1)}
-      </text>
     </svg>
   );
 }
