@@ -12,6 +12,7 @@ interface MeasureData {
     weight: number | null;
     fatRatio: number | null;
     fatMass: number | null;
+    fatFreeMass: number | null;
     muscleMass: number | null;
     boneMass: number | null;
     hydration: number | null;
@@ -19,6 +20,11 @@ interface MeasureData {
     systolic: number | null;
     diastolic: number | null;
     spo2: number | null;
+    bodyTemp: number | null;
+    skinTemp: number | null;
+    pulseWaveVelocity: number | null;
+    vo2max: number | null;
+    vascularAge: number | null;
     date: string | null;
   };
   history: { date: string; weight: number }[];
@@ -27,14 +33,30 @@ interface MeasureData {
 interface SleepData {
   lastNight: {
     totalSleep: number | null;
+    timeInBed: number | null;
+    sleepEfficiency: number | null;
+    sleepLatency: number | null;
+    wakeupLatency: number | null;
     deepSleep: number | null;
     lightSleep: number | null;
     remSleep: number | null;
     awake: number | null;
+    remEpisodes: number | null;
     sleepScore: number | null;
+    wakeupCount: number | null;
+    wakeDuration: number | null;
+    outOfBedCount: number | null;
     hrAvg: number | null;
     hrMin: number | null;
+    hrMax: number | null;
     rrAvg: number | null;
+    rrMin: number | null;
+    rrMax: number | null;
+    breathingDisturbances: number | null;
+    snoring: number | null;
+    snoringEpisodes: number | null;
+    nightEvents: number | null;
+    apneaIndex: number | null;
     date: string;
   } | null;
 }
@@ -44,7 +66,19 @@ interface ActivityData {
     steps: number;
     distance: number;
     calories: number;
+    totalCalories: number;
     elevation: number;
+    softMinutes: number;
+    moderateMinutes: number;
+    intenseMinutes: number;
+    activeMinutes: number;
+    hrAvg: number | null;
+    hrMin: number | null;
+    hrMax: number | null;
+    hrZone0: number;
+    hrZone1: number;
+    hrZone2: number;
+    hrZone3: number;
   } | null;
 }
 
@@ -61,13 +95,18 @@ interface Props {
 }
 
 function formatDuration(seconds: number | null): string {
-  if (seconds === null) return '--';
+  if (seconds === null || seconds === undefined) return '--';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function formatNumber(val: number | null, unit?: string): string {
+function formatMinutes(seconds: number | null): string {
+  if (seconds === null || seconds === undefined) return '--';
+  return `${Math.round(seconds / 60)}m`;
+}
+
+function formatNumber(val: number | null | undefined, unit?: string): string {
   if (val === null || val === undefined) return '--';
   return `${val}${unit || ''}`;
 }
@@ -109,7 +148,6 @@ function WeightChart({ history }: { history: { date: string; weight: number }[] 
         strokeLinejoin="round"
         strokeLinecap="round"
       />
-      {/* Min/max labels */}
       <text x={w - pad} y={pad + 10} textAnchor="end" className="fill-white/30" fontSize="9">
         {max.toFixed(1)}
       </text>
@@ -135,7 +173,7 @@ function CompositionBar({ label, value, max, color }: { label: string; value: nu
   );
 }
 
-function SleepBar({ data }: { data: NonNullable<SleepData['lastNight']> }) {
+function SleepStagesBar({ data }: { data: NonNullable<SleepData['lastNight']> }) {
   const total = (data.deepSleep ?? 0) + (data.lightSleep ?? 0) + (data.remSleep ?? 0) + (data.awake ?? 0);
   if (total === 0) return null;
 
@@ -189,6 +227,17 @@ function MetricCard({ icon: Icon, label, value, color, dimmed }: {
   );
 }
 
+// Compact metric row
+function MetricRow({ label, value, unit, color }: { label: string; value: number | null | undefined; unit?: string; color?: string }) {
+  const display = value !== null && value !== undefined ? `${value}${unit || ''}` : '--';
+  return (
+    <div className="flex justify-between items-center">
+      <span className="text-[10px] text-white/40">{label}</span>
+      <span className="text-[10px] font-mono" style={{ color: color || 'rgba(255,255,255,0.6)' }}>{display}</span>
+    </div>
+  );
+}
+
 // Not connected state
 function NotConnected() {
   return (
@@ -224,86 +273,217 @@ function SummaryView({ data }: { data: WithingsData }) {
   );
 }
 
-// Weight mode: current weight, chart, body composition
+// Weight mode: current weight, chart, body composition, vitals
 function WeightView({ data }: { data: WithingsData }) {
   const m = data.measures;
   if (!m) return <div className="p-4 text-center text-white/30 text-xs">No measurement data</div>;
+
+  const l = m.latest;
 
   return (
     <div className="p-3 space-y-3 overflow-y-auto h-full">
       <div className="text-center">
         <div className="text-3xl font-bold text-white/90">
-          {m.latest.weight !== null ? `${m.latest.weight} lbs` : '--'}
+          {l.weight !== null ? `${l.weight} lbs` : '--'}
         </div>
-        {m.latest.date && (
-          <div className="text-[10px] text-white/30 mt-0.5">{timeAgo(m.latest.date)}</div>
+        {l.date && (
+          <div className="text-[10px] text-white/30 mt-0.5">{timeAgo(l.date)}</div>
         )}
       </div>
 
       <WeightChart history={m.history} />
 
       <div className="space-y-1.5">
-        <CompositionBar label="Body Fat" value={m.latest.fatRatio} max={50} color="#fb923c" />
-        <CompositionBar label="Muscle" value={m.latest.muscleMass !== null && m.latest.weight && m.latest.weight > 0 ? Math.round((m.latest.muscleMass / m.latest.weight) * 100) : null} max={100} color="#6366f1" />
-        <CompositionBar label="Bone" value={m.latest.boneMass !== null && m.latest.weight && m.latest.weight > 0 ? Math.round((m.latest.boneMass / m.latest.weight) * 100) : null} max={20} color="#94a3b8" />
-        <CompositionBar label="Hydration" value={m.latest.hydration} max={100} color="#38bdf8" />
+        <CompositionBar label="Body Fat" value={l.fatRatio} max={50} color="#fb923c" />
+        <CompositionBar label="Muscle" value={l.muscleMass !== null && l.weight && l.weight > 0 ? Math.round((l.muscleMass / l.weight) * 100) : null} max={100} color="#6366f1" />
+        <CompositionBar label="Bone" value={l.boneMass !== null && l.weight && l.weight > 0 ? Math.round((l.boneMass / l.weight) * 100) : null} max={20} color="#94a3b8" />
+        <CompositionBar label="Hydration" value={l.hydration} max={100} color="#38bdf8" />
+      </div>
+
+      {/* Vitals section */}
+      <div className="space-y-1 pt-1 border-t border-white/5">
+        <div className="text-[9px] text-white/20 uppercase tracking-wider mb-1.5">Vitals</div>
+        {l.systolic !== null && l.diastolic !== null ? (
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] text-white/40">Blood Pressure</span>
+            <span className="text-[10px] font-mono text-white/60">{l.systolic}/{l.diastolic} mmHg</span>
+          </div>
+        ) : (
+          <MetricRow label="Blood Pressure" value={null} />
+        )}
+        <MetricRow label="Heart Rate" value={l.heartRate} unit=" bpm" color="#ef4444" />
+        <MetricRow label="SpO2" value={l.spo2} unit="%" color="#38bdf8" />
+        <MetricRow label="Body Temp" value={l.bodyTemp} unit="°F" color="#fb923c" />
+        <MetricRow label="Skin Temp" value={l.skinTemp} unit="°F" />
+        <MetricRow label="Pulse Wave" value={l.pulseWaveVelocity} unit=" m/s" />
+        <MetricRow label="VO2max" value={l.vo2max} unit=" ml/min/kg" color="#22c55e" />
+        <MetricRow label="Vascular Age" value={l.vascularAge} unit=" yrs" />
       </div>
     </div>
   );
 }
 
-// Sleep mode
+// Sleep mode: comprehensive sleep data
 function SleepView({ data }: { data: WithingsData }) {
   const s = data.sleep?.lastNight;
   if (!s) return <div className="p-4 text-center text-white/30 text-xs">No sleep data</div>;
 
   const scoreColor = (s.sleepScore ?? 0) >= 80 ? '#22c55e' : (s.sleepScore ?? 0) >= 60 ? '#eab308' : '#ef4444';
+  const effColor = (s.sleepEfficiency ?? 0) >= 85 ? '#22c55e' : (s.sleepEfficiency ?? 0) >= 75 ? '#eab308' : '#ef4444';
 
   return (
     <div className="p-3 space-y-3 overflow-y-auto h-full">
-      <div className="text-center">
-        <div className="text-4xl font-bold" style={{ color: scoreColor }}>
-          {s.sleepScore ?? '--'}
+      {/* Score and efficiency header */}
+      <div className="flex items-center justify-center gap-6">
+        <div className="text-center">
+          <div className="text-3xl font-bold" style={{ color: scoreColor }}>
+            {s.sleepScore ?? '--'}
+          </div>
+          <div className="text-[9px] text-white/30">Score</div>
         </div>
-        <div className="text-[10px] text-white/30">Sleep Score</div>
-      </div>
-
-      <SleepBar data={s} />
-
-      <div className="text-center text-sm text-white/60">
-        Total: {formatDuration(s.totalSleep)}
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <div>
-          <div className="text-xs text-white/60 font-mono">{s.hrAvg ?? '--'}</div>
-          <div className="text-[9px] text-white/30">HR avg</div>
-        </div>
-        <div>
-          <div className="text-xs text-white/60 font-mono">{s.hrMin ?? '--'}</div>
-          <div className="text-[9px] text-white/30">HR min</div>
-        </div>
-        <div>
-          <div className="text-xs text-white/60 font-mono">{s.rrAvg ?? '--'}</div>
-          <div className="text-[9px] text-white/30">RR avg</div>
+        <div className="w-px h-10 bg-white/10" />
+        <div className="text-center">
+          <div className="text-2xl font-bold" style={{ color: effColor }}>
+            {s.sleepEfficiency !== null ? `${Math.round(s.sleepEfficiency)}%` : '--'}
+          </div>
+          <div className="text-[9px] text-white/30">Efficiency</div>
         </div>
       </div>
+
+      {/* Sleep stages */}
+      <SleepStagesBar data={s} />
+
+      {/* Duration metrics */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] text-white/40">Total Sleep</span>
+          <span className="text-[10px] font-mono text-white/60">{formatDuration(s.totalSleep)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] text-white/40">In Bed</span>
+          <span className="text-[10px] font-mono text-white/60">{formatDuration(s.timeInBed)}</span>
+        </div>
+      </div>
+
+      {/* Timing */}
+      <div className="space-y-0.5 pt-1 border-t border-white/5">
+        <div className="text-[9px] text-white/20 uppercase tracking-wider mb-1">Timing</div>
+        <MetricRow label="Fell asleep in" value={s.sleepLatency !== null ? Math.round(s.sleepLatency / 60) : null} unit=" min" />
+        <MetricRow label="Wakeup latency" value={s.wakeupLatency !== null ? Math.round(s.wakeupLatency / 60) : null} unit=" min" />
+        <MetricRow label="Wake count" value={s.wakeupCount} unit="x" />
+        <MetricRow label="Awake duration" value={s.wakeDuration !== null ? Math.round(s.wakeDuration / 60) : null} unit=" min" color="#ef4444" />
+        <MetricRow label="Out of bed" value={s.outOfBedCount} unit="x" />
+      </div>
+
+      {/* Heart & Respiratory */}
+      <div className="space-y-0.5 pt-1 border-t border-white/5">
+        <div className="text-[9px] text-white/20 uppercase tracking-wider mb-1">Heart & Breathing</div>
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] text-white/40">Heart Rate</span>
+          <span className="text-[10px] font-mono text-white/60">
+            {s.hrMin ?? '--'} / <span style={{ color: '#ef4444' }}>{s.hrAvg ?? '--'}</span> / {s.hrMax ?? '--'} bpm
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] text-white/40">Respiratory</span>
+          <span className="text-[10px] font-mono text-white/60">
+            {s.rrMin ?? '--'} / {s.rrAvg ?? '--'} / {s.rrMax ?? '--'} br/m
+          </span>
+        </div>
+        {s.breathingDisturbances !== null && (
+          <MetricRow label="Breathing dist." value={Math.round(s.breathingDisturbances)} />
+        )}
+        {s.snoringEpisodes !== null && s.snoringEpisodes > 0 && (
+          <MetricRow label="Snoring episodes" value={s.snoringEpisodes} />
+        )}
+        {s.snoring !== null && s.snoring > 0 && (
+          <MetricRow label="Snoring duration" value={Math.round(s.snoring / 60)} unit=" min" />
+        )}
+        {s.apneaIndex !== null && (
+          <MetricRow label="Apnea index" value={Math.round(s.apneaIndex * 10) / 10} />
+        )}
+      </div>
+
+      {/* REM detail */}
+      {s.remEpisodes !== null && (
+        <div className="text-[9px] text-white/20 text-center">
+          {s.remEpisodes} REM episodes
+        </div>
+      )}
 
       <div className="text-[9px] text-white/20 text-center">{s.date}</div>
     </div>
   );
 }
 
-// Activity mode
+// Activity intensity bar
+function IntensityBar({ soft, moderate, intense }: { soft: number; moderate: number; intense: number }) {
+  const total = soft + moderate + intense;
+  if (total === 0) return null;
+
+  const segments = [
+    { label: 'Light', value: soft, color: '#94a3b8' },
+    { label: 'Moderate', value: moderate, color: '#fb923c' },
+    { label: 'Intense', value: intense, color: '#ef4444' },
+  ];
+
+  return (
+    <div className="space-y-1.5">
+      <div className="h-2.5 rounded-full overflow-hidden flex">
+        {segments.map(s => (
+          <div
+            key={s.label}
+            style={{ width: `${(s.value / total) * 100}%`, backgroundColor: s.color }}
+            className="h-full"
+          />
+        ))}
+      </div>
+      <div className="flex gap-3 flex-wrap">
+        {segments.map(s => (
+          <div key={s.label} className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.color }} />
+            <span className="text-[9px] text-white/40">{s.label} {s.value}m</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// HR Zone bars
+function HRZoneBars({ zones }: { zones: [number, number, number, number] }) {
+  const max = Math.max(...zones, 1);
+  const labels = ['Rest', 'Light', 'Moderate', 'Intense'];
+  const colors = ['#94a3b8', '#22c55e', '#fb923c', '#ef4444'];
+
+  return (
+    <div className="space-y-1">
+      {zones.map((val, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="text-[9px] text-white/30 w-14 shrink-0">{labels[i]}</span>
+          <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${(val / max) * 100}%`, backgroundColor: colors[i] }} />
+          </div>
+          <span className="text-[9px] text-white/40 w-8 text-right font-mono">{val}s</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Activity mode: comprehensive activity data
 function ActivityView({ data }: { data: WithingsData }) {
   const a = data.activity?.today;
   if (!a) return <div className="p-4 text-center text-white/30 text-xs">No activity data</div>;
 
   const stepTarget = 10000;
   const stepPct = Math.min((a.steps / stepTarget) * 100, 100);
+  const hasHRZones = a.hrZone0 > 0 || a.hrZone1 > 0 || a.hrZone2 > 0 || a.hrZone3 > 0;
+  const hasIntensity = a.softMinutes > 0 || a.moderateMinutes > 0 || a.intenseMinutes > 0;
 
   return (
-    <div className="p-3 space-y-4 h-full flex flex-col justify-center">
+    <div className="p-3 space-y-3 overflow-y-auto h-full">
+      {/* Steps */}
       <div className="text-center">
         <div className="text-3xl font-bold text-white/90">{a.steps.toLocaleString()}</div>
         <div className="text-[10px] text-white/30">steps</div>
@@ -319,22 +499,45 @@ function ActivityView({ data }: { data: WithingsData }) {
         <div className="text-[9px] text-white/30 text-right">{stepPct.toFixed(0)}% of 10K goal</div>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <span className="text-[11px] text-white/40">Distance</span>
-          <span className="text-[11px] text-white/60 font-mono">{(a.distance / 1000).toFixed(1)} km</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-[11px] text-white/40">Calories</span>
-          <span className="text-[11px] text-white/60 font-mono">{a.calories.toLocaleString()} kcal</span>
-        </div>
-        {a.elevation > 0 && (
-          <div className="flex justify-between items-center">
-            <span className="text-[11px] text-white/40">Elevation</span>
-            <span className="text-[11px] text-white/60 font-mono">{a.elevation} m</span>
-          </div>
-        )}
+      {/* Core metrics */}
+      <div className="space-y-1">
+        <MetricRow label="Distance" value={a.distance > 0 ? Math.round(a.distance / 100) / 10 : null} unit=" km" />
+        <MetricRow label="Active Calories" value={a.calories > 0 ? a.calories : null} unit=" kcal" color="#fb923c" />
+        <MetricRow label="Total Calories" value={a.totalCalories > 0 ? a.totalCalories : null} unit=" kcal" />
+        {a.elevation > 0 && <MetricRow label="Elevation" value={a.elevation} unit=" m" />}
       </div>
+
+      {/* Activity intensity */}
+      {hasIntensity && (
+        <div className="pt-1 border-t border-white/5">
+          <div className="text-[9px] text-white/20 uppercase tracking-wider mb-1.5">Activity Intensity</div>
+          <IntensityBar soft={a.softMinutes} moderate={a.moderateMinutes} intense={a.intenseMinutes} />
+          <div className="text-[10px] text-white/40 text-center mt-1.5">
+            <span className="font-mono text-white/60">{a.activeMinutes}</span> active min
+          </div>
+        </div>
+      )}
+
+      {/* Heart rate */}
+      {a.hrAvg !== null && (
+        <div className="pt-1 border-t border-white/5">
+          <div className="text-[9px] text-white/20 uppercase tracking-wider mb-1">Heart Rate</div>
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] text-white/40">Min / Avg / Max</span>
+            <span className="text-[10px] font-mono text-white/60">
+              {a.hrMin ?? '--'} / <span style={{ color: '#ef4444' }}>{a.hrAvg}</span> / {a.hrMax ?? '--'} bpm
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* HR Zones */}
+      {hasHRZones && (
+        <div className="pt-1 border-t border-white/5">
+          <div className="text-[9px] text-white/20 uppercase tracking-wider mb-1.5">HR Zones</div>
+          <HRZoneBars zones={[a.hrZone0, a.hrZone1, a.hrZone2, a.hrZone3]} />
+        </div>
+      )}
     </div>
   );
 }

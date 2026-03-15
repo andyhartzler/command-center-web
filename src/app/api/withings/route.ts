@@ -114,6 +114,30 @@ interface MeasureGroup {
   measures: { type: number; value: number; unit: number }[];
 }
 
+// Withings measure type IDs
+const MEAS_TYPES = [
+  1,   // Weight (kg)
+  5,   // Fat Free Mass (kg)
+  6,   // Fat Ratio (%)
+  8,   // Fat Mass Weight (kg)
+  9,   // Diastolic BP (mmHg)
+  10,  // Systolic BP (mmHg)
+  11,  // Heart Pulse (bpm)
+  54,  // SpO2 (%)
+  71,  // Body Temperature (°C)
+  73,  // Skin Temperature (°C)
+  76,  // Muscle Mass (kg)
+  77,  // Hydration (%)
+  88,  // Bone Mass (kg)
+  91,  // Pulse Wave Velocity (m/s)
+  123, // VO2max (ml/min/kg)
+  155, // Vascular Age
+].join(',');
+
+function celsiusToF(c: number): number {
+  return Math.round(c * 9 / 5 + 32);
+}
+
 async function fetchMeasures(token: string) {
   const now = Math.floor(Date.now() / 1000);
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60;
@@ -122,7 +146,7 @@ async function fetchMeasures(token: string) {
     action: 'getmeas',
     startdate: thirtyDaysAgo.toString(),
     enddate: now.toString(),
-    meastypes: '1,5,6,8,9,10,11,54,76,77,88',
+    meastypes: MEAS_TYPES,
   });
 
   if (data.status !== 0) return null;
@@ -140,7 +164,6 @@ async function fetchMeasures(token: string) {
       if (!typeMap[m.type] || grp.date > typeMap[m.type].date) {
         typeMap[m.type] = { value: val, date: grp.date };
       }
-      // Collect weight history
       if (m.type === 1) {
         weightHistory.push({
           date: new Date(grp.date * 1000).toISOString().slice(0, 10),
@@ -172,6 +195,7 @@ async function fetchMeasures(token: string) {
       weight: get(1) !== null ? kgToLbs(get(1)!) : null,
       fatRatio: get(6),
       fatMass: get(8) !== null ? kgToLbs(get(8)!) : null,
+      fatFreeMass: get(5) !== null ? kgToLbs(get(5)!) : null,
       muscleMass: get(76) !== null ? kgToLbs(get(76)!) : null,
       boneMass: get(88) !== null ? kgToLbs(get(88)!) : null,
       hydration: get(77),
@@ -179,11 +203,26 @@ async function fetchMeasures(token: string) {
       systolic: get(10),
       diastolic: get(9),
       spo2: get(54),
+      bodyTemp: get(71) !== null ? celsiusToF(get(71)!) : null,
+      skinTemp: get(73) !== null ? celsiusToF(get(73)!) : null,
+      pulseWaveVelocity: get(91),
+      vo2max: get(123),
+      vascularAge: get(155),
       date: latestDate,
     },
     history,
   };
 }
+
+const SLEEP_FIELDS = [
+  'total_sleep_time', 'total_timeinbed', 'sleep_efficiency', 'sleep_latency',
+  'wakeup_latency', 'waso', 'deepsleepduration', 'lightsleepduration',
+  'remsleepduration', 'nb_rem_episodes', 'sleep_score',
+  'hr_average', 'hr_min', 'hr_max', 'rr_average', 'rr_min', 'rr_max',
+  'breathing_disturbances_intensity', 'snoring', 'snoringepisodecount',
+  'wakeupcount', 'wakeupduration', 'out_of_bed_count', 'night_events',
+  'apnea_hypopnea_index',
+].join(',');
 
 async function fetchSleep(token: string) {
   const today = new Date();
@@ -196,7 +235,7 @@ async function fetchSleep(token: string) {
     action: 'getsummary',
     startdateymd: fmt(yesterday),
     enddateymd: fmt(today),
-    data_fields: 'nb_rem_episodes,sleep_efficiency,sleep_latency,total_sleep_time,total_timeinbed,wakeup_latency,waso,deepsleepduration,lightsleepduration,remsleepduration,sleep_score,hr_average,hr_min,rr_average',
+    data_fields: SLEEP_FIELDS,
   });
 
   if (data.status !== 0) return null;
@@ -211,18 +250,41 @@ async function fetchSleep(token: string) {
   return {
     lastNight: {
       totalSleep: d.total_sleep_time ?? null,
+      timeInBed: d.total_timeinbed ?? null,
+      sleepEfficiency: d.sleep_efficiency ?? null,
+      sleepLatency: d.sleep_latency ?? null,
+      wakeupLatency: d.wakeup_latency ?? null,
       deepSleep: d.deepsleepduration ?? null,
       lightSleep: d.lightsleepduration ?? null,
       remSleep: d.remsleepduration ?? null,
       awake: d.waso ?? null,
+      remEpisodes: d.nb_rem_episodes ?? null,
       sleepScore: d.sleep_score ?? null,
+      wakeupCount: d.wakeupcount ?? null,
+      wakeDuration: d.wakeupduration ?? null,
+      outOfBedCount: d.out_of_bed_count ?? null,
       hrAvg: d.hr_average ?? null,
       hrMin: d.hr_min ?? null,
+      hrMax: d.hr_max ?? null,
       rrAvg: d.rr_average ?? null,
+      rrMin: d.rr_min ?? null,
+      rrMax: d.rr_max ?? null,
+      breathingDisturbances: d.breathing_disturbances_intensity ?? null,
+      snoring: d.snoring ?? null,
+      snoringEpisodes: d.snoringepisodecount ?? null,
+      nightEvents: d.night_events ?? null,
+      apneaIndex: d.apnea_hypopnea_index ?? null,
       date: night.date ?? fmt(yesterday),
     },
   };
 }
+
+const ACTIVITY_FIELDS = [
+  'steps', 'distance', 'elevation', 'calories', 'totalcalories',
+  'soft', 'moderate', 'intense', 'active',
+  'hr_average', 'hr_min', 'hr_max',
+  'hr_zone_0', 'hr_zone_1', 'hr_zone_2', 'hr_zone_3',
+].join(',');
 
 async function fetchActivity(token: string) {
   const today = new Date().toISOString().slice(0, 10);
@@ -231,7 +293,7 @@ async function fetchActivity(token: string) {
     action: 'getactivity',
     startdateymd: today,
     enddateymd: today,
-    data_fields: 'steps,distance,calories,elevation',
+    data_fields: ACTIVITY_FIELDS,
   });
 
   if (data.status !== 0) return null;
@@ -245,7 +307,19 @@ async function fetchActivity(token: string) {
       steps: a.steps ?? 0,
       distance: a.distance ? Math.round(a.distance) : 0,
       calories: a.calories ? Math.round(a.calories) : 0,
+      totalCalories: a.totalcalories ? Math.round(a.totalcalories) : 0,
       elevation: a.elevation ? Math.round(a.elevation) : 0,
+      softMinutes: a.soft ?? 0,
+      moderateMinutes: a.moderate ?? 0,
+      intenseMinutes: a.intense ?? 0,
+      activeMinutes: a.active ?? 0,
+      hrAvg: a.hr_average ?? null,
+      hrMin: a.hr_min ?? null,
+      hrMax: a.hr_max ?? null,
+      hrZone0: a.hr_zone_0 ?? 0,
+      hrZone1: a.hr_zone_1 ?? 0,
+      hrZone2: a.hr_zone_2 ?? 0,
+      hrZone3: a.hr_zone_3 ?? 0,
     },
   };
 }
