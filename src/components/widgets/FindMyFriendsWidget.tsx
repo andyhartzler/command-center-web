@@ -201,7 +201,6 @@ function MapMode({ friends, avatars, containerSize }: {
     for (const friend of mappable) {
       const coord = new mapkit.Coordinate(friend.lat, friend.lng);
       const avatarUrl = avatars[friend.handle];
-      const color = statusColor(friend.status);
 
       const annotation = new mapkit.Annotation(
         coord,
@@ -220,11 +219,6 @@ function MapMode({ friends, avatars, containerSize }: {
             placeholder.textContent = friend.name.charAt(0).toUpperCase();
             el.appendChild(placeholder);
           }
-
-          // Status dot
-          const dot = document.createElement('div');
-          dot.style.cssText = `position:absolute;bottom:0px;right:0px;width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);`;
-          el.appendChild(dot);
 
           // Name label below photo
           const label = document.createElement('div');
