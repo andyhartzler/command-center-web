@@ -60,8 +60,13 @@ function drawMoon(canvas: HTMLCanvasElement, phase: number, moonImg: HTMLImageEl
   // Phase shadow using pixel manipulation for smooth terminator
   const imageData = ctx.getImageData(0, 0, size, size);
   const data = imageData.data;
-  const sweep = Math.cos(phase * 2 * Math.PI);
   const isNewMoon = phase < 0.01 || phase > 0.99;
+  const isWaning = phase >= 0.5;
+  // For waxing: terminator sweeps from right edge (new) to left edge (full)
+  // For waning: terminator sweeps from right edge (full) to left edge (new)
+  const sweep = isWaning
+    ? Math.cos((phase - 0.5) * 2 * Math.PI)
+    : Math.cos(phase * 2 * Math.PI);
 
   for (let py = 0; py < size; py++) {
     const dy = py - cy;
@@ -79,7 +84,7 @@ function drawMoon(canvas: HTMLCanvasElement, phase: number, moonImg: HTMLImageEl
       let inShadow = false;
       if (isNewMoon) {
         inShadow = true;
-      } else if (phase < 0.5) {
+      } else if (!isWaning) {
         // Waxing: shadow on the left (right side lit)
         inShadow = px < terminatorX;
       } else {
