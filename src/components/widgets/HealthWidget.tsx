@@ -544,8 +544,6 @@ function SleepView({ data, size }: { data: WithingsData; size: Size }) {
         )}
       </div>
 
-      {/* Date footer */}
-      <div className="text-[8px] text-white/15 text-center shrink-0">{s.date}</div>
     </div>
   );
 }
