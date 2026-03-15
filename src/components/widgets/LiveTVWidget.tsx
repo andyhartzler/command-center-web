@@ -74,7 +74,6 @@ function buildPlutoUrl(channelId: string): string {
 
 // URLs from these domains have proper CORS headers and can be played directly
 const CORS_SAFE_DOMAINS = [
-  'pluto.tv', 'prd.pluto.tv',
   'akamaized.net', 'akamaihd.net',
   'cbsnews.akamaized.net',
   'uplynk.com',

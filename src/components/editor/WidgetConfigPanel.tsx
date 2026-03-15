@@ -1035,54 +1035,97 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
 
 // --- Live TV Channel Picker ---
 
-const LIVETV_CHANNELS: { name: string; url: string; resolver?: string; callsign: string }[] = [
-  { name: 'KSHB 41 (NBC)', url: '', resolver: 'kshb', callsign: 'KSHB' },
-  { name: 'KMBC 9 (ABC)', url: '', resolver: 'kmbc', callsign: 'KMBC' },
-  { name: 'KCTV5 (CBS)', url: 'https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00312-graytelevisioni-kctv5news-vizious/playlist.m3u8', callsign: 'KCTV5' },
-  { name: 'WDAF FOX 4', url: '', resolver: 'wdaf', callsign: 'FOX4' },
-  { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', callsign: 'PBS' },
+interface PickerChannel { name: string; url: string; resolver?: string; callsign: string; category: string }
+
+const LIVETV_CHANNELS: PickerChannel[] = [
+  // KC Local
+  { name: 'KSHB 41 (NBC)', url: '', resolver: 'kshb', callsign: 'KSHB', category: 'KC Local' },
+  { name: 'KMBC 9 (ABC)', url: '', resolver: 'kmbc', callsign: 'KMBC', category: 'KC Local' },
+  { name: 'KCTV5 (CBS)', url: 'https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00312-graytelevisioni-kctv5news-vizious/playlist.m3u8', callsign: 'KCTV5', category: 'KC Local' },
+  { name: 'WDAF FOX 4', url: '', resolver: 'wdaf', callsign: 'FOX4', category: 'KC Local' },
+  { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', callsign: 'PBS', category: 'KC Local' },
+  // US News (use channel name to match widget ALL_CHANNELS — url is empty for pluto resolver channels)
+  { name: 'CNN', url: '', callsign: 'CNN', category: 'US News' },
+  { name: 'Fox News', url: '', callsign: 'FOX', category: 'US News' },
+  { name: 'MSNBC', url: '', callsign: 'MSNBC', category: 'US News' },
+  { name: 'ABC News Live', url: 'https://aegis-cloudfront-1.tubi.video/d6cbb0de-68e4-4f3b-82f9-bf5d526e0bde/index.m3u8', callsign: 'ABC', category: 'US News' },
+  { name: 'CBS News', url: 'https://cbsnews.akamaized.net/hls/live/2020607/cbsnlineup_8/master.m3u8', callsign: 'CBS', category: 'US News' },
+  { name: 'NBC News NOW', url: 'https://xumo-drct-nbcnn-ir8ze.fast.nbcuni.com/live/master.m3u8', callsign: 'NBC', category: 'US News' },
+  { name: 'Bloomberg', url: 'https://bloomberg.com/media-manifest/streams/us.m3u8', callsign: 'BBG', category: 'US News' },
+  { name: 'Fox Weather', url: 'https://247wlive.foxweather.com/stream/index.m3u8', callsign: 'FXWX', category: 'US News' },
+  { name: 'Scripps News', url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8', callsign: 'SCRP', category: 'US News' },
+  { name: 'Newsmax', url: 'https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8', callsign: 'NMAX', category: 'US News' },
+  { name: 'CNBC', url: '', callsign: 'CNBC', category: 'US News' },
+  { name: 'USA Today', url: '', callsign: 'USAT', category: 'US News' },
+  { name: 'Reuters', url: '', callsign: 'REUT', category: 'US News' },
+  // World News
+  { name: 'BBC News', url: 'https://pb-iiczlgfysam0q.akamaized.net/v1/amcnetworks_bbcnews_1/samsungheadend_us/latest/main/hls/playlist.m3u8', callsign: 'BBC', category: 'World News' },
+  { name: 'Al Jazeera', url: 'https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8', callsign: 'AJE', category: 'World News' },
+  { name: 'DW News', url: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', callsign: 'DW', category: 'World News' },
+  { name: 'Sky News UK', url: 'https://ythls.armelin.one/channel/UCoMdktPbSTixAyNGwb-UYkQ.m3u8', callsign: 'SKY', category: 'World News' },
+  { name: 'France 24', url: 'https://ythls.armelin.one/channel/UCQfwfsi5VrQ8yKZ-UWmAEFg.m3u8', callsign: 'F24', category: 'World News' },
+  { name: 'CGTN', url: 'https://news.cgtn.com/resource/live/english/cgtn-news.m3u8', callsign: 'CGTN', category: 'World News' },
+  // Sports
+  { name: 'ESPN (CBS Sports HQ)', url: '', callsign: 'ESPN', category: 'Sports' },
+  { name: 'Fox Sports', url: '', callsign: 'FS1', category: 'Sports' },
+  { name: 'NFL Channel', url: '', callsign: 'NFL', category: 'Sports' },
+  { name: 'beIN SPORTS XTRA', url: '', callsign: 'beIN', category: 'Sports' },
+  { name: 'PGA Tour', url: '', callsign: 'PGA', category: 'Sports' },
 ];
 
 function LiveTVChannelPicker({ selectedName, onSelect }: {
   selectedName: string;
   onSelect: (name: string, url: string) => void;
 }) {
+  // Group channels by category
+  const categories: Record<string, PickerChannel[]> = {};
+  for (const ch of LIVETV_CHANNELS) {
+    if (!categories[ch.category]) categories[ch.category] = [];
+    categories[ch.category].push(ch);
+  }
+
   return (
-    <div className="space-y-1">
-      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider mb-1">KC Local Channels</div>
-      {LIVETV_CHANNELS.map(ch => {
-        const isActive = selectedName === ch.name;
-        return (
-          <button
-            key={ch.name}
-            onClick={() => onSelect(ch.name, ch.url)}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left ${
-              isActive
-                ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30'
-                : 'bg-white/[0.02] border border-white/[0.04] hover:bg-white/5'
-            }`}
-          >
-            <Radio
-              size={11}
-              className={isActive ? 'text-red-400 shrink-0' : 'text-white/20 shrink-0'}
-            />
-            <div className="flex-1 min-w-0">
-              <div className={`text-xs font-medium truncate ${isActive ? 'text-white/90' : 'text-white/60'}`}>
-                {ch.name}
-              </div>
-            </div>
-            <span className={`text-[9px] font-bold font-mono shrink-0 ${isActive ? 'text-[#6b8aab]' : 'text-white/20'}`}>
-              {ch.callsign}
-            </span>
-            {isActive && (
-              <span className="relative flex h-1.5 w-1.5 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
-              </span>
-            )}
-          </button>
-        );
-      })}
+    <div className="space-y-2">
+      {Object.entries(categories).map(([cat, channels]) => (
+        <div key={cat}>
+          <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider mb-1">{cat}</div>
+          <div className="space-y-1">
+            {channels.map(ch => {
+              const isActive = selectedName === ch.name;
+              return (
+                <button
+                  key={ch.name}
+                  onClick={() => onSelect(ch.name, ch.url)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left ${
+                    isActive
+                      ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30'
+                      : 'bg-white/[0.02] border border-white/[0.04] hover:bg-white/5'
+                  }`}
+                >
+                  <Radio
+                    size={11}
+                    className={isActive ? 'text-red-400 shrink-0' : 'text-white/20 shrink-0'}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-xs font-medium truncate ${isActive ? 'text-white/90' : 'text-white/60'}`}>
+                      {ch.name}
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-bold font-mono shrink-0 ${isActive ? 'text-[#6b8aab]' : 'text-white/20'}`}>
+                    {ch.callsign}
+                  </span>
+                  {isActive && (
+                    <span className="relative flex h-1.5 w-1.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
