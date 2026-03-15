@@ -290,6 +290,42 @@ function ConfigNumberField({ label, value, onChange, min, max, step }: {
   );
 }
 
+function WithingsConnectionStatus() {
+  const [connected, setConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch('/api/withings?action=status')
+      .then(r => r.json())
+      .then(data => setConnected(!!data.connected))
+      .catch(() => setConnected(false));
+  }, []);
+
+  if (connected === null) {
+    return <div className="text-[10px] text-white/20">Checking connection...</div>;
+  }
+
+  if (connected) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-green-500" />
+        <span className="text-[11px] text-white/50">Withings Connected</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-2 h-2 rounded-full bg-red-500" />
+      <button
+        onClick={() => window.open('/api/withings/auth', '_blank')}
+        className="text-[11px] text-[#f472b6] hover:text-[#f472b6]/80"
+      >
+        Connect Withings
+      </button>
+    </div>
+  );
+}
+
 function EditableList({ label, items, onChange, placeholder }: {
   label: string;
   items: string[];
@@ -1019,8 +1055,45 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
         </ConfigSection>
       );
 
-    case 'reminders':
     case 'health':
+      return (
+        <ConfigSection title="Health Settings">
+          <div className="space-y-3">
+            {/* Display mode selector */}
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-white/60">Display Mode</span>
+              <div className="flex gap-1">
+                {(['summary', 'weight', 'sleep', 'activity'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => updateConfig({ displayMode: mode })}
+                    className={`px-2 py-0.5 text-[10px] rounded ${
+                      (cfg.displayMode as string || 'summary') === mode
+                        ? 'bg-[#f472b6]/30 text-[#f472b6] font-medium'
+                        : 'bg-white/5 text-white/40 hover:bg-white/10'
+                    }`}
+                  >
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Refresh interval */}
+            <ConfigNumberField
+              label="Refresh (sec)"
+              value={(cfg.refreshInterval as number) || 300}
+              onChange={v => updateConfig({ refreshInterval: v })}
+              min={60} max={600} step={30}
+            />
+
+            {/* Connection status */}
+            <WithingsConnectionStatus />
+          </div>
+        </ConfigSection>
+      );
+
+    case 'reminders':
     case 'homeKit':
       return (
         <ConfigSection title="Settings">

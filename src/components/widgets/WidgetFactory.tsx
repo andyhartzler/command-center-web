@@ -26,6 +26,7 @@ const CalendarWidget = dynamic(() => import('./CalendarWidget').then(m => ({ def
 const AirQualityWidget = dynamic(() => import('./AirQualityWidget').then(m => ({ default: m.AirQualityWidget })), { ssr: false });
 const AppleMusicWidget = dynamic(() => import('./AppleMusicWidget').then(m => ({ default: m.AppleMusicWidget })), { ssr: false });
 const FindMyFriendsWidget = dynamic(() => import('./FindMyFriendsWidget').then(m => ({ default: m.FindMyFriendsWidget })), { ssr: false });
+const HealthWidget = dynamic(() => import('./HealthWidget').then(m => ({ default: m.HealthWidget })), { ssr: false });
 const PlaceholderWidget = dynamic(() => import('./PlaceholderWidget').then(m => ({ default: m.PlaceholderWidget })), { ssr: false });
 
 interface WidgetFactoryProps {
@@ -60,8 +61,8 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
     case 'airQuality': return <AirQualityWidget config={widgetConfig.config} style={style} />;
     case 'appleMusic': return <AppleMusicWidget config={widgetConfig.config} style={style} />;
     case 'findMyFriends': return <FindMyFriendsWidget config={widgetConfig.config} style={style} />;
+    case 'health': return <HealthWidget config={widgetConfig.config} style={style} />;
     case 'reminders':
-    case 'health':
     case 'homeKit': {
       const meta = WIDGET_TYPE_META[widgetConfig.type];
       return <PlaceholderWidget name={meta.displayName} icon={meta.icon} color={meta.color} />;

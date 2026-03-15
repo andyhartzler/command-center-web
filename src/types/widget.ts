@@ -171,6 +171,11 @@ export interface AirQualityConfig {
   longitude: number;
 }
 
+export interface HealthConfig {
+  displayMode: 'summary' | 'weight' | 'sleep' | 'activity';
+  refreshInterval: number;
+}
+
 export interface FindMyFriendsConfig {
   trackedHandles: string[];
   displayMode: 'map' | 'pins' | 'list';
@@ -200,7 +205,7 @@ export type WidgetConfig =
   | { type: 'aircraftTracker'; config: AircraftTrackerConfig }
   | { type: 'calendar'; config: { feeds?: { name: string; url: string }[] } }
   | { type: 'reminders'; config: Record<string, never> }
-  | { type: 'health'; config: Record<string, never> }
+  | { type: 'health'; config: HealthConfig }
   | { type: 'homeKit'; config: Record<string, never> }
   | { type: 'airQuality'; config: AirQualityConfig }
   | { type: 'appleMusic'; config: Record<string, never> }
@@ -263,7 +268,7 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   aircraftTracker: { displayName: 'Aircraft Tracker', category: 'World Monitor', icon: 'radar', color: '#a78bfa', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   faaDelays: { displayName: 'FAA Delays', category: 'World Monitor', icon: 'plane-landing', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#fb923c', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  health: { displayName: 'Health', category: 'System', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
+  health: { displayName: 'Health', category: 'Productivity', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
   airQuality: { displayName: 'Air Quality', category: 'Time & Location', icon: 'wind', color: '#34d399', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'] },
   appleMusic: { displayName: 'Top Charts', category: 'Media', icon: 'music', color: '#fa2d48', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
@@ -294,7 +299,7 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'liveTV': return { type: 'liveTV', config: { selectedChannelURL: '', selectedChannelName: '', isMuted: true, showIPTV: false } };
     case 'calendar': return { type: 'calendar', config: { feeds: [] } };
     case 'reminders': return { type: 'reminders', config: {} };
-    case 'health': return { type: 'health', config: {} };
+    case 'health': return { type: 'health', config: { displayMode: 'summary', refreshInterval: 300 } };
     case 'homeKit': return { type: 'homeKit', config: {} };
     case 'airQuality': return { type: 'airQuality', config: { latitude: 39.0997, longitude: -94.5786 } };
     case 'appleMusic': return { type: 'appleMusic', config: {} };
