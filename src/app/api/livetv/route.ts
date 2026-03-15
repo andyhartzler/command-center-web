@@ -20,6 +20,13 @@ async function proxyStream(url: string): Promise<NextResponse> {
       if (host.includes('usnlive.com')) {
         headers['Referer'] = 'https://usnewson.com/';
         headers['Origin'] = 'https://usnewson.com';
+      } else if (host.includes('livenewsplay.com')) {
+        headers['Referer'] = 'https://www.newslive.com/';
+        headers['Origin'] = 'https://www.newslive.com';
+      } else if (host.includes('jmp2.uk')) {
+        headers['Referer'] = 'https://jmp2.uk/';
+      } else if (host.includes('enhdtv.com')) {
+        headers['Referer'] = 'https://www.enhdtv.com/';
       }
     } catch { /* ignore */ }
 
@@ -37,6 +44,10 @@ async function proxyStream(url: string): Promise<NextResponse> {
       manifest = manifest.replace(/^(?!#)(?!https?:\/\/)(.+)$/gm, (match) => {
         const absolute = match.startsWith('/') ? new URL(match, url).href : baseUrl + match;
         return `/api/livetv?proxy=${encodeURIComponent(absolute)}`;
+      });
+      // Rewrite AES-128 key URIs to go through proxy (for CORS)
+      manifest = manifest.replace(/URI="(https?:\/\/[^"]+)"/g, (_match, keyUrl) => {
+        return `URI="/api/livetv?proxy=${encodeURIComponent(keyUrl)}"`;
       });
       return new NextResponse(manifest, {
         headers: {

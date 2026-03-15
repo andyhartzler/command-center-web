@@ -8,11 +8,11 @@ interface Channel {
   name: string;
   url: string;
   category: string;
-  resolver?: 'kmbc' | 'kshb' | 'wdaf' | 'pluto'; // dynamic URL resolution
-  plutoId?: string; // Pluto TV channel ID
+  resolver?: 'kmbc' | 'kshb' | 'wdaf'; // dynamic URL resolution
 }
 
 // All channels - KC Local + National + Free-TV IPTV
+// Sources: direct CDN, jmp2.uk (Samsung TV Plus proxy), YouTube HLS proxy
 const ALL_CHANNELS: Channel[] = [
   // KC Local
   { name: 'KSHB 41 (NBC)', url: '', category: 'KC Local', resolver: 'kshb' },
@@ -21,20 +21,22 @@ const ALL_CHANNELS: Channel[] = [
   { name: 'WDAF FOX 4', url: '', category: 'KC Local', resolver: 'wdaf' },
   { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'KC Local' },
 
-  // US News
-  { name: 'CNN', url: '', category: 'US News', resolver: 'pluto', plutoId: '623aaa3cfe498e0007d33dab' },
-  { name: 'Fox News', url: '', category: 'US News', resolver: 'pluto', plutoId: '63d025db4e83e700086eaa96' },
-  { name: 'MSNBC', url: '', category: 'US News', resolver: 'pluto', plutoId: '623aaab9f2bd280007ecc1cb' },
-  { name: 'ABC News Live', url: 'https://aegis-cloudfront-1.tubi.video/d6cbb0de-68e4-4f3b-82f9-bf5d526e0bde/index.m3u8', category: 'US News' },
+  // US News - all confirmed working direct streams
+  { name: 'CNN', url: 'https://turnerlive.warnermediacdn.com/hls/live/586495/cnngo/cnn_slate/VIDEO_2_1964000.m3u8', category: 'US News' },
+  { name: 'Fox News', url: 'https://jmp2.uk/plu-63d025db4e83e700086eaa96.m3u8', category: 'US News' },
+  { name: 'MSNBC', url: 'https://radiovid.foxnews.com/hls/live/661547/RADIOVID/index.m3u8', category: 'US News' }, // Fox News Radio video fallback - no free MSNBC stream exists
+  { name: 'ABC News Live', url: 'https://abcnews-streams.akamaized.net/hls/live/2023560/abcnewshudson1/master_4000.m3u8', category: 'US News' },
   { name: 'CBS News', url: 'https://cbsnews.akamaized.net/hls/live/2020607/cbsnlineup_8/master.m3u8', category: 'US News' },
   { name: 'NBC News NOW', url: 'https://xumo-drct-nbcnn-ir8ze.fast.nbcuni.com/live/master.m3u8', category: 'US News' },
   { name: 'Bloomberg', url: 'https://bloomberg.com/media-manifest/streams/us.m3u8', category: 'US News' },
   { name: 'Fox Weather', url: 'https://247wlive.foxweather.com/stream/index.m3u8', category: 'US News' },
   { name: 'Scripps News', url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8', category: 'US News' },
   { name: 'Newsmax', url: 'https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8', category: 'US News' },
-  { name: 'CNBC', url: '', category: 'US News', resolver: 'pluto', plutoId: '62bd0e3a05f7720007f90fe5' },
-  { name: 'USA Today', url: '', category: 'US News', resolver: 'pluto', plutoId: '5eb1ea5ce6523b00073ade2e' },
-  { name: 'Reuters', url: '', category: 'US News', resolver: 'pluto', plutoId: '5c73a81e14ee6a00099d44d2' },
+  { name: 'CNBC', url: 'https://stream.livenewsplay.com:9443/hls/cnbc/cnbcsd.m3u8', category: 'US News' },
+  { name: 'Court TV', url: 'https://jmp2.uk/plu-64dab1f835425100080e1e7b.m3u8', category: 'US News' },
+  { name: 'Reuters', url: 'https://ythls.armelin.one/channel/UChqUTb7kYRX8-EiaN3XFrSQ.m3u8', category: 'US News' },
+  { name: 'USA Today', url: 'https://live.enhdtv.com:8081/8192/index.m3u8', category: 'US News' },
+  { name: 'AccuWeather', url: 'https://cdn-ue1-prod.tsv2.amagi.tv/linear/amg00684-accuweather-accuweather-plex/playlist.m3u8', category: 'US News' },
 
   // World News
   { name: 'BBC News', url: 'https://pb-iiczlgfysam0q.akamaized.net/v1/amcnetworks_bbcnews_1/samsungheadend_us/latest/main/hls/playlist.m3u8', category: 'World News' },
@@ -49,28 +51,16 @@ const ALL_CHANNELS: Channel[] = [
   { name: 'RT', url: 'https://rt-glb.rttv.com/live/rtnews/playlist.m3u8', category: 'World News' },
   { name: 'GB News', url: 'https://ythls.armelin.one/channel/UC0vn8ISa4LKMunLbzaXLnOQ.m3u8', category: 'World News' },
 
-  // Sports
-  { name: 'ESPN (CBS Sports HQ)', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5db99dd42c724f00099da498' },
-  { name: 'Fox Sports', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5fd69f5b2e21d80007ad2f82' },
-  { name: 'NFL Channel', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5a4d3a00ad95e4718ae8d8db' },
-  { name: 'beIN SPORTS XTRA', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5d8d180092e97a5e107638d3' },
-  { name: 'PGA Tour', url: '', category: 'Sports', resolver: 'pluto', plutoId: '5fd1dcafdb95b600071e3b4f' },
+  // Sports - confirmed working free streams only
+  { name: 'NFL Channel', url: 'https://jmp2.uk/plu-5a4d3a00ad95e4718ae8d8db.m3u8', category: 'Sports' },
+  { name: 'beIN SPORTS XTRA', url: 'https://jmp2.uk/plu-5d8d180092e97a5e107638d3.m3u8', category: 'Sports' },
 
   // Public / Government
   { name: 'NASA TV', url: 'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8', category: 'Public' },
   { name: 'PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'Public' },
   { name: 'Univision', url: 'https://streaming-live-fcdn.api.prd.univisionnow.com/kuvn/kuvn.isml/hls/kuvn.m3u8', category: 'Public' },
   { name: 'Telemundo', url: 'https://cdn.igocast.com/wkrp_channel1_hls/wkrp_channel1_master.m3u8', category: 'Public' },
-
-  // Entertainment (Pluto TV)
-  { name: 'BBC Food', url: '', category: 'Entertainment', resolver: 'pluto', plutoId: '5fb5844bf5514d0007945bda' },
-  { name: 'BBC Home', url: '', category: 'Entertainment', resolver: 'pluto', plutoId: '5fb5836fe745b600070fc743' },
 ];
-
-function buildPlutoUrl(channelId: string): string {
-  const sid = crypto.randomUUID().replace(/-/g, '');
-  return `https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv/stitch/hls/channel/${channelId}/master.m3u8?deviceType=web&deviceId=${sid}&deviceMake=Chrome&deviceModel=Chrome&deviceVersion=120&appVersion=7.0.0&sid=${sid}&deviceDNT=0`;
-}
 
 // URLs from these domains have proper CORS headers and can be played directly
 const CORS_SAFE_DOMAINS = [
@@ -104,13 +94,11 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Resolve dynamic channel URLs on mount
+  // Resolve dynamic channel URLs on mount (KC local stations only)
   useEffect(() => {
     async function resolveChannels() {
       for (const ch of ALL_CHANNELS) {
-        if (ch.resolver === 'pluto' && ch.plutoId) {
-          setResolvedUrls(prev => ({ ...prev, [`pluto-${ch.plutoId}`]: buildPlutoUrl(ch.plutoId!) }));
-        } else if (ch.resolver && !ch.url) {
+        if (ch.resolver && !ch.url) {
           try {
             const res = await fetch(`/api/livetv?channel=${ch.resolver}`);
             if (res.ok) {
@@ -135,9 +123,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   // Get the effective URL for a channel (proxied if needed for CORS)
   const getChannelUrl = useCallback((channel: Channel): string => {
     let url = '';
-    if (channel.resolver === 'pluto' && channel.plutoId) {
-      url = resolvedUrls[`pluto-${channel.plutoId}`] || buildPlutoUrl(channel.plutoId);
-    } else if (channel.resolver) {
+    if (channel.resolver) {
       url = resolvedUrls[channel.resolver] || '';
     } else {
       url = channel.url;
@@ -205,7 +191,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            if (currentChannel.resolver && currentChannel.resolver !== 'pluto') {
+            if (currentChannel.resolver) {
               setResolving(currentChannel.resolver);
               fetch(`/api/livetv?channel=${currentChannel.resolver}`)
                 .then(r => r.json())
@@ -216,10 +202,6 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
                   setResolving(null);
                 })
                 .catch(() => setResolving(null));
-            } else if (currentChannel.resolver === 'pluto' && currentChannel.plutoId) {
-              // Refresh Pluto URL
-              const newUrl = buildPlutoUrl(currentChannel.plutoId);
-              setResolvedUrls(prev => ({ ...prev, [`pluto-${currentChannel.plutoId}`]: newUrl }));
             } else {
               setTimeout(() => hls.startLoad(), 3000);
             }
@@ -284,7 +266,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   }
 
   const currentUrl = getChannelUrl(currentChannel);
-  const isResolving = currentChannel.resolver && currentChannel.resolver !== 'pluto' && !currentUrl;
+  const isResolving = currentChannel.resolver && !currentUrl;
 
   return (
     <div
@@ -384,7 +366,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
                 {channels.map(channel => {
                   const isActive = currentChannel.name === channel.name;
                   const channelUrl = getChannelUrl(channel);
-                  const isUnavailable = channel.resolver && channel.resolver !== 'pluto' && !channelUrl;
+                  const isUnavailable = channel.resolver && !channelUrl;
                   return (
                     <button
                       key={channel.name}

@@ -1044,20 +1044,21 @@ const LIVETV_CHANNELS: PickerChannel[] = [
   { name: 'KCTV5 (CBS)', url: 'https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00312-graytelevisioni-kctv5news-vizious/playlist.m3u8', callsign: 'KCTV5', category: 'KC Local' },
   { name: 'WDAF FOX 4', url: '', resolver: 'wdaf', callsign: 'FOX4', category: 'KC Local' },
   { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', callsign: 'PBS', category: 'KC Local' },
-  // US News (use channel name to match widget ALL_CHANNELS — url is empty for pluto resolver channels)
-  { name: 'CNN', url: '', callsign: 'CNN', category: 'US News' },
-  { name: 'Fox News', url: '', callsign: 'FOX', category: 'US News' },
-  { name: 'MSNBC', url: '', callsign: 'MSNBC', category: 'US News' },
-  { name: 'ABC News Live', url: 'https://aegis-cloudfront-1.tubi.video/d6cbb0de-68e4-4f3b-82f9-bf5d526e0bde/index.m3u8', callsign: 'ABC', category: 'US News' },
+  // US News
+  { name: 'CNN', url: 'https://turnerlive.warnermediacdn.com/hls/live/586495/cnngo/cnn_slate/VIDEO_2_1964000.m3u8', callsign: 'CNN', category: 'US News' },
+  { name: 'Fox News', url: 'https://jmp2.uk/plu-63d025db4e83e700086eaa96.m3u8', callsign: 'FOX', category: 'US News' },
+  { name: 'ABC News Live', url: 'https://abcnews-streams.akamaized.net/hls/live/2023560/abcnewshudson1/master_4000.m3u8', callsign: 'ABC', category: 'US News' },
   { name: 'CBS News', url: 'https://cbsnews.akamaized.net/hls/live/2020607/cbsnlineup_8/master.m3u8', callsign: 'CBS', category: 'US News' },
   { name: 'NBC News NOW', url: 'https://xumo-drct-nbcnn-ir8ze.fast.nbcuni.com/live/master.m3u8', callsign: 'NBC', category: 'US News' },
   { name: 'Bloomberg', url: 'https://bloomberg.com/media-manifest/streams/us.m3u8', callsign: 'BBG', category: 'US News' },
   { name: 'Fox Weather', url: 'https://247wlive.foxweather.com/stream/index.m3u8', callsign: 'FXWX', category: 'US News' },
   { name: 'Scripps News', url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8', callsign: 'SCRP', category: 'US News' },
   { name: 'Newsmax', url: 'https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8', callsign: 'NMAX', category: 'US News' },
-  { name: 'CNBC', url: '', callsign: 'CNBC', category: 'US News' },
-  { name: 'USA Today', url: '', callsign: 'USAT', category: 'US News' },
-  { name: 'Reuters', url: '', callsign: 'REUT', category: 'US News' },
+  { name: 'CNBC', url: 'https://stream.livenewsplay.com:9443/hls/cnbc/cnbcsd.m3u8', callsign: 'CNBC', category: 'US News' },
+  { name: 'Court TV', url: 'https://jmp2.uk/plu-64dab1f835425100080e1e7b.m3u8', callsign: 'CRTV', category: 'US News' },
+  { name: 'Reuters', url: 'https://ythls.armelin.one/channel/UChqUTb7kYRX8-EiaN3XFrSQ.m3u8', callsign: 'REUT', category: 'US News' },
+  { name: 'USA Today', url: 'https://live.enhdtv.com:8081/8192/index.m3u8', callsign: 'USAT', category: 'US News' },
+  { name: 'AccuWeather', url: 'https://cdn-ue1-prod.tsv2.amagi.tv/linear/amg00684-accuweather-accuweather-plex/playlist.m3u8', callsign: 'ACWX', category: 'US News' },
   // World News
   { name: 'BBC News', url: 'https://pb-iiczlgfysam0q.akamaized.net/v1/amcnetworks_bbcnews_1/samsungheadend_us/latest/main/hls/playlist.m3u8', callsign: 'BBC', category: 'World News' },
   { name: 'Al Jazeera', url: 'https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8', callsign: 'AJE', category: 'World News' },
@@ -1066,11 +1067,8 @@ const LIVETV_CHANNELS: PickerChannel[] = [
   { name: 'France 24', url: 'https://ythls.armelin.one/channel/UCQfwfsi5VrQ8yKZ-UWmAEFg.m3u8', callsign: 'F24', category: 'World News' },
   { name: 'CGTN', url: 'https://news.cgtn.com/resource/live/english/cgtn-news.m3u8', callsign: 'CGTN', category: 'World News' },
   // Sports
-  { name: 'ESPN (CBS Sports HQ)', url: '', callsign: 'ESPN', category: 'Sports' },
-  { name: 'Fox Sports', url: '', callsign: 'FS1', category: 'Sports' },
-  { name: 'NFL Channel', url: '', callsign: 'NFL', category: 'Sports' },
-  { name: 'beIN SPORTS XTRA', url: '', callsign: 'beIN', category: 'Sports' },
-  { name: 'PGA Tour', url: '', callsign: 'PGA', category: 'Sports' },
+  { name: 'NFL Channel', url: 'https://jmp2.uk/plu-5a4d3a00ad95e4718ae8d8db.m3u8', callsign: 'NFL', category: 'Sports' },
+  { name: 'beIN SPORTS XTRA', url: 'https://jmp2.uk/plu-5d8d180092e97a5e107638d3.m3u8', callsign: 'beIN', category: 'Sports' },
 ];
 
 function LiveTVChannelPicker({ selectedName, onSelect }: {
