@@ -77,7 +77,7 @@ export function ConflictWidget({ config }: ConflictWidgetProps) {
         new mapkit.Coordinate(event.lat, event.lon),
         () => createPulsingElement(),
         {
-          anchorOffset: { x: 0, y: 0 },
+          anchorOffset: new DOMPoint(0, 0),
           callout: {
             calloutContentForAnnotation: () => {
               const el = document.createElement('div');

@@ -142,7 +142,7 @@ export function useAppleMap(
       },
       {
         data: opts.data,
-        anchorOffset: { x: 0, y: 0 },
+        anchorOffset: new DOMPoint(0, 0),
         callout: opts.popupHtml
           ? {
               calloutContentForAnnotation: () => {

@@ -99,7 +99,7 @@ export function AirTrafficWidget({ config }: AirTrafficWidgetProps) {
         new mapkit.Coordinate(ac.lat, ac.lon),
         () => createAircraftElement(ac.heading, color),
         {
-          anchorOffset: { x: 0, y: 0 },
+          anchorOffset: new DOMPoint(0, 0),
           callout: {
             calloutContentForAnnotation: () => {
               const el = document.createElement('div');

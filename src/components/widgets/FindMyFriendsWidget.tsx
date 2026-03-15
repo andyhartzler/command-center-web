@@ -231,7 +231,7 @@ function MapMode({ friends, avatars, containerSize }: {
 
           return el;
         },
-        { anchorOffset: { x: 0, y: -8 } }
+        { anchorOffset: new DOMPoint(0, -8) }
       );
 
       m.addAnnotation(annotation);

@@ -89,7 +89,7 @@ declare namespace mapkit {
     subtitle?: string;
     callout?: CalloutDelegate;
     animates?: boolean;
-    anchorOffset?: { x: number; y: number };
+    anchorOffset?: DOMPoint;
   }
 
   interface CalloutDelegate {
