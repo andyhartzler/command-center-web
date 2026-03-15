@@ -239,7 +239,10 @@ function MapMode({ friends, avatars }: {
       m.addAnnotation(annotation);
     }
 
-    // Auto-zoom to fit all friends with generous padding
+    // Set map padding so pins aren't hidden behind the bottom-left overlay
+    (m as any).padding = new (mapkit as any).Padding(40, 40, 100, 20);
+
+    // Auto-zoom to fit all friends with padding
     if (mappable.length > 1) {
       const lats = mappable.map(f => f.lat);
       const lngs = mappable.map(f => f.lng);
@@ -249,9 +252,8 @@ function MapMode({ friends, avatars }: {
       const maxLng = Math.max(...lngs);
       const cLat = (minLat + maxLat) / 2;
       const cLng = (minLng + maxLng) / 2;
-      // 2x padding so pins at edges aren't clipped
-      const latSpan = Math.max((maxLat - minLat) * 2.0, 0.08);
-      const lngSpan = Math.max((maxLng - minLng) * 2.0, 0.08);
+      const latSpan = Math.max((maxLat - minLat) * 1.5, 0.08);
+      const lngSpan = Math.max((maxLng - minLng) * 1.5, 0.08);
       m.setRegionAnimated(
         new mapkit.CoordinateRegion(
           new mapkit.Coordinate(cLat, cLng),

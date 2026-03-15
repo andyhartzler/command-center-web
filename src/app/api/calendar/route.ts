@@ -117,7 +117,8 @@ export async function GET(request: NextRequest) {
     const feedErrors: string[] = [];
 
     const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 86400000);
+    // Start of today (midnight local time on server, but ISO dates compared as UTC-safe)
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthsAhead = new Date(now.getTime() + 90 * 86400000);
 
     await Promise.all(
@@ -167,7 +168,7 @@ export async function GET(request: NextRequest) {
           // Filter to relevant date range
           for (const event of events) {
             const eventDate = new Date(event.start);
-            if (eventDate >= weekAgo && eventDate <= monthsAhead) {
+            if (eventDate >= startOfToday && eventDate <= monthsAhead) {
               allEvents.push(event);
             }
           }
