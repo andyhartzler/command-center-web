@@ -366,8 +366,8 @@ function SleepScoreArc({ score, radius }: { score: number | null; radius: number
       {fillD && <path d={fillD} fill="none" stroke={glowColor} strokeWidth={strokeWidth + 4} strokeLinecap="round" />}
       {/* Fill */}
       {fillD && <path d={fillD} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />}
-      {/* Score text */}
-      <text x={cx} y={cy - radius * 0.08} textAnchor="middle" dominantBaseline="central"
+      {/* Score text - positioned well above the label */}
+      <text x={cx} y={cy - radius * 0.25} textAnchor="middle" dominantBaseline="central"
         fill={score !== null ? color : 'rgba(255,255,255,0.2)'}
         fontSize={fontSize} fontWeight="700" fontFamily="system-ui, sans-serif">
         {score ?? '--'}
@@ -493,15 +493,15 @@ function SleepView({ data, size }: { data: WithingsData; size: Size }) {
     <div className="flex flex-col h-full p-2.5 gap-1.5 overflow-hidden">
 
       {/* Row 1: Score arc + total sleep + stage pills */}
-      <div className="flex items-center shrink-0" style={{ minHeight: compact ? 60 : 80 }}>
+      <div className="flex items-end shrink-0" style={{ minHeight: compact ? 70 : 100 }}>
         {/* Score arc */}
-        <div className="flex-shrink-0 flex items-center justify-center" style={{ width: arcRadius * 2 + 8 }}>
+        <div className="flex-shrink-0 flex items-end justify-center" style={{ width: arcRadius * 2 + 8 }}>
           <SleepScoreArc score={s.sleepScore} radius={arcRadius} />
         </div>
 
-        {/* Stage pills fill remaining width */}
-        <div className="flex-1 min-w-0">
-          <SleepStagePills data={s} height={pillHeight} />
+        {/* Stage pills fill remaining width, aligned to bottom so bars grow upward */}
+        <div className="flex-1 min-w-0 pb-0.5">
+          <SleepStagePills data={s} height={compact ? 60 : medium ? 85 : 70} />
         </div>
       </div>
 
