@@ -1014,6 +1014,26 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
         </ConfigSection>
       );
 
+    case 'uvIndex':
+      return (
+        <ConfigSection title="UV Index Settings">
+          <div className="space-y-2">
+            <ConfigNumberField
+              label="Latitude"
+              value={(cfg.latitude as number) || 39.0997}
+              onChange={v => updateConfig({ latitude: v })}
+              min={-90} max={90} step={0.01}
+            />
+            <ConfigNumberField
+              label="Longitude"
+              value={(cfg.longitude as number) || -94.5786}
+              onChange={v => updateConfig({ longitude: v })}
+              min={-180} max={180} step={0.01}
+            />
+          </div>
+        </ConfigSection>
+      );
+
     case 'findMyFriends':
       return (
         <ConfigSection title="Find My Settings">

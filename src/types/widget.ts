@@ -37,7 +37,8 @@ export type WidgetType =
   | 'homeKit'
   | 'airQuality'
   | 'appleMusic'
-  | 'findMyFriends';
+  | 'findMyFriends'
+  | 'uvIndex';
 
 export interface GridSize {
   columns: number;
@@ -176,6 +177,11 @@ export interface HealthConfig {
   refreshInterval: number;
 }
 
+export interface UVIndexConfig {
+  latitude: number;
+  longitude: number;
+}
+
 export interface FindMyFriendsConfig {
   trackedHandles: string[];
   displayMode: 'map' | 'pins' | 'list';
@@ -209,7 +215,8 @@ export type WidgetConfig =
   | { type: 'homeKit'; config: Record<string, never> }
   | { type: 'airQuality'; config: AirQualityConfig }
   | { type: 'appleMusic'; config: Record<string, never> }
-  | { type: 'findMyFriends'; config: FindMyFriendsConfig };
+  | { type: 'findMyFriends'; config: FindMyFriendsConfig }
+  | { type: 'uvIndex'; config: UVIndexConfig };
 
 export interface DashboardWidget {
   id: string;
@@ -273,6 +280,7 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   airQuality: { displayName: 'Air Quality', category: 'Time & Location', icon: 'wind', color: '#34d399', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'] },
   appleMusic: { displayName: 'Top Charts', category: 'Media', icon: 'music', color: '#fa2d48', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   findMyFriends: { displayName: 'Find My', category: 'Productivity', icon: 'map-pin', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide'] },
+  uvIndex: { displayName: 'UV Index', category: 'Time & Location', icon: 'sun', color: '#f59e0b', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'] },
 };
 
 export function defaultConfig(type: WidgetType): WidgetConfig {
@@ -304,5 +312,6 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'airQuality': return { type: 'airQuality', config: { latitude: 39.0997, longitude: -94.5786 } };
     case 'appleMusic': return { type: 'appleMusic', config: {} };
     case 'findMyFriends': return { type: 'findMyFriends', config: { trackedHandles: [], displayMode: 'map', refreshInterval: 180 } };
+    case 'uvIndex': return { type: 'uvIndex', config: { latitude: 39.0997, longitude: -94.5786 } };
   }
 }
