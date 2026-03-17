@@ -134,6 +134,23 @@ declare namespace mapkit {
     style?: Partial<OverlayStyle>;
   }
 
+  class Geocoder {
+    constructor(options?: { language?: string });
+    reverseLookup(
+      coordinate: Coordinate,
+      callback: (error: Error | null, data: { results: GeocoderResult[] }) => void,
+    ): void;
+  }
+
+  interface GeocoderResult {
+    name?: string;
+    locality?: string;
+    administrativeArea?: string;
+    country?: string;
+    formattedAddress?: string;
+    coordinate: Coordinate;
+  }
+
   // For compatibility
   const FeatureVisibility: {
     Hidden: string;

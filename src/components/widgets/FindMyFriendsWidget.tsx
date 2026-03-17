@@ -42,6 +42,45 @@ interface Props {
   style: WidgetStyle;
 }
 
+/** Client-side reverse geocode using MapKit JS (already loaded for map widget) */
+async function reverseGeocodeClient(lat: number, lng: number): Promise<string | null> {
+  try {
+    if (typeof mapkit === 'undefined') return null;
+    const geocoder = new mapkit.Geocoder();
+    return new Promise((resolve) => {
+      geocoder.reverseLookup(
+        new mapkit.Coordinate(lat, lng),
+        (err, data) => {
+          if (err || !data?.results?.length) { resolve(null); return; }
+          const r = data.results[0];
+          const city = r.locality || '';
+          const state = r.administrativeArea || '';
+          if (city && state) resolve(`${city}, ${state}`);
+          else if (city) resolve(city);
+          else if (state) resolve(state);
+          else resolve(null);
+        }
+      );
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Enrich friends client-side: fill missing addresses and fix status */
+async function enrichFriendsClient(friends: FriendLocation[]): Promise<FriendLocation[]> {
+  return Promise.all(friends.map(async (f) => {
+    const hasCoords = f.lat !== 0 || f.lng !== 0;
+    // If we have valid coords, treat as live
+    const status = hasCoords && f.status !== 'live' && f.status !== 'legacy' ? 'live' : f.status;
+    if (f.address) return status !== f.status ? { ...f, status } : f;
+    if (!hasCoords) return f;
+    const location = await reverseGeocodeClient(f.lat, f.lng);
+    if (!location) return { ...f, status };
+    return { ...f, address: location, subtitle: location, status };
+  }));
+}
+
 export function FindMyFriendsWidget({ config, style: _style }: Props) {
   const [data, setData] = useState<FindMyData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,6 +96,8 @@ export function FindMyFriendsWidget({ config, style: _style }: Props) {
         throw new Error(text.includes('error') ? JSON.parse(text).error : `HTTP ${res.status}`);
       }
       const json: FindMyData = await res.json();
+      // Enrich client-side: fill missing addresses + fix status
+      json.friends = await enrichFriendsClient(json.friends);
       setData(json);
       setError(null);
     } catch (err) {
