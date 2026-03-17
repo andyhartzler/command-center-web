@@ -39,13 +39,26 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
   }
 }
 
-/** Fill in missing address/subtitle for friends that have valid coords */
+/** Fill in missing address/subtitle and fix status for friends that have valid coords */
 async function enrichFriends(friends: Friend[]): Promise<Friend[]> {
   const tasks = friends.map(async (f) => {
-    if (f.address || (f.lat === 0 && f.lng === 0)) return f;
+    const hasCoords = f.lat !== 0 || f.lng !== 0;
+
+    // If we have valid coords, treat as live regardless of scraper status
+    const status = hasCoords && f.status !== 'live' && f.status !== 'legacy'
+      ? 'live'
+      : f.status;
+
+    // If address is already populated, just fix the status
+    if (f.address) return status !== f.status ? { ...f, status } : f;
+
+    // No coords means we can't enrich
+    if (!hasCoords) return f;
+
+    // Reverse-geocode to fill in address
     const location = await reverseGeocode(f.lat, f.lng);
-    if (!location) return f;
-    return { ...f, address: location, subtitle: location };
+    if (!location) return { ...f, status };
+    return { ...f, address: location, subtitle: location, status };
   });
   return Promise.all(tasks);
 }
