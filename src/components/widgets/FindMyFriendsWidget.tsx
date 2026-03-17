@@ -42,26 +42,23 @@ interface Props {
   style: WidgetStyle;
 }
 
-/** Client-side reverse geocode using MapKit JS (already loaded for map widget) */
+/** Client-side reverse geocode using Nominatim (works from browser, blocked from Vercel servers) */
 async function reverseGeocodeClient(lat: number, lng: number): Promise<string | null> {
   try {
-    if (typeof mapkit === 'undefined') return null;
-    const geocoder = new mapkit.Geocoder();
-    return new Promise((resolve) => {
-      geocoder.reverseLookup(
-        new mapkit.Coordinate(lat, lng),
-        (err, data) => {
-          if (err || !data?.results?.length) { resolve(null); return; }
-          const r = data.results[0];
-          const city = r.locality || '';
-          const state = r.administrativeArea || '';
-          if (city && state) resolve(`${city}, ${state}`);
-          else if (city) resolve(city);
-          else if (state) resolve(state);
-          else resolve(null);
-        }
-      );
-    });
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`,
+      { headers: { 'User-Agent': 'command-center-web/1.0' } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const addr = data.address;
+    if (!addr) return null;
+    const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || '';
+    const state = addr.state || '';
+    if (city && state) return `${city}, ${state}`;
+    if (city) return city;
+    if (state) return state;
+    return data.display_name?.split(',').slice(0, 2).join(',').trim() || null;
   } catch {
     return null;
   }
