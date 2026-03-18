@@ -42,12 +42,18 @@ interface Props {
   style: WidgetStyle;
 }
 
-/** Client-side reverse geocode using Nominatim (works from browser, blocked from Vercel servers) */
+/** Format coords as a readable fallback location (e.g. "39.1°N, 94.6°W") */
+function coordsToLabel(lat: number, lng: number): string {
+  const latDir = lat >= 0 ? 'N' : 'S';
+  const lngDir = lng >= 0 ? 'E' : 'W';
+  return `${Math.abs(lat).toFixed(1)}°${latDir}, ${Math.abs(lng).toFixed(1)}°${lngDir}`;
+}
+
+/** Client-side reverse geocode using Nominatim */
 async function reverseGeocodeClient(lat: number, lng: number): Promise<string | null> {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`,
-      { headers: { 'User-Agent': 'command-center-web/1.0' } }
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -72,9 +78,10 @@ async function enrichFriendsClient(friends: FriendLocation[]): Promise<FriendLoc
     const status = hasCoords && f.status !== 'live' && f.status !== 'legacy' ? 'live' : f.status;
     if (f.address) return status !== f.status ? { ...f, status } : f;
     if (!hasCoords) return f;
+    // Try reverse geocoding, fall back to formatted coordinates
     const location = await reverseGeocodeClient(f.lat, f.lng);
-    if (!location) return { ...f, status };
-    return { ...f, address: location, subtitle: location, status };
+    const label = location || coordsToLabel(f.lat, f.lng);
+    return { ...f, address: label, subtitle: label, status };
   }));
 }
 
