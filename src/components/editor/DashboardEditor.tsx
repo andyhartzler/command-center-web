@@ -1,6 +1,6 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import { Monitor, ShieldAlert, Plus, Play, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Monitor, ShieldAlert, Plus, Play, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import { WidgetSidebar } from './WidgetSidebar';
 import { EditorGrid } from './EditorGrid';
@@ -28,15 +28,32 @@ export function DashboardEditor() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [eocMenuOpen, setEocMenuOpen] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const eocMenuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const currentPage = pages[currentPageIndex];
 
-  // Close context menu on outside click
+  // Responsive: detect narrow viewport
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const mq = window.matchMedia('(max-width: 1099px)');
+    const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      setIsNarrow(e.matches);
+      if (e.matches) setSidebarOpen(false);
+      else setSidebarOpen(true);
+    };
+    onChange(mq);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Close context menu on outside click (pointerdown for touch support)
+  useEffect(() => {
+    const handler = (e: PointerEvent) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
         setContextMenuPage(null);
         setIsRenaming(false);
@@ -45,8 +62,8 @@ export function DashboardEditor() {
         setEocMenuOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
   }, []);
 
   // Focus rename input when renaming
@@ -62,6 +79,39 @@ export function DashboardEditor() {
     setContextMenuPage({ index, x: e.clientX, y: e.clientY });
     setIsRenaming(false);
   };
+
+  // Long-press for touch: 500ms triggers context menu
+  const handlePagePointerDown = useCallback((e: React.PointerEvent, index: number) => {
+    if (e.pointerType !== 'touch') return;
+    longPressStartRef.current = { x: e.clientX, y: e.clientY };
+    longPressTimerRef.current = setTimeout(() => {
+      setContextMenuPage({ index, x: e.clientX, y: e.clientY });
+      setIsRenaming(false);
+      longPressStartRef.current = null;
+    }, 500);
+  }, []);
+
+  const handlePagePointerMove = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType !== 'touch' || !longPressStartRef.current) return;
+    const dx = Math.abs(e.clientX - longPressStartRef.current.x);
+    const dy = Math.abs(e.clientY - longPressStartRef.current.y);
+    if (dx > 10 || dy > 10) {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressStartRef.current = null;
+    }
+  }, []);
+
+  const handlePagePointerUp = useCallback(() => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressStartRef.current = null;
+  }, []);
+
+  // Cleanup long-press timer
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
+  }, []);
 
   const handleRenameStart = () => {
     if (contextMenuPage === null) return;
@@ -115,6 +165,16 @@ export function DashboardEditor() {
     <div className="w-screen h-screen flex flex-col bg-[#1c1c1e] overflow-hidden">
       {/* Top bar */}
       <div className="shrink-0 h-11 border-b border-white/[0.06] flex items-center px-4 gap-3 bg-[#1a1a1c]">
+        {/* Sidebar toggle (narrow screens) */}
+        {isNarrow && (
+          <button
+            onClick={() => setSidebarOpen(prev => !prev)}
+            className="flex items-center justify-center w-7 h-7 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors"
+          >
+            {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+          </button>
+        )}
+
         {/* Left: mode toggle */}
         <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.04] rounded-lg">
           <button
@@ -192,6 +252,10 @@ export function DashboardEditor() {
                       setSelectedWidgetId(null);
                     }}
                     onContextMenu={(e) => handlePageContextMenu(e, i)}
+                    onPointerDown={(e) => handlePagePointerDown(e, i)}
+                    onPointerMove={handlePagePointerMove}
+                    onPointerUp={handlePagePointerUp}
+                    onPointerCancel={handlePagePointerUp}
                     className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                       isSelected
                         ? 'bg-white/[0.06] text-white/90'
@@ -223,7 +287,7 @@ export function DashboardEditor() {
 
         <div className="flex-1" />
 
-        {/* Right: display button — prominent */}
+        {/* Right: display button */}
         <button
           onClick={() => setDisplayMode(true)}
           className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-[#6b8aab] text-white hover:bg-[#7d9bbc] transition-all shadow-lg shadow-black/20"
@@ -236,9 +300,13 @@ export function DashboardEditor() {
       {/* Three-panel layout */}
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left: Widget sidebar */}
-        <div className="shrink-0 w-[280px] border-r border-white/[0.08] overflow-y-auto bg-[#1a1a1c]">
-          <WidgetSidebar />
-        </div>
+        {sidebarOpen && (
+          <div className={`shrink-0 w-[280px] border-r border-white/[0.08] overflow-y-auto bg-[#1a1a1c] ${
+            isNarrow ? 'absolute left-0 top-11 bottom-0 z-40 shadow-2xl shadow-black/50' : ''
+          }`}>
+            <WidgetSidebar />
+          </div>
+        )}
 
         {/* Center: Editor grid */}
         <div className="flex-1 overflow-hidden min-w-0">
@@ -260,7 +328,9 @@ export function DashboardEditor() {
 
         {/* Right: Config panel (only when widget selected) */}
         {selectedWidgetId && (
-          <div className="shrink-0 w-[280px] border-l border-white/[0.08] overflow-y-auto bg-[#1a1a1c]">
+          <div className={`shrink-0 w-[280px] border-l border-white/[0.08] overflow-y-auto bg-[#1a1a1c] ${
+            isNarrow ? 'absolute right-0 top-11 bottom-0 z-40 shadow-2xl shadow-black/50' : ''
+          }`}>
             <WidgetConfigPanel
               widgetId={selectedWidgetId}
               onClose={() => setSelectedWidgetId(null)}
@@ -268,6 +338,14 @@ export function DashboardEditor() {
           </div>
         )}
       </div>
+
+      {/* Overlay backdrop for narrow sidebars */}
+      {isNarrow && (sidebarOpen || selectedWidgetId) && (
+        <div
+          className="fixed inset-0 top-11 z-30 bg-black/30"
+          onClick={() => { setSidebarOpen(false); setSelectedWidgetId(null); }}
+        />
+      )}
 
       {/* Context menu for page tabs */}
       {contextMenuPage && (

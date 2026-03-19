@@ -9,6 +9,14 @@ export function DashboardDisplay() {
   const currentPage = pages[currentPageIndex];
   const autoRotateRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const [showToolbar, setShowToolbar] = useState(false);
+  const isTouchDevice = useRef(false);
+  const toolbarTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const swipeStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  // Detect touch device
+  useEffect(() => {
+    isTouchDevice.current = window.matchMedia('(hover: none)').matches;
+  }, []);
 
   const goNext = useCallback(() => {
     if (pages.length <= 1) return;
@@ -19,6 +27,44 @@ export function DashboardDisplay() {
     if (pages.length <= 1) return;
     setCurrentPageIndex((currentPageIndex - 1 + pages.length) % pages.length);
   }, [currentPageIndex, pages.length, setCurrentPageIndex]);
+
+  // Touch: tap anywhere toggles toolbar, auto-hide after 4s
+  const handleTouchToggleToolbar = useCallback(() => {
+    if (!isTouchDevice.current) return;
+    setShowToolbar(prev => {
+      const next = !prev;
+      if (toolbarTimerRef.current) clearTimeout(toolbarTimerRef.current);
+      if (next) {
+        toolbarTimerRef.current = setTimeout(() => setShowToolbar(false), 4000);
+      }
+      return next;
+    });
+  }, []);
+
+  // Swipe tracking (touch only)
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') {
+      swipeStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+    }
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType !== 'touch' || !swipeStartRef.current) return;
+    const dx = e.clientX - swipeStartRef.current.x;
+    const dy = e.clientY - swipeStartRef.current.y;
+    const elapsed = Date.now() - swipeStartRef.current.time;
+    swipeStartRef.current = null;
+
+    // Horizontal swipe: >50px within 500ms, more horizontal than vertical
+    if (elapsed < 500 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) goNext();   // swipe left = next
+      else goPrev();          // swipe right = prev
+      return;
+    }
+
+    // If not a swipe, treat as tap to toggle toolbar
+    handleTouchToggleToolbar();
+  }, [goNext, goPrev, handleTouchToggleToolbar]);
 
   // Keyboard navigation (matches Swift: Escape, arrows, space)
   useEffect(() => {
@@ -45,12 +91,23 @@ export function DashboardDisplay() {
     };
   }, [currentPage?.autoRotateSeconds, goNext]);
 
+  // Cleanup toolbar timer
+  useEffect(() => {
+    return () => {
+      if (toolbarTimerRef.current) clearTimeout(toolbarTimerRef.current);
+    };
+  }, []);
+
   if (!currentPage) return null;
 
   const theme = BACKGROUND_THEMES[currentPage.backgroundTheme];
 
   return (
-    <div className={`w-screen h-screen relative ${theme.className}`}>
+    <div
+      className={`w-screen h-screen relative ${theme.className}`}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+    >
       {/* Invisible hover zone at top (matches Swift: Color.clear .frame(height: 30)) */}
       <div
         className="display-toolbar-zone"
@@ -77,7 +134,7 @@ export function DashboardDisplay() {
             </span>
           )}
           <button
-            onClick={() => setDisplayMode(false)}
+            onClick={(e) => { e.stopPropagation(); setDisplayMode(false); }}
             className="flex items-center gap-1 px-3 py-1.5 text-white/80 rounded-lg transition-colors hover:bg-white/[0.08]"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
           >

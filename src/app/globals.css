@@ -119,6 +119,7 @@ body {
   inset: 0;
   padding: 16px;
   z-index: 1;
+  touch-action: pan-x pan-y;
 }
 
 /* ============================================================
@@ -133,9 +134,11 @@ body {
   opacity: 0;
   transition: opacity 0.25s ease-in-out;
 }
-.display-toolbar-zone:hover + .display-toolbar,
-.display-toolbar:hover {
-  opacity: 1;
+@media (hover: hover) {
+  .display-toolbar-zone:hover + .display-toolbar,
+  .display-toolbar:hover {
+    opacity: 1;
+  }
 }
 .display-toolbar-zone {
   position: absolute;

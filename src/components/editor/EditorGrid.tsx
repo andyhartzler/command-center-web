@@ -25,13 +25,14 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
   const [resizePreview, setResizePreview] = useState<{ cols: number; rows: number } | null>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
   const isDragging = useRef(false);
+  const pointerTypeRef = useRef<string>('mouse');
 
   const handleCellClick = useCallback(() => {
     onSelectWidget(null);
   }, [onSelectWidget]);
 
   const handleWidgetClick = useCallback(
-    (e: React.MouseEvent, widgetId: string) => {
+    (e: React.PointerEvent, widgetId: string) => {
       e.stopPropagation();
       if (!isDragging.current) {
         onSelectWidget(widgetId);
@@ -52,29 +53,34 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
   );
 
   // Move drag start
-  const handleDragStart = useCallback((e: React.MouseEvent, widgetId: string) => {
+  const handleDragStart = useCallback((e: React.PointerEvent, widgetId: string) => {
+    pointerTypeRef.current = e.pointerType;
     dragStartPos.current = { x: e.clientX, y: e.clientY };
     setDragWidgetId(widgetId);
     setDragMode('move');
     isDragging.current = false;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
   // Resize drag start
-  const handleResizeStart = useCallback((e: React.MouseEvent, widgetId: string) => {
+  const handleResizeStart = useCallback((e: React.PointerEvent, widgetId: string) => {
     e.stopPropagation();
     e.preventDefault();
+    pointerTypeRef.current = e.pointerType;
     dragStartPos.current = { x: e.clientX, y: e.clientY };
     setDragWidgetId(widgetId);
     setDragMode('resize');
     isDragging.current = true;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
-  const handleDragMove = useCallback((e: React.MouseEvent) => {
+  const handleDragMove = useCallback((e: React.PointerEvent) => {
     if (!dragWidgetId || !dragStartPos.current || !gridRef.current) return;
 
     const dx = Math.abs(e.clientX - dragStartPos.current.x);
     const dy = Math.abs(e.clientY - dragStartPos.current.y);
-    if (dx < 5 && dy < 5 && dragMode === 'move') return;
+    const threshold = pointerTypeRef.current === 'touch' ? 15 : 5;
+    if (dx < threshold && dy < threshold && dragMode === 'move') return;
 
     isDragging.current = true;
     const gridRect = gridRef.current.getBoundingClientRect();
@@ -93,7 +99,7 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
       const clampedRow = Math.max(0, Math.min(GRID_ROWS - currentSize.rows, row));
       setDragTarget({ col: clampedCol, row: clampedRow });
     } else {
-      // Resize mode: compute new size based on mouse position relative to widget origin
+      // Resize mode: compute new size based on pointer position relative to widget origin
       const newCols = Math.max(2, Math.min(GRID_COLUMNS - widget.position.column, col - widget.position.column + 1));
       const newRows = Math.max(2, Math.min(GRID_ROWS - widget.position.row, row - widget.position.row + 1));
       setResizePreview({ cols: newCols, rows: newRows });
@@ -105,7 +111,6 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
       if (dragMode === 'move' && dragTarget) {
         moveWidget(dragWidgetId, { column: dragTarget.col, row: dragTarget.row });
       } else if (dragMode === 'resize' && resizePreview) {
-        // Apply custom size
         updateWidget(dragWidgetId, {
           size: { columns: resizePreview.cols, rows: resizePreview.rows },
         });
@@ -126,9 +131,11 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
     <div
       className={`w-full h-full p-2 ${theme.className}`}
       onClick={handleCellClick}
-      onMouseMove={handleDragMove}
-      onMouseUp={handleDragEnd}
-      onMouseLeave={handleDragEnd}
+      onPointerMove={handleDragMove}
+      onPointerUp={handleDragEnd}
+      onPointerLeave={handleDragEnd}
+      onPointerCancel={handleDragEnd}
+      style={{ touchAction: 'none' }}
     >
       <div
         ref={gridRef}
@@ -198,8 +205,8 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
           return (
             <div
               key={widget.id}
-              onMouseDown={e => handleDragStart(e, widget.id)}
-              onClick={e => handleWidgetClick(e, widget.id)}
+              onPointerDown={e => handleDragStart(e, widget.id)}
+              onClick={e => handleWidgetClick(e as unknown as React.PointerEvent, widget.id)}
               className={`relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-150 group ${
                 isSelected
                   ? 'ring-2 ring-[#6b8aab] ring-offset-1 ring-offset-transparent'
@@ -209,6 +216,7 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
                 gridColumn: `${widget.position.column + 1} / span ${displayCols}`,
                 gridRow: `${widget.position.row + 1} / span ${displayRows}`,
                 zIndex: isSelected ? 5 : 1,
+                touchAction: 'none',
               }}
             >
               {/* Live widget preview */}
@@ -216,16 +224,20 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
                 <WidgetFactory widget={widget} />
               </div>
 
-              {/* Delete button */}
+              {/* Delete button - visible on hover OR when selected */}
               <button
                 onClick={e => handleDelete(e, widget.id)}
-                className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto hover:bg-red-500 z-10"
+                className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-500/80 flex items-center justify-center transition-opacity pointer-events-auto hover:bg-red-500 z-10 ${
+                  isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
               >
                 <X size={10} className="text-white" />
               </button>
 
-              {/* Widget type label */}
-              <div className="absolute top-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              {/* Widget type label - visible on hover OR when selected */}
+              <div className={`absolute top-1.5 left-1.5 transition-opacity pointer-events-none z-10 ${
+                isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              }`}>
                 <span
                   className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full backdrop-blur-sm"
                   style={{
@@ -237,10 +249,12 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
                 </span>
               </div>
 
-              {/* Resize handle (bottom-right corner) */}
+              {/* Resize handle (bottom-right corner) - visible on hover OR when selected */}
               <div
-                onMouseDown={e => handleResizeStart(e, widget.id)}
-                className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto z-10"
+                onPointerDown={e => handleResizeStart(e, widget.id)}
+                className={`absolute bottom-0 right-0 w-5 h-5 cursor-se-resize transition-opacity pointer-events-auto z-10 ${
+                  isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
               >
                 <svg
                   width="12" height="12"
