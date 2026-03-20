@@ -46,11 +46,30 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Primary: Cloudflare Worker with email-based flight alerts
-    const alertResult = await fetchFromAlertWorker(tail);
-    if (alertResult && alertResult.recentFlights.length > 0) {
-      aircraftCache = { key: tail, data: alertResult, ts: Date.now() };
-      return NextResponse.json(alertResult);
+    // Fetch from alert worker and FlightAware scrape in parallel
+    const [alertResult, scraped] = await Promise.all([
+      fetchFromAlertWorker(tail),
+      scrapeFlightAwareHistory(tail),
+    ]);
+
+    // Merge: use alert worker for real-time status, FlightAware for historical flights
+    if (alertResult || scraped) {
+      const base = scraped || alertResult!;
+      const result: TrackerData = {
+        tailNumber: tail,
+        owner: base.owner,
+        aircraftType: base.aircraftType || 'S22T',
+        lastSeen: base.lastSeen,
+        isAirborne: alertResult?.isAirborne || scraped?.isAirborne || false,
+        currentFlight: alertResult?.currentFlight || scraped?.currentFlight || null,
+        // Prefer FlightAware scraped history (richer), supplement with alert worker flights
+        recentFlights: scraped?.recentFlights.length
+          ? scraped.recentFlights
+          : alertResult?.recentFlights || [],
+        source: scraped ? 'flightaware-web' : 'flight-alerts',
+      };
+      aircraftCache = { key: tail, data: result, ts: Date.now() };
+      return NextResponse.json(result);
     }
 
     // Try FlightAware AeroAPI (if key provided)
@@ -61,13 +80,6 @@ export async function GET(request: NextRequest) {
         aircraftCache = { key: tail, data: result, ts: Date.now() };
         return NextResponse.json(result);
       }
-    }
-
-    // Free fallback: Scrape FlightAware public flight history page
-    const scraped = await scrapeFlightAwareHistory(tail);
-    if (scraped) {
-      aircraftCache = { key: tail, data: scraped, ts: Date.now() };
-      return NextResponse.json(scraped);
     }
 
     // Try ADS-B Exchange API (if key provided)
@@ -99,6 +111,23 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Parse airport codes from FlightAware email subject lines
+function parseSubject(raw: string): { origin: string; destination: string } {
+  // "N233AB has departed LRY for GTU" → origin=LRY, dest=GTU
+  const depMatch = raw.match(/departed\s+(\w{3,4})\s+for\s+(\w{3,4})/i);
+  if (depMatch) return { origin: depMatch[1], destination: depMatch[2] };
+
+  // "N233AB arrived at GTU from LRY" → origin=LRY, dest=GTU
+  const arrMatch = raw.match(/arrived\s+at\s+(\w{3,4})\s+from\s+(\w{3,4})/i);
+  if (arrMatch) return { origin: arrMatch[2], destination: arrMatch[1] };
+
+  // "N233AB is expected to arrive at GTU in 45 min" → dest=GTU
+  const etaMatch = raw.match(/arrive\s+at\s+(\w{3,4})/i);
+  if (etaMatch) return { origin: '', destination: etaMatch[1] };
+
+  return { origin: '', destination: '' };
+}
+
 async function fetchFromAlertWorker(tail: string): Promise<TrackerData | null> {
   try {
     const res = await fetch('https://flight-alerts.hartzler.workers.dev/api/events', {
@@ -128,26 +157,50 @@ async function fetchFromAlertWorker(tail: string): Promise<TrackerData | null> {
       const date = new Date(ev.receivedAt);
       const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+      // Parse airport codes from rawSubject when fields are empty
+      const parsed = parseSubject(ev.rawSubject);
+      const evOrigin = ev.origin || parsed.origin;
+      const evDest = ev.destination || parsed.destination;
+
       if (ev.type === 'arrival') {
-        // Look for matching departure (next event chronologically, which is i+1 since events are newest-first)
         const dep = events[i + 1]?.type === 'departure' ? events[i + 1] : null;
+        const depParsed = dep ? parseSubject(dep.rawSubject) : null;
+        const depOrigin = dep?.origin || depParsed?.origin || '';
+        const depTime = dep ? new Date(dep.receivedAt).toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago',
+        }) : '';
+        const arrTime = date.toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago',
+        });
+
+        // Calculate duration if we have both times
+        let duration = '';
+        if (dep) {
+          const mins = Math.round((date.getTime() - new Date(dep.receivedAt).getTime()) / 60000);
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          duration = h > 0 ? `${h}h ${m}m` : `${m}m`;
+        }
+
         flights.push({
           date: dateStr,
-          departure: dep?.origin || '',
-          arrival: ev.destination || '',
-          departureTime: dep?.time || '',
-          arrivalTime: ev.time || '',
-          duration: '',
+          departure: depOrigin || evOrigin,
+          arrival: evDest,
+          departureTime: dep?.time || depTime,
+          arrivalTime: ev.time || arrTime,
+          duration,
           status: 'completed',
         });
-        if (dep) i++; // skip the departure event we consumed
+        if (dep) i++;
       } else if (ev.type === 'departure') {
-        // Departure without a following arrival = currently in flight
+        const depTime = date.toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago',
+        });
         flights.push({
           date: dateStr,
-          departure: ev.origin || '',
-          arrival: '',
-          departureTime: ev.time || '',
+          departure: evOrigin,
+          arrival: evDest,
+          departureTime: ev.time || depTime,
           arrivalTime: '',
           duration: '',
           status: 'in_progress',
