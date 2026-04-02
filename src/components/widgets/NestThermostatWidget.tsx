@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Thermometer, Flame, Snowflake, Power } from 'lucide-react';
+import { Thermometer, Flame, Snowflake, Power, ExternalLink, RefreshCw } from 'lucide-react';
 import { type NestThermostatConfig, type WidgetStyle } from '@/types/widget';
 
 interface Props {
@@ -11,33 +11,77 @@ interface Props {
 export function NestThermostatWidget({ config, style }: Props) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchNest = useCallback(async () => {
     try {
-      const res = await fetch(`/api/nest?projectId=${config.projectId}`);
-      if (!res.ok) throw new Error('Failed to fetch');
+      const res = await fetch(`/api/nest`);
       const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      setData(json.devices?.[0]);
-      setError(null);
+      
+      if (res.status === 401) {
+        setAuthUrl(json.authUrl);
+        setData(null);
+        setError(null);
+      } else if (!res.ok) {
+        throw new Error(json.error || 'Failed to fetch');
+      } else {
+        setData(json.devices?.[0]);
+        setError(null);
+        setAuthUrl(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setIsLoading(false);
     }
-  }, [config]);
+  }, []);
 
   useEffect(() => {
     fetchNest();
-    const interval = setInterval(fetchNest, 30000);
+    const interval = setInterval(fetchNest, 60000);
     return () => clearInterval(interval);
   }, [fetchNest]);
 
+  if (isLoading && !data) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-black/20">
+        <RefreshCw size={24} className="text-white/20 animate-spin" />
+      </div>
+    );
+  }
+
+  if (authUrl) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-black/40 to-black/20">
+        <div className="p-3 rounded-full bg-white/5 mb-4">
+          <Thermometer size={32} className="text-white/40" />
+        </div>
+        <h3 className="text-sm font-medium text-white/90 mb-1 text-center">Nest Disconnected</h3>
+        <p className="text-[10px] text-white/40 text-center mb-4 max-w-[140px]">Connect your Google account to see your thermostat.</p>
+        <a 
+          href={authUrl}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg text-xs font-semibold hover:bg-white/90 transition-colors"
+        >
+          Connect Nest <ExternalLink size={12} />
+        </a>
+      </div>
+    );
+  }
+
   if (error || !data) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center p-4">
-        <Thermometer size={24} className="text-white/20 mb-2" />
-        <span className="text-xs text-white/40 text-center">
-          {error || 'Loading Nest...'}
+      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-black/20 text-center">
+        <Thermometer size={24} className="text-red-400/40 mb-2" />
+        <span className="text-[10px] text-white/40 max-w-[120px]">
+          {error || 'No device found'}
         </span>
+        <button 
+          onClick={() => { setIsLoading(true); fetchNest(); }}
+          className="mt-3 text-[10px] text-emerald-400/60 hover:text-emerald-400 underline"
+        >
+          Retry connection
+        </button>
       </div>
     );
   }
@@ -46,37 +90,65 @@ export function NestThermostatWidget({ config, style }: Props) {
   const ambientTemp = traits["sdm.devices.traits.Temperature"]?.ambientTemperatureCelsius || 0;
   const humidity = traits["sdm.devices.traits.Humidity"]?.ambientHumidityPercent || 0;
   const mode = traits["sdm.devices.traits.ThermostatMode"]?.mode || "OFF";
+  const hvacState = traits["sdm.devices.traits.ThermostatHvac"]?.status || "OFF";
   const setpoint = traits["sdm.devices.traits.ThermostatTemperatureSetpoint"]?.coolCelsius 
                 || traits["sdm.devices.traits.ThermostatTemperatureSetpoint"]?.heatCelsius || ambientTemp;
 
-  const modeIcon = mode === 'COOL' ? <Snowflake size={20} className="text-blue-400" /> :
-                   mode === 'HEAT' ? <Flame size={20} className="text-orange-400" /> :
+  // Convert to Fahrenheit for US user
+  const toF = (c: number) => (c * 9/5) + 32;
+
+  const isActive = hvacState !== 'OFF';
+  const modeIcon = mode === 'COOL' ? <Snowflake size={20} className={isActive ? "text-blue-400 animate-pulse" : "text-blue-400/60"} /> :
+                   mode === 'HEAT' ? <Flame size={20} className={isActive ? "text-orange-400 animate-pulse" : "text-orange-400/60"} /> :
                    <Power size={20} className="text-white/40" />;
 
   return (
-    <div className="w-full h-full flex flex-col justify-between p-5 overflow-hidden bg-gradient-to-br from-black/40 to-black/10">
+    <div className="w-full h-full flex flex-col justify-between p-5 overflow-hidden bg-gradient-to-br from-black/60 to-black/20">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {modeIcon}
-          <span className="text-sm font-medium text-white/70">{traits["sdm.devices.traits.Info"]?.customName || 'Thermostat'}</span>
+          <div className="flex flex-col">
+            <span className="text-xs font-semibold text-white/90 uppercase tracking-tight">
+              {traits["sdm.devices.traits.Info"]?.customName || 'Nest'}
+            </span>
+            <span className={`text-[10px] ${isActive ? 'text-emerald-400 font-bold' : 'text-white/30'}`}>
+              {hvacState === 'COOLING' ? 'Cooling...' : hvacState === 'HEATING' ? 'Heating...' : 'Idle'}
+            </span>
+          </div>
         </div>
-        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/10 text-white/70 tracking-widest">{mode}</span>
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none mb-1">{mode}</span>
+          <div className="flex gap-1">
+            <div className={`w-1 h-1 rounded-full ${mode === 'COOL' ? 'bg-blue-400' : 'bg-white/10'}`} />
+            <div className={`w-1 h-1 rounded-full ${mode === 'HEAT' ? 'bg-orange-400' : 'bg-white/10'}`} />
+          </div>
+        </div>
       </div>
       
-      <div className="flex flex-col items-center justify-center flex-1">
+      <div className="flex flex-col items-center justify-center flex-1 relative">
+        {/* Decorative Ring */}
+        <div className={`absolute inset-0 m-auto w-32 h-32 border-2 rounded-full opacity-10 ${isActive ? 'border-emerald-400 scale-110 duration-1000' : 'border-white'}`} />
+        
         <div className="flex items-start">
           <span className="text-6xl font-light tracking-tighter text-white/90">
-            {ambientTemp.toFixed(1)}
+            {toF(ambientTemp).toFixed(0)}
           </span>
-          <span className="text-2xl font-light text-white/50 mt-2">&deg;C</span>
+          <span className="text-2xl font-light text-white/40 mt-2">&deg;</span>
         </div>
-        <span className="text-sm text-white/50 mt-1">Target: {setpoint.toFixed(1)}&deg;C</span>
+        <div className="flex items-center gap-1.5 mt-1">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/40" />
+          <span className="text-xs text-white/50 font-medium tracking-wide">Set to {toF(setpoint).toFixed(0)}&deg;</span>
+        </div>
       </div>
 
-      <div className="flex items-center justify-center gap-6 mt-2">
-        <div className="flex flex-col items-center">
-          <span className="text-xs text-white/40">Humidity</span>
+      <div className="grid grid-cols-2 gap-4 mt-2 pt-4 border-t border-white/5">
+        <div className="flex flex-col items-center border-r border-white/5">
+          <span className="text-[10px] text-white/30 uppercase font-bold tracking-tighter mb-0.5">Humidity</span>
           <span className="text-sm font-medium text-white/80">{humidity}%</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <span className="text-[10px] text-white/30 uppercase font-bold tracking-tighter mb-0.5">Mode</span>
+          <span className="text-sm font-medium text-white/80 capitalize">{mode.toLowerCase()}</span>
         </div>
       </div>
     </div>
