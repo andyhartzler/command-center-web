@@ -313,5 +313,10 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'appleMusic': return { type: 'appleMusic', config: {} };
     case 'findMyFriends': return { type: 'findMyFriends', config: { trackedHandles: [], displayMode: 'map', refreshInterval: 180 } };
     case 'uvIndex': return { type: 'uvIndex', config: { latitude: 39.0997, longitude: -94.5786 } };
+    case 'hue': return { type: 'hue', config: { bridgeIp: '', applicationKey: '' } };
+    case 'nestThermostat': return { type: 'nestThermostat', config: { projectId: '', clientId: '', clientSecret: '', refreshToken: '' } };
+    case 'icloudAlbum': return { type: 'icloudAlbum', config: { albumUrl: '', cycleIntervalSeconds: 30, transitionEffect: 'fade' } };
+    case 'feeds': return { type: 'feeds', config: { feedUrls: ['https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'], maxItems: 10 } };
+    case 'twitterTrending': return { type: 'twitterTrending', config: { woeid: 23424977, maxTrends: 10 } };
   }
 }

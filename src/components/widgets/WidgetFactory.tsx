@@ -30,6 +30,13 @@ const HealthWidget = dynamic(() => import('./HealthWidget').then(m => ({ default
 const UVIndexWidget = dynamic(() => import('./UVIndexWidget').then(m => ({ default: m.UVIndexWidget })), { ssr: false });
 const PlaceholderWidget = dynamic(() => import('./PlaceholderWidget').then(m => ({ default: m.PlaceholderWidget })), { ssr: false });
 
+const HomeKitWidget = dynamic(() => import('./HomeKitWidget').then(m => ({ default: m.HomeKitWidget })), { ssr: false });
+const HueWidget = dynamic(() => import('./HueWidget').then(m => ({ default: m.HueWidget })), { ssr: false });
+const NestThermostatWidget = dynamic(() => import('./NestThermostatWidget').then(m => ({ default: m.NestThermostatWidget })), { ssr: false });
+const ICloudAlbumWidget = dynamic(() => import('./iCloudAlbumWidget').then(m => ({ default: m.ICloudAlbumWidget })), { ssr: false });
+const FeedsWidget = dynamic(() => import('./FeedsWidget').then(m => ({ default: m.FeedsWidget })), { ssr: false });
+const TwitterTrendingWidget = dynamic(() => import('./TwitterTrendingWidget').then(m => ({ default: m.TwitterTrendingWidget })), { ssr: false });
+
 interface WidgetFactoryProps {
   widget: DashboardWidget;
 }
@@ -64,8 +71,13 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
     case 'findMyFriends': return <FindMyFriendsWidget config={widgetConfig.config} style={style} />;
     case 'health': return <HealthWidget config={widgetConfig.config} style={style} />;
     case 'uvIndex': return <UVIndexWidget config={widgetConfig.config} style={style} />;
-    case 'reminders':
-    case 'homeKit': {
+    case 'homeKit': return <HomeKitWidget config={widgetConfig.config} style={style} />;
+    case 'hue': return <HueWidget config={widgetConfig.config} style={style} />;
+    case 'nestThermostat': return <NestThermostatWidget config={widgetConfig.config} style={style} />;
+    case 'icloudAlbum': return <ICloudAlbumWidget config={widgetConfig.config} style={style} />;
+    case 'feeds': return <FeedsWidget config={widgetConfig.config} style={style} />;
+    case 'twitterTrending': return <TwitterTrendingWidget config={widgetConfig.config} style={style} />;
+    case 'reminders': {
       const meta = WIDGET_TYPE_META[widgetConfig.type];
       return <PlaceholderWidget name={meta.displayName} icon={meta.icon} color={meta.color} />;
     }
