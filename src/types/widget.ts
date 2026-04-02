@@ -333,8 +333,8 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'news': return { type: 'news', config: { maxItems: 15, categories: ['local'] } };
     case 'worldNews': return { type: 'worldNews', config: { maxItems: 15, categories: ['world', 'us', 'tech', 'finance'] } };
     case 'stocks': return { type: 'stocks', config: { symbols: ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA'] } };
-    case 'crypto': return { type: 'crypto', config: { coins: ['bitcoin', 'ethereum', 'solana'] } };
-    case 'sports': return { type: 'sports', config: { leagues: ['nfl', 'nba', 'mlb'], favoriteTeams: ['Kansas City Chiefs', 'Kansas City Royals'] } };
+    case 'crypto': return { type: 'crypto', config: { coins: ['bitcoin', 'ethereum', 'binancecoin', 'ripple', 'solana', 'cardano', 'dogecoin', 'tron', 'avalanche-2', 'polkadot', 'chainlink', 'litecoin', 'uniswap', 'stellar', 'near', 'bitcoin-cash', 'monero', 'cosmos', 'hedera', 'aptos', 'sui', 'arbitrum', 'filecoin', 'kaspa', 'render-token'] } };
+    case 'sports': return { type: 'sports', config: { leagues: ['nfl', 'nba', 'mlb', 'nhl', 'mls'], favoriteTeams: ['Kansas City Chiefs', 'Kansas City Royals', 'Sporting Kansas City', 'Kansas City Current'] } };
     case 'sun': return { type: 'sun', config: { latitude: 39.0997, longitude: -94.5786 } };
     case 'earthquakes': return { type: 'earthquakes', config: { minMagnitude: 2.5, maxQuakes: 50, region: 'us' } };
     case 'airTraffic': return { type: 'airTraffic', config: { centerLat: 39.0997, centerLon: -94.5786, radiusNm: 50 } };

@@ -30,26 +30,31 @@ interface SportsWidgetProps {
   style: WidgetStyle;
 }
 
+const LEAGUE_COLORS: Record<string, { text: string; border: string }> = {
+  NFL: { text: 'text-green-500/70', border: 'border-green-500/20' },
+  NBA: { text: 'text-orange-400/70', border: 'border-orange-400/20' },
+  MLB: { text: 'text-[#6b8aab]/70', border: 'border-[#6b8aab]/20' },
+  NHL: { text: 'text-sky-400/70', border: 'border-sky-400/20' },
+  MLS: { text: 'text-emerald-400/70', border: 'border-emerald-400/20' },
+  WNBA: { text: 'text-orange-300/70', border: 'border-orange-300/20' },
+  NWSL: { text: 'text-pink-400/70', border: 'border-pink-400/20' },
+  NCAAF: { text: 'text-amber-500/70', border: 'border-amber-500/20' },
+  NCAAB: { text: 'text-blue-400/70', border: 'border-blue-400/20' },
+  EPL: { text: 'text-purple-400/70', border: 'border-purple-400/20' },
+  LALIGA: { text: 'text-red-400/70', border: 'border-red-400/20' },
+  BUNDESLIGA: { text: 'text-red-500/70', border: 'border-red-500/20' },
+  SERIEA: { text: 'text-blue-500/70', border: 'border-blue-500/20' },
+  LIGUE1: { text: 'text-yellow-400/70', border: 'border-yellow-400/20' },
+  UCL: { text: 'text-indigo-400/70', border: 'border-indigo-400/20' },
+  LIGA_MX: { text: 'text-green-400/70', border: 'border-green-400/20' },
+};
+
 function getLeagueColor(league: string): string {
-  switch (league) {
-    case 'NFL': return 'text-green-500/70';
-    case 'NBA': return 'text-orange-400/70';
-    case 'MLB': return 'text-[#6b8aab]/70';
-    case 'NHL': return 'text-sky-400/70';
-    case 'MLS': return 'text-emerald-400/70';
-    default: return 'text-white/40';
-  }
+  return LEAGUE_COLORS[league]?.text || 'text-white/40';
 }
 
 function getLeagueBorderColor(league: string): string {
-  switch (league) {
-    case 'NFL': return 'border-green-500/20';
-    case 'NBA': return 'border-orange-400/20';
-    case 'MLB': return 'border-[#6b8aab]/20';
-    case 'NHL': return 'border-sky-400/20';
-    case 'MLS': return 'border-emerald-400/20';
-    default: return 'border-white/10';
-  }
+  return LEAGUE_COLORS[league]?.border || 'border-white/10';
 }
 
 export function SportsWidget({ config }: SportsWidgetProps) {
@@ -107,10 +112,28 @@ export function SportsWidget({ config }: SportsWidgetProps) {
   // Highlight favorite teams
   const isFavorite = (team: string): boolean =>
     config.favoriteTeams?.some(
-      (fav) =>
-        team.toLowerCase().includes(fav.toLowerCase()) ||
-        fav.toLowerCase().includes(team.toLowerCase()),
+      (fav) => {
+        const favLower = fav.toLowerCase();
+        const teamLower = team.toLowerCase();
+        return teamLower.includes(favLower) || favLower.includes(teamLower);
+      },
     ) || false;
+
+  // Only show games involving favorite teams
+  const filteredGames = config.favoriteTeams?.length
+    ? games.filter(game =>
+        isFavorite(game.homeTeam) || isFavorite(game.awayTeam) ||
+        isFavorite(game.homeAbbr) || isFavorite(game.awayAbbr))
+    : games;
+
+  if (filteredGames.length === 0) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+        <Trophy size={20} className="text-white/20" />
+        <span className="text-xs text-white/30">No games for your teams today</span>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full flex flex-col p-3 overflow-hidden">
@@ -119,14 +142,14 @@ export function SportsWidget({ config }: SportsWidgetProps) {
         className="text-[10px] font-bold text-white/30 uppercase mb-2"
         style={{ letterSpacing: '4px' }}
       >
-        Scoreboard
+        My Teams
       </div>
 
       {/* Games */}
       <div className="flex-1 overflow-y-auto scrollbar-hide space-y-1">
-        {games.map((game) => {
-          const homeFav = isFavorite(game.homeTeam);
-          const awayFav = isFavorite(game.awayTeam);
+        {filteredGames.map((game) => {
+          const homeFav = isFavorite(game.homeTeam) || isFavorite(game.homeAbbr);
+          const awayFav = isFavorite(game.awayTeam) || isFavorite(game.awayAbbr);
 
           return (
             <div

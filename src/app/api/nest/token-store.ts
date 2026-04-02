@@ -40,6 +40,10 @@ export function setTokensCookie(response: NextResponse, tokens: NestTokens): voi
   });
 }
 
+export function deleteTokens(response: NextResponse): void {
+  response.cookies.delete(COOKIE_NAME);
+}
+
 export async function readTokens(req?: NextRequest): Promise<NestTokens | null> {
   if (req) {
     const fromCookie = readTokensFromCookie(req);

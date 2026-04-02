@@ -4,8 +4,9 @@ import {
   Clock, CloudSun, Sun, Moon, Calendar, ListChecks, Newspaper, Globe,
   Video, Camera, Tv, Trophy, TrendingUp, Bitcoin, BarChart3, Activity,
   Plane, AlertTriangle, PlaneLanding, Flame, Heart, Home, Cpu, Wind,
-  Trash2, X, Plus, Minus, Radio, Search, MapPin, Music,
+  Trash2, X, Plus, Minus, Radio, Search, MapPin, Music, GripVertical,
 } from 'lucide-react';
+import { COIN_CATALOG } from '@/components/widgets/CryptoWidget';
 import { useAppState } from '@/context/AppState';
 import {
   WIDGET_TYPE_META,
@@ -366,6 +367,350 @@ function EditableList({ label, items, onChange, placeholder }: {
   );
 }
 
+// --- Crypto coin picker with drag-to-reorder ---
+function CoinPicker({ coins, onChange }: { coins: string[]; onChange: (coins: string[]) => void }) {
+  const [search, setSearch] = useState('');
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+  const coinSet = new Set(coins);
+  const searchLower = search.toLowerCase();
+
+  const allCoins = Object.entries(COIN_CATALOG);
+  const filtered = search
+    ? allCoins.filter(([id, [sym, name]]) =>
+        name.toLowerCase().includes(searchLower) ||
+        sym.toLowerCase().includes(searchLower) ||
+        id.toLowerCase().includes(searchLower))
+    : [];
+
+  const toggle = (coinId: string) => {
+    if (coinSet.has(coinId)) {
+      onChange(coins.filter(c => c !== coinId));
+    } else {
+      onChange([...coins, coinId]);
+    }
+  };
+
+  const handleDragStart = (i: number) => setDragIdx(i);
+  const handleDragOver = (e: React.DragEvent, i: number) => { e.preventDefault(); setOverIdx(i); };
+  const handleDrop = (i: number) => {
+    if (dragIdx === null || dragIdx === i) { setDragIdx(null); setOverIdx(null); return; }
+    const next = [...coins];
+    const [moved] = next.splice(dragIdx, 1);
+    next.splice(i, 0, moved);
+    onChange(next);
+    setDragIdx(null);
+    setOverIdx(null);
+  };
+  const handleDragEnd = () => { setDragIdx(null); setOverIdx(null); };
+
+  return (
+    <div className="space-y-2">
+      {/* Selected coins - draggable to reorder */}
+      {coins.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Selected (drag to reorder)</div>
+          {coins.map((coinId, i) => {
+            const entry = COIN_CATALOG[coinId];
+            const sym = entry?.[0] || coinId.toUpperCase().slice(0, 4);
+            const name = entry?.[1] || coinId;
+            const isDragging = dragIdx === i;
+            const isOver = overIdx === i;
+            return (
+              <div
+                key={coinId}
+                draggable
+                onDragStart={() => handleDragStart(i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDrop={() => handleDrop(i)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-grab active:cursor-grabbing ${
+                  isDragging ? 'opacity-30' : isOver ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30' : 'bg-white/[0.03] border border-transparent'
+                }`}
+              >
+                <GripVertical size={10} className="text-white/15 shrink-0" />
+                <span className="text-[10px] font-bold text-white/50 w-10 shrink-0">{sym}</span>
+                <span className="text-[11px] text-white/70 flex-1 truncate">{name}</span>
+                <button
+                  onClick={() => toggle(coinId)}
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-red-400/50 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                >
+                  <X size={8} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Search to add */}
+      <div className="space-y-1">
+        <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Add Coins</div>
+        <div className="relative">
+          <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-white/20" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name (e.g. Bitcoin, Solana)..."
+            className="w-full bg-[#252528] border border-white/[0.06] rounded-lg pl-6 pr-2 py-1.5 text-[11px] text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
+          />
+        </div>
+        {search && (
+          <div className="max-h-[200px] overflow-y-auto scrollbar-hide space-y-px">
+            {filtered.length === 0 ? (
+              <div className="text-[10px] text-white/25 py-2 text-center">No coins match &quot;{search}&quot;</div>
+            ) : (
+              filtered.slice(0, 30).map(([id, [sym, name]]) => {
+                const selected = coinSet.has(id);
+                return (
+                  <button
+                    key={id}
+                    onClick={() => { toggle(id); if (!selected) setSearch(''); }}
+                    className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-[11px] transition-colors ${
+                      selected
+                        ? 'bg-[#6b8aab]/15 text-white/90'
+                        : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'
+                    }`}
+                  >
+                    <div className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
+                      selected ? 'bg-[#6b8aab] border-[#6b8aab]' : 'border-white/15'
+                    }`}>
+                      {selected && <span className="text-[8px] text-white font-bold">&#10003;</span>}
+                    </div>
+                    <span className="text-[10px] font-bold text-white/40 w-10 shrink-0">{sym}</span>
+                    <span className="flex-1 truncate">{name}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- All teams by league ---
+const ALL_TEAMS: Record<string, { name: string; abbr: string }[]> = {
+  NFL: [
+    { name: 'Arizona Cardinals', abbr: 'ARI' }, { name: 'Atlanta Falcons', abbr: 'ATL' },
+    { name: 'Baltimore Ravens', abbr: 'BAL' }, { name: 'Buffalo Bills', abbr: 'BUF' },
+    { name: 'Carolina Panthers', abbr: 'CAR' }, { name: 'Chicago Bears', abbr: 'CHI' },
+    { name: 'Cincinnati Bengals', abbr: 'CIN' }, { name: 'Cleveland Browns', abbr: 'CLE' },
+    { name: 'Dallas Cowboys', abbr: 'DAL' }, { name: 'Denver Broncos', abbr: 'DEN' },
+    { name: 'Detroit Lions', abbr: 'DET' }, { name: 'Green Bay Packers', abbr: 'GB' },
+    { name: 'Houston Texans', abbr: 'HOU' }, { name: 'Indianapolis Colts', abbr: 'IND' },
+    { name: 'Jacksonville Jaguars', abbr: 'JAX' }, { name: 'Kansas City Chiefs', abbr: 'KC' },
+    { name: 'Las Vegas Raiders', abbr: 'LV' }, { name: 'Los Angeles Chargers', abbr: 'LAC' },
+    { name: 'Los Angeles Rams', abbr: 'LAR' }, { name: 'Miami Dolphins', abbr: 'MIA' },
+    { name: 'Minnesota Vikings', abbr: 'MIN' }, { name: 'New England Patriots', abbr: 'NE' },
+    { name: 'New Orleans Saints', abbr: 'NO' }, { name: 'New York Giants', abbr: 'NYG' },
+    { name: 'New York Jets', abbr: 'NYJ' }, { name: 'Philadelphia Eagles', abbr: 'PHI' },
+    { name: 'Pittsburgh Steelers', abbr: 'PIT' }, { name: 'San Francisco 49ers', abbr: 'SF' },
+    { name: 'Seattle Seahawks', abbr: 'SEA' }, { name: 'Tampa Bay Buccaneers', abbr: 'TB' },
+    { name: 'Tennessee Titans', abbr: 'TEN' }, { name: 'Washington Commanders', abbr: 'WSH' },
+  ],
+  NBA: [
+    { name: 'Atlanta Hawks', abbr: 'ATL' }, { name: 'Boston Celtics', abbr: 'BOS' },
+    { name: 'Brooklyn Nets', abbr: 'BKN' }, { name: 'Charlotte Hornets', abbr: 'CHA' },
+    { name: 'Chicago Bulls', abbr: 'CHI' }, { name: 'Cleveland Cavaliers', abbr: 'CLE' },
+    { name: 'Dallas Mavericks', abbr: 'DAL' }, { name: 'Denver Nuggets', abbr: 'DEN' },
+    { name: 'Detroit Pistons', abbr: 'DET' }, { name: 'Golden State Warriors', abbr: 'GS' },
+    { name: 'Houston Rockets', abbr: 'HOU' }, { name: 'Indiana Pacers', abbr: 'IND' },
+    { name: 'LA Clippers', abbr: 'LAC' }, { name: 'Los Angeles Lakers', abbr: 'LAL' },
+    { name: 'Memphis Grizzlies', abbr: 'MEM' }, { name: 'Miami Heat', abbr: 'MIA' },
+    { name: 'Milwaukee Bucks', abbr: 'MIL' }, { name: 'Minnesota Timberwolves', abbr: 'MIN' },
+    { name: 'New Orleans Pelicans', abbr: 'NOP' }, { name: 'New York Knicks', abbr: 'NYK' },
+    { name: 'Oklahoma City Thunder', abbr: 'OKC' }, { name: 'Orlando Magic', abbr: 'ORL' },
+    { name: 'Philadelphia 76ers', abbr: 'PHI' }, { name: 'Phoenix Suns', abbr: 'PHX' },
+    { name: 'Portland Trail Blazers', abbr: 'POR' }, { name: 'Sacramento Kings', abbr: 'SAC' },
+    { name: 'San Antonio Spurs', abbr: 'SA' }, { name: 'Toronto Raptors', abbr: 'TOR' },
+    { name: 'Utah Jazz', abbr: 'UTA' }, { name: 'Washington Wizards', abbr: 'WAS' },
+  ],
+  MLB: [
+    { name: 'Arizona Diamondbacks', abbr: 'ARI' }, { name: 'Atlanta Braves', abbr: 'ATL' },
+    { name: 'Baltimore Orioles', abbr: 'BAL' }, { name: 'Boston Red Sox', abbr: 'BOS' },
+    { name: 'Chicago Cubs', abbr: 'CHC' }, { name: 'Chicago White Sox', abbr: 'CWS' },
+    { name: 'Cincinnati Reds', abbr: 'CIN' }, { name: 'Cleveland Guardians', abbr: 'CLE' },
+    { name: 'Colorado Rockies', abbr: 'COL' }, { name: 'Detroit Tigers', abbr: 'DET' },
+    { name: 'Houston Astros', abbr: 'HOU' }, { name: 'Kansas City Royals', abbr: 'KC' },
+    { name: 'Los Angeles Angels', abbr: 'LAA' }, { name: 'Los Angeles Dodgers', abbr: 'LAD' },
+    { name: 'Miami Marlins', abbr: 'MIA' }, { name: 'Milwaukee Brewers', abbr: 'MIL' },
+    { name: 'Minnesota Twins', abbr: 'MIN' }, { name: 'New York Mets', abbr: 'NYM' },
+    { name: 'New York Yankees', abbr: 'NYY' }, { name: 'Oakland Athletics', abbr: 'OAK' },
+    { name: 'Philadelphia Phillies', abbr: 'PHI' }, { name: 'Pittsburgh Pirates', abbr: 'PIT' },
+    { name: 'San Diego Padres', abbr: 'SD' }, { name: 'San Francisco Giants', abbr: 'SF' },
+    { name: 'Seattle Mariners', abbr: 'SEA' }, { name: 'St. Louis Cardinals', abbr: 'STL' },
+    { name: 'Tampa Bay Rays', abbr: 'TB' }, { name: 'Texas Rangers', abbr: 'TEX' },
+    { name: 'Toronto Blue Jays', abbr: 'TOR' }, { name: 'Washington Nationals', abbr: 'WSH' },
+  ],
+  NHL: [
+    { name: 'Anaheim Ducks', abbr: 'ANA' }, { name: 'Arizona Coyotes', abbr: 'ARI' },
+    { name: 'Boston Bruins', abbr: 'BOS' }, { name: 'Buffalo Sabres', abbr: 'BUF' },
+    { name: 'Calgary Flames', abbr: 'CGY' }, { name: 'Carolina Hurricanes', abbr: 'CAR' },
+    { name: 'Chicago Blackhawks', abbr: 'CHI' }, { name: 'Colorado Avalanche', abbr: 'COL' },
+    { name: 'Columbus Blue Jackets', abbr: 'CBJ' }, { name: 'Dallas Stars', abbr: 'DAL' },
+    { name: 'Detroit Red Wings', abbr: 'DET' }, { name: 'Edmonton Oilers', abbr: 'EDM' },
+    { name: 'Florida Panthers', abbr: 'FLA' }, { name: 'Los Angeles Kings', abbr: 'LAK' },
+    { name: 'Minnesota Wild', abbr: 'MIN' }, { name: 'Montreal Canadiens', abbr: 'MTL' },
+    { name: 'Nashville Predators', abbr: 'NSH' }, { name: 'New Jersey Devils', abbr: 'NJD' },
+    { name: 'New York Islanders', abbr: 'NYI' }, { name: 'New York Rangers', abbr: 'NYR' },
+    { name: 'Ottawa Senators', abbr: 'OTT' }, { name: 'Philadelphia Flyers', abbr: 'PHI' },
+    { name: 'Pittsburgh Penguins', abbr: 'PIT' }, { name: 'San Jose Sharks', abbr: 'SJS' },
+    { name: 'Seattle Kraken', abbr: 'SEA' }, { name: 'St. Louis Blues', abbr: 'STL' },
+    { name: 'Tampa Bay Lightning', abbr: 'TBL' }, { name: 'Toronto Maple Leafs', abbr: 'TOR' },
+    { name: 'Utah Hockey Club', abbr: 'UTA' }, { name: 'Vancouver Canucks', abbr: 'VAN' },
+    { name: 'Vegas Golden Knights', abbr: 'VGK' }, { name: 'Washington Capitals', abbr: 'WSH' },
+    { name: 'Winnipeg Jets', abbr: 'WPG' },
+  ],
+  MLS: [
+    { name: 'Atlanta United', abbr: 'ATL' }, { name: 'Austin FC', abbr: 'ATX' },
+    { name: 'Charlotte FC', abbr: 'CLT' }, { name: 'Chicago Fire', abbr: 'CHI' },
+    { name: 'FC Cincinnati', abbr: 'CIN' }, { name: 'Colorado Rapids', abbr: 'COL' },
+    { name: 'Columbus Crew', abbr: 'CLB' }, { name: 'D.C. United', abbr: 'DC' },
+    { name: 'FC Dallas', abbr: 'DAL' }, { name: 'Houston Dynamo', abbr: 'HOU' },
+    { name: 'Inter Miami', abbr: 'MIA' }, { name: 'LA Galaxy', abbr: 'LA' },
+    { name: 'LAFC', abbr: 'LAFC' }, { name: 'Minnesota United', abbr: 'MIN' },
+    { name: 'CF Montreal', abbr: 'MTL' }, { name: 'Nashville SC', abbr: 'NSH' },
+    { name: 'New England Revolution', abbr: 'NE' }, { name: 'New York City FC', abbr: 'NYC' },
+    { name: 'New York Red Bulls', abbr: 'NYRB' }, { name: 'Orlando City', abbr: 'ORL' },
+    { name: 'Philadelphia Union', abbr: 'PHI' }, { name: 'Portland Timbers', abbr: 'POR' },
+    { name: 'Real Salt Lake', abbr: 'RSL' }, { name: 'San Jose Earthquakes', abbr: 'SJ' },
+    { name: 'Seattle Sounders', abbr: 'SEA' }, { name: 'Sporting Kansas City', abbr: 'SKC' },
+    { name: 'St. Louis City SC', abbr: 'STL' }, { name: 'Toronto FC', abbr: 'TOR' },
+    { name: 'Vancouver Whitecaps', abbr: 'VAN' },
+  ],
+  WNBA: [
+    { name: 'Atlanta Dream', abbr: 'ATL' }, { name: 'Chicago Sky', abbr: 'CHI' },
+    { name: 'Connecticut Sun', abbr: 'CONN' }, { name: 'Dallas Wings', abbr: 'DAL' },
+    { name: 'Golden State Valkyries', abbr: 'GS' }, { name: 'Indiana Fever', abbr: 'IND' },
+    { name: 'Las Vegas Aces', abbr: 'LVA' }, { name: 'Los Angeles Sparks', abbr: 'LA' },
+    { name: 'Minnesota Lynx', abbr: 'MIN' }, { name: 'New York Liberty', abbr: 'NY' },
+    { name: 'Phoenix Mercury', abbr: 'PHX' }, { name: 'Seattle Storm', abbr: 'SEA' },
+    { name: 'Washington Mystics', abbr: 'WAS' },
+  ],
+  NWSL: [
+    { name: 'Angel City FC', abbr: 'ACFC' }, { name: 'Bay FC', abbr: 'BAY' },
+    { name: 'Chicago Red Stars', abbr: 'CHI' }, { name: 'Houston Dash', abbr: 'HOU' },
+    { name: 'Kansas City Current', abbr: 'KC' }, { name: 'NJ/NY Gotham FC', abbr: 'NJY' },
+    { name: 'North Carolina Courage', abbr: 'NC' }, { name: 'Orlando Pride', abbr: 'ORL' },
+    { name: 'Portland Thorns', abbr: 'POR' }, { name: 'Racing Louisville', abbr: 'LOU' },
+    { name: 'San Diego Wave', abbr: 'SD' }, { name: 'Seattle Reign', abbr: 'SEA' },
+    { name: 'Utah Royals', abbr: 'UTA' }, { name: 'Washington Spirit', abbr: 'WAS' },
+  ],
+  EPL: [
+    { name: 'Arsenal', abbr: 'ARS' }, { name: 'Aston Villa', abbr: 'AVL' },
+    { name: 'Bournemouth', abbr: 'BOU' }, { name: 'Brentford', abbr: 'BRE' },
+    { name: 'Brighton', abbr: 'BHA' }, { name: 'Chelsea', abbr: 'CHE' },
+    { name: 'Crystal Palace', abbr: 'CRY' }, { name: 'Everton', abbr: 'EVE' },
+    { name: 'Fulham', abbr: 'FUL' }, { name: 'Ipswich Town', abbr: 'IPS' },
+    { name: 'Leicester City', abbr: 'LEI' }, { name: 'Liverpool', abbr: 'LIV' },
+    { name: 'Manchester City', abbr: 'MCI' }, { name: 'Manchester United', abbr: 'MUN' },
+    { name: 'Newcastle', abbr: 'NEW' }, { name: 'Nottingham Forest', abbr: 'NFO' },
+    { name: 'Southampton', abbr: 'SOU' }, { name: 'Tottenham', abbr: 'TOT' },
+    { name: 'West Ham', abbr: 'WHU' }, { name: 'Wolves', abbr: 'WOL' },
+  ],
+};
+
+const LEAGUE_LABELS: Record<string, string> = {
+  NFL: 'NFL', NBA: 'NBA', MLB: 'MLB', NHL: 'NHL', MLS: 'MLS',
+  WNBA: 'WNBA', NWSL: 'NWSL', EPL: 'Premier League',
+};
+
+function TeamPicker({ favoriteTeams, onChange }: {
+  favoriteTeams: string[];
+  onChange: (teams: string[]) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const favSet = new Set(favoriteTeams);
+
+  const toggle = (teamName: string) => {
+    if (favSet.has(teamName)) {
+      onChange(favoriteTeams.filter(t => t !== teamName));
+    } else {
+      onChange([...favoriteTeams, teamName]);
+    }
+  };
+
+  const searchLower = search.toLowerCase();
+
+  return (
+    <div className="space-y-2">
+      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Favorite Teams</div>
+
+      {/* Selected teams chips */}
+      {favoriteTeams.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {favoriteTeams.map(team => (
+            <button
+              key={team}
+              onClick={() => toggle(team)}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#6b8aab]/20 text-[10px] text-[#6b8aab] hover:bg-red-500/15 hover:text-red-400 transition-colors"
+            >
+              {team} <X size={8} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-white/20" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search teams..."
+          className="w-full bg-[#252528] border border-white/[0.06] rounded-lg pl-6 pr-2 py-1.5 text-[11px] text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
+        />
+      </div>
+
+      {/* Team list by league */}
+      <div className="max-h-[300px] overflow-y-auto scrollbar-hide space-y-2">
+        {Object.entries(ALL_TEAMS).map(([league, teams]) => {
+          const filtered = search
+            ? teams.filter(t => t.name.toLowerCase().includes(searchLower) || t.abbr.toLowerCase().includes(searchLower))
+            : teams;
+          if (filtered.length === 0) return null;
+
+          return (
+            <div key={league}>
+              <div className="text-[9px] font-bold text-white/30 uppercase tracking-wider mb-1 sticky top-0 bg-[#1c1c1e] py-0.5">
+                {LEAGUE_LABELS[league] || league}
+              </div>
+              <div className="space-y-px">
+                {filtered.map(team => {
+                  const selected = favSet.has(team.name);
+                  return (
+                    <button
+                      key={`${league}-${team.abbr}`}
+                      onClick={() => toggle(team.name)}
+                      className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-[11px] transition-colors ${
+                        selected
+                          ? 'bg-[#6b8aab]/15 text-white/90'
+                          : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'
+                      }`}
+                    >
+                      <div className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
+                        selected ? 'bg-[#6b8aab] border-[#6b8aab]' : 'border-white/15'
+                      }`}>
+                        {selected && <span className="text-[8px] text-white font-bold">&#10003;</span>}
+                      </div>
+                      <span className="flex-1 truncate">{team.name}</span>
+                      <span className="text-[9px] text-white/25 font-mono">{team.abbr}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // --- Widget-specific config sections ---
 
 function WidgetSpecificConfig({ widget, updateConfig }: {
@@ -558,11 +903,9 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
     case 'crypto':
       return (
         <ConfigSection title="Crypto Settings">
-          <EditableList
-            label="Coins (CoinGecko IDs)"
-            items={(cfg.coins as string[]) || []}
-            onChange={items => updateConfig({ coins: items })}
-            placeholder="e.g. bitcoin"
+          <CoinPicker
+            coins={(cfg.coins as string[]) || []}
+            onChange={coins => updateConfig({ coins })}
           />
         </ConfigSection>
       );
@@ -571,17 +914,38 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
       return (
         <ConfigSection title="Sports Settings">
           <div className="space-y-3">
-            <EditableList
-              label="Leagues"
-              items={(cfg.leagues as string[]) || []}
-              onChange={items => updateConfig({ leagues: items })}
-              placeholder="e.g. NFL"
-            />
-            <EditableList
-              label="Favorite Teams"
-              items={(cfg.favoriteTeams as string[]) || []}
-              onChange={items => updateConfig({ favoriteTeams: items })}
-              placeholder="e.g. Chiefs"
+            {/* League toggles */}
+            <div className="space-y-1.5">
+              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Leagues</div>
+              <div className="flex flex-wrap gap-1">
+                {Object.keys(ALL_TEAMS).map(league => {
+                  const leagueKey = league.toLowerCase();
+                  const leagues = (cfg.leagues as string[]) || [];
+                  const active = leagues.includes(leagueKey);
+                  return (
+                    <button
+                      key={league}
+                      onClick={() => {
+                        const next = active
+                          ? leagues.filter(l => l !== leagueKey)
+                          : [...leagues, leagueKey];
+                        updateConfig({ leagues: next });
+                      }}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${
+                        active
+                          ? 'bg-[#6b8aab]/20 text-[#6b8aab] border border-[#6b8aab]/30'
+                          : 'bg-white/[0.03] text-white/30 border border-white/[0.06] hover:text-white/50'
+                      }`}
+                    >
+                      {LEAGUE_LABELS[league] || league}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <TeamPicker
+              favoriteTeams={(cfg.favoriteTeams as string[]) || []}
+              onChange={teams => updateConfig({ favoriteTeams: teams })}
             />
           </div>
         </ConfigSection>

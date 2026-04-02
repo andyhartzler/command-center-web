@@ -65,7 +65,7 @@ export function HomeKitWidget({ config, style }: Props) {
   const activeCount = devices.filter(d => ['on', 'playing', 'healthy', 'locked'].includes(d.state.toLowerCase())).length;
 
   return (
-    <div className="w-full h-full flex flex-col p-5 overflow-hidden bg-gradient-to-b from-black/60 to-black/20 font-sans">
+    <div className="w-full h-full flex flex-col p-5 overflow-hidden font-sans">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 shrink-0">
         <div className="flex items-center gap-2.5">

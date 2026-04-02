@@ -11,15 +11,59 @@ interface CoinData {
   change24h: number;
 }
 
-const COIN_SYMBOLS: Record<string, string> = {
-  bitcoin: 'BTC', ethereum: 'ETH', solana: 'SOL', dogecoin: 'DOGE',
-  cardano: 'ADA', polkadot: 'DOT', avalanche: 'AVAX', chainlink: 'LINK',
-  polygon: 'MATIC', litecoin: 'LTC', ripple: 'XRP', tron: 'TRX',
+// Master coin catalog: { coingeckoId: [ticker, displayName] }
+export const COIN_CATALOG: Record<string, [string, string]> = {
+  bitcoin: ['BTC', 'Bitcoin'], ethereum: ['ETH', 'Ethereum'], tether: ['USDT', 'Tether'],
+  ripple: ['XRP', 'XRP'], binancecoin: ['BNB', 'BNB'], solana: ['SOL', 'Solana'],
+  'usd-coin': ['USDC', 'USD Coin'], dogecoin: ['DOGE', 'Dogecoin'], cardano: ['ADA', 'Cardano'],
+  tron: ['TRX', 'Tron'], toncoin: ['TON', 'Toncoin'], 'avalanche-2': ['AVAX', 'Avalanche'],
+  'shiba-inu': ['SHIB', 'Shiba Inu'], chainlink: ['LINK', 'Chainlink'], polkadot: ['DOT', 'Polkadot'],
+  'bitcoin-cash': ['BCH', 'Bitcoin Cash'], litecoin: ['LTC', 'Litecoin'], uniswap: ['UNI', 'Uniswap'],
+  near: ['NEAR', 'NEAR Protocol'], dai: ['DAI', 'Dai'], stellar: ['XLM', 'Stellar'],
+  'internet-computer': ['ICP', 'Internet Computer'], kaspa: ['KAS', 'Kaspa'], pepe: ['PEPE', 'Pepe'],
+  'ethereum-classic': ['ETC', 'Ethereum Classic'], aptos: ['APT', 'Aptos'], monero: ['XMR', 'Monero'],
+  'render-token': ['RNDR', 'Render'], hedera: ['HBAR', 'Hedera'], cosmos: ['ATOM', 'Cosmos'],
+  arbitrum: ['ARB', 'Arbitrum'], filecoin: ['FIL', 'Filecoin'], mantle: ['MNT', 'Mantle'],
+  'immutable-x': ['IMX', 'Immutable'], optimism: ['OP', 'Optimism'], sui: ['SUI', 'Sui'],
+  'injective-protocol': ['INJ', 'Injective'], vechain: ['VET', 'VeChain'], celestia: ['TIA', 'Celestia'],
+  'sei-network': ['SEI', 'Sei'], stacks: ['STX', 'Stacks'], 'the-graph': ['GRT', 'The Graph'],
+  algorand: ['ALGO', 'Algorand'], aave: ['AAVE', 'Aave'], maker: ['MKR', 'Maker'],
+  fantom: ['FTM', 'Fantom'], bonk: ['BONK', 'Bonk'], floki: ['FLOKI', 'Floki'],
+  fetch: ['FET', 'Fetch.ai'], 'matic-network': ['MATIC', 'Polygon'],
+  theta: ['THETA', 'Theta'], 'the-sandbox': ['SAND', 'The Sandbox'], decentraland: ['MANA', 'Decentraland'],
+  'axie-infinity': ['AXS', 'Axie Infinity'], eos: ['EOS', 'EOS'], iota: ['IOTA', 'IOTA'],
+  'neo-token': ['NEO', 'NEO'], tezos: ['XTZ', 'Tezos'], 'flow-token': ['FLOW', 'Flow'],
+  kava: ['KAVA', 'Kava'], 'gala-2': ['GALA', 'Gala'], enjin: ['ENJ', 'Enjin Coin'],
+  chiliz: ['CHZ', 'Chiliz'], 'curve-dao-token': ['CRV', 'Curve DAO'],
+  '1inch': ['1INCH', '1inch'], 'compound-coin': ['COMP', 'Compound'], 'basic-attention-token': ['BAT', 'Basic Attention Token'],
+  zcash: ['ZEC', 'Zcash'], dash: ['DASH', 'Dash'], waves: ['WAVES', 'Waves'],
+  loopring: ['LRC', 'Loopring'], 'ens-domains': ['ENS', 'ENS'], 'lido-dao': ['LDO', 'Lido DAO'],
+  'rocket-pool': ['RPL', 'Rocket Pool'], 'pendle-finance': ['PENDLE', 'Pendle'],
+  worldcoin: ['WLD', 'Worldcoin'], 'blur-token': ['BLUR', 'Blur'], jupiter: ['JUP', 'Jupiter'],
+  'jito-governance-token': ['JTO', 'Jito'], pyth: ['PYTH', 'Pyth Network'],
+  wormhole: ['W', 'Wormhole'],'ondo-finance': ['ONDO', 'Ondo Finance'],
+  'ethena-usde': ['USDE', 'Ethena USDe'], 'first-digital-usd': ['FDUSD', 'First Digital USD'],
+  'wrapped-bitcoin': ['WBTC', 'Wrapped Bitcoin'], 'leo-token': ['LEO', 'LEO Token'],
+  'okb-token': ['OKB', 'OKB'], cronos: ['CRO', 'Cronos'], quant: ['QNT', 'Quant'],
+  elrond: ['EGLD', 'MultiversX'], mina: ['MINA', 'Mina Protocol'],
+  raydium: ['RAY', 'Raydium'], 'marinade-staked-sol': ['MSOL', 'Marinade Staked SOL'],
+  bittensor: ['TAO', 'Bittensor'], arweave: ['AR', 'Arweave'],
+  'thorchain-erc20': ['RUNE', 'THORChain'], 'akash-network': ['AKT', 'Akash Network'],
+  osmosis: ['OSMO', 'Osmosis'], 'terra-luna-2': ['LUNA', 'Terra'],
+  'synthetix-network-token': ['SNX', 'Synthetix'], 'gmx-token': ['GMX', 'GMX'],
+  'dydx-chain': ['DYDX', 'dYdX'], helium: ['HNT', 'Helium'],
+  'mask-network': ['MASK', 'Mask Network'], 'iotex-token': ['IOTX', 'IoTeX'],
+  zilliqa: ['ZIL', 'Zilliqa'], harmony: ['ONE', 'Harmony'], celo: ['CELO', 'Celo'],
+  ankr: ['ANKR', 'Ankr'], sushi: ['SUSHI', 'SushiSwap'], yearn: ['YFI', 'Yearn Finance'],
+  'pancakeswap-token': ['CAKE', 'PancakeSwap'],
 };
 
-const COIN_NAMES: Record<string, string> = {
-  bitcoin: 'Bitcoin', ethereum: 'Ethereum', solana: 'Solana', dogecoin: 'Dogecoin', cardano: 'Cardano',
-};
+const COIN_SYMBOLS: Record<string, string> = Object.fromEntries(
+  Object.entries(COIN_CATALOG).map(([id, [sym]]) => [id, sym])
+);
+const COIN_NAMES: Record<string, string> = Object.fromEntries(
+  Object.entries(COIN_CATALOG).map(([id, [, name]]) => [id, name])
+);
 
 interface CryptoWidgetProps {
   config: CryptoConfig;

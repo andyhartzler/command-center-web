@@ -50,7 +50,7 @@ export function FeedsWidget({ config, style }: Props) {
   }
 
   return (
-    <div className="w-full h-full flex flex-col p-4 overflow-hidden bg-black/20">
+    <div className="w-full h-full flex flex-col p-4 overflow-hidden">
       <div className="flex items-center gap-2 mb-3 shrink-0">
         <Rss size={14} className="text-emerald-400" />
         <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Global Alerts</span>

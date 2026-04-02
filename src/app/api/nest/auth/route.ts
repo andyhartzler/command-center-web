@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
     prompt: 'consent',
   });
 
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  // Use the Nest-specific Partner Connections Manager URL
+  const authUrl = `https://nestservices.google.com/partnerconnections/${projectId}/auth?${params.toString()}`;
 
   const response = NextResponse.redirect(authUrl);
   response.cookies.set('nest_state', state, {

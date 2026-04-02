@@ -169,10 +169,10 @@ function ScaledPollutantBox({ label, value, s }: { label: string; value: number 
   return (
     <div
       className="flex-1 min-w-0 flex flex-col items-center bg-white/[0.04] rounded-md"
-      style={{ padding: `${Math.max(2, 3 * s)}px ${Math.max(3, 5 * s)}px`, gap: '1px' }}
+      style={{ padding: `${Math.max(2, 3 * s)}px ${Math.max(3, 4 * s)}px`, gap: '1px' }}
     >
-      <span className="text-white/30 uppercase" style={{ fontSize: `${Math.max(5, 6 * s)}px`, letterSpacing: '0.5px', lineHeight: 1 }}>{label}</span>
-      <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: `${Math.max(7, 11 * s)}px`, lineHeight: 1 }}>
+      <span className="text-white/30 uppercase" style={{ fontSize: `${Math.max(5, 5.5 * s)}px`, letterSpacing: '0.5px', lineHeight: 1 }}>{label}</span>
+      <span className="font-semibold text-white/70 tabular-nums" style={{ fontSize: `${Math.max(7, 9 * s)}px`, lineHeight: 1 }}>
         {value !== null ? value.toFixed(1) : '--'}
       </span>
     </div>

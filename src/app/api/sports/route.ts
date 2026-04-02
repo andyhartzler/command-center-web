@@ -6,6 +6,17 @@ const LEAGUE_MAP: Record<string, { sport: string; league: string }> = {
   mlb: { sport: 'baseball', league: 'mlb' },
   nhl: { sport: 'hockey', league: 'nhl' },
   mls: { sport: 'soccer', league: 'usa.1' },
+  wnba: { sport: 'basketball', league: 'wnba' },
+  nwsl: { sport: 'soccer', league: 'usa.nwsl' },
+  ncaaf: { sport: 'football', league: 'college-football' },
+  ncaab: { sport: 'basketball', league: 'mens-college-basketball' },
+  epl: { sport: 'soccer', league: 'eng.1' },
+  laliga: { sport: 'soccer', league: 'esp.1' },
+  bundesliga: { sport: 'soccer', league: 'ger.1' },
+  seriea: { sport: 'soccer', league: 'ita.1' },
+  ligue1: { sport: 'soccer', league: 'fra.1' },
+  ucl: { sport: 'soccer', league: 'uefa.champions' },
+  liga_mx: { sport: 'soccer', league: 'mex.1' },
 };
 
 interface ESPNCompetitor {
