@@ -38,7 +38,12 @@ export type WidgetType =
   | 'airQuality'
   | 'appleMusic'
   | 'findMyFriends'
-  | 'uvIndex';
+  | 'uvIndex'
+  | 'hue'
+  | 'nestThermostat'
+  | 'icloudAlbum'
+  | 'feeds'
+  | 'twitterTrending';
 
 export interface GridSize {
   columns: number;
@@ -182,6 +187,34 @@ export interface UVIndexConfig {
   longitude: number;
 }
 
+export interface HueConfig {
+  bridgeIp: string;
+  applicationKey: string;
+}
+
+export interface NestThermostatConfig {
+  projectId: string;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}
+
+export interface ICloudAlbumConfig {
+  albumUrl: string;
+  cycleIntervalSeconds: number;
+  transitionEffect: 'fade' | 'slide' | 'crossfade';
+}
+
+export interface FeedsConfig {
+  feedUrls: string[];
+  maxItems: number;
+}
+
+export interface TwitterTrendingConfig {
+  woeid: number;
+  maxTrends: number;
+}
+
 export interface FindMyFriendsConfig {
   trackedHandles: string[];
   displayMode: 'map' | 'pins' | 'list';
@@ -216,7 +249,12 @@ export type WidgetConfig =
   | { type: 'airQuality'; config: AirQualityConfig }
   | { type: 'appleMusic'; config: Record<string, never> }
   | { type: 'findMyFriends'; config: FindMyFriendsConfig }
-  | { type: 'uvIndex'; config: UVIndexConfig };
+  | { type: 'uvIndex'; config: UVIndexConfig }
+  | { type: 'hue'; config: HueConfig }
+  | { type: 'nestThermostat'; config: NestThermostatConfig }
+  | { type: 'icloudAlbum'; config: ICloudAlbumConfig }
+  | { type: 'feeds'; config: FeedsConfig }
+  | { type: 'twitterTrending'; config: TwitterTrendingConfig };
 
 export interface DashboardWidget {
   id: string;
@@ -281,6 +319,11 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   appleMusic: { displayName: 'Top Charts', category: 'Media', icon: 'music', color: '#fa2d48', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
   findMyFriends: { displayName: 'Find My', category: 'Productivity', icon: 'map-pin', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide'] },
   uvIndex: { displayName: 'UV Index', category: 'Time & Location', icon: 'sun', color: '#f59e0b', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'] },
+  hue: { displayName: 'Philips Hue', category: 'System', icon: 'lightbulb', color: '#facc15', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
+  nestThermostat: { displayName: 'Nest', category: 'System', icon: 'thermometer', color: '#38bdf8', defaultFamily: 'small', supportedFamilies: ['small', 'medium'] },
+  icloudAlbum: { displayName: 'iCloud Album', category: 'Media', icon: 'image', color: '#a78bfa', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
+  feeds: { displayName: 'Global Alerts', category: 'Media', icon: 'rss', color: '#10b981', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
+  twitterTrending: { displayName: 'Twitter Trends', category: 'Media', icon: 'trending-up', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
 };
 
 export function defaultConfig(type: WidgetType): WidgetConfig {
