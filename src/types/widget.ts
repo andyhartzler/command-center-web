@@ -332,7 +332,7 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'weather': return { type: 'weather', config: { latitude: 39.0997, longitude: -94.5786, locationName: 'Kansas City', units: 'fahrenheit' } };
     case 'news': return { type: 'news', config: { maxItems: 15, categories: ['local'] } };
     case 'worldNews': return { type: 'worldNews', config: { maxItems: 15, categories: ['world', 'us', 'tech', 'finance'] } };
-    case 'stocks': return { type: 'stocks', config: { symbols: ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA'] } };
+    case 'stocks': return { type: 'stocks', config: { symbols: ['SPY', 'QQQ', 'DIA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'TSM', 'AVGO', 'JPM', 'V', 'UNH', 'MA', 'HD', 'COST', 'NFLX', 'CRM', 'AMD', 'ORCL', 'ADBE', 'BA', 'DIS', 'GS', 'CAT', 'GE', 'XOM', 'COIN'] } };
     case 'crypto': return { type: 'crypto', config: { coins: ['bitcoin', 'ethereum', 'binancecoin', 'ripple', 'solana', 'cardano', 'dogecoin', 'tron', 'avalanche-2', 'polkadot', 'chainlink', 'litecoin', 'uniswap', 'stellar', 'near', 'bitcoin-cash', 'monero', 'cosmos', 'hedera', 'aptos', 'sui', 'arbitrum', 'filecoin', 'kaspa', 'render-token'] } };
     case 'sports': return { type: 'sports', config: { leagues: ['nfl', 'nba', 'mlb', 'nhl', 'mls'], favoriteTeams: ['Kansas City Chiefs', 'Kansas City Royals', 'Sporting Kansas City', 'Kansas City Current'] } };
     case 'sun': return { type: 'sun', config: { latitude: 39.0997, longitude: -94.5786 } };

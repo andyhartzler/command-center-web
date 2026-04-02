@@ -26,14 +26,11 @@ export function NestThermostatWidget({ config, style }: Props) {
     return () => ro.disconnect();
   }, []);
 
-  const isCompact = dims.w < 200;
-  const isShort = dims.h < 300;
-
   const fetchNest = useCallback(async () => {
     try {
       const res = await fetch(`/api/nest`);
       const json = await res.json();
-      
+
       if (res.status === 401) {
         setAuthUrl(json.authUrl);
         setData(null);
@@ -60,7 +57,7 @@ export function NestThermostatWidget({ config, style }: Props) {
 
   if (isLoading && !data) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black/20">
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center">
         <RefreshCw size={24} className="text-white/20 animate-spin" />
       </div>
     );
@@ -68,13 +65,13 @@ export function NestThermostatWidget({ config, style }: Props) {
 
   if (authUrl) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-black/40 to-black/20">
+      <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center p-6">
         <div className="p-3 rounded-full bg-white/5 mb-4">
           <Thermometer size={32} className="text-white/40" />
         </div>
         <h3 className="text-sm font-medium text-white/90 mb-1 text-center">Nest Disconnected</h3>
         <p className="text-[10px] text-white/40 text-center mb-4 max-w-[140px]">Connect your Google account to see your thermostat.</p>
-        <a 
+        <a
           href={authUrl}
           className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg text-xs font-semibold hover:bg-white/90 transition-colors"
         >
@@ -86,19 +83,19 @@ export function NestThermostatWidget({ config, style }: Props) {
 
   if (error || !data) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-black/20 text-center">
+      <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center p-4 text-center">
         <Thermometer size={24} className="text-red-400/40 mb-2" />
         <span className="text-[10px] text-white/40 max-w-[120px]">
           {error || 'No device found'}
         </span>
         <div className="flex gap-4 mt-3">
-          <button 
+          <button
             onClick={() => { setIsLoading(true); fetchNest(); }}
             className="text-[10px] text-emerald-400/60 hover:text-emerald-400 underline"
           >
             Retry
           </button>
-          <a 
+          <a
             href="/api/nest/logout"
             className="text-[10px] text-red-400/60 hover:text-red-400 underline"
           >
@@ -114,72 +111,84 @@ export function NestThermostatWidget({ config, style }: Props) {
   const humidity = traits["sdm.devices.traits.Humidity"]?.ambientHumidityPercent || 0;
   const mode = traits["sdm.devices.traits.ThermostatMode"]?.mode || "OFF";
   const hvacState = traits["sdm.devices.traits.ThermostatHvac"]?.status || "OFF";
-  const setpoint = traits["sdm.devices.traits.ThermostatTemperatureSetpoint"]?.coolCelsius 
+  const setpoint = traits["sdm.devices.traits.ThermostatTemperatureSetpoint"]?.coolCelsius
                 || traits["sdm.devices.traits.ThermostatTemperatureSetpoint"]?.heatCelsius || ambientTemp;
 
-  // Convert to Fahrenheit for US user
   const toF = (c: number) => (c * 9/5) + 32;
-
   const isActive = hvacState !== 'OFF';
-  const modeIcon = mode === 'COOL' ? <Snowflake size={20} className={isActive ? "text-blue-400 animate-pulse" : "text-blue-400/60"} /> :
-                   mode === 'HEAT' ? <Flame size={20} className={isActive ? "text-orange-400 animate-pulse" : "text-orange-400/60"} /> :
-                   <Power size={20} className="text-white/40" />;
 
-  const ringSize = isCompact ? 'w-24 h-24' : 'w-32 h-32';
-  const tempSize = isCompact ? 'text-5xl' : 'text-6xl';
-  const degreeSize = isCompact ? 'text-xl mt-1' : 'text-2xl mt-2';
-  const padding = isCompact ? 'p-3' : 'p-5';
-  const bottomGap = isCompact ? 'gap-2' : 'gap-4';
-  const bottomPt = isCompact || isShort ? 'pt-2' : 'pt-4';
-  const bottomMt = isCompact || isShort ? 'mt-1' : 'mt-2';
+  // Scale everything based on container dimensions
+  const s = Math.min(dims.w / 200, dims.h / 320);
+  const iconSize = Math.max(12, 18 * s);
+  const ringPx = Math.max(60, 120 * s);
+  const tempFontPx = Math.max(28, 56 * s);
+  const degreeFontPx = Math.max(12, 22 * s);
+  const labelFontPx = Math.max(7, 10 * s);
+  const valueFontPx = Math.max(10, 14 * s);
+  const setFontPx = Math.max(8, 12 * s);
+  const headerFontPx = Math.max(8, 11 * s);
+  const statusFontPx = Math.max(7, 10 * s);
+  const modeFontPx = Math.max(7, 9 * s);
+  const pad = Math.max(8, 16 * s);
+  const dotSize = Math.max(3, 5 * s);
+
+  const modeIcon = mode === 'COOL'
+    ? <Snowflake size={iconSize} className={isActive ? "text-blue-400 animate-pulse" : "text-blue-400/60"} />
+    : mode === 'HEAT'
+    ? <Flame size={iconSize} className={isActive ? "text-orange-400 animate-pulse" : "text-orange-400/60"} />
+    : <Power size={iconSize} className="text-white/40" />;
 
   return (
-    <div ref={containerRef} className={`w-full h-full flex flex-col justify-between ${padding} overflow-hidden`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div ref={containerRef} className="w-full h-full flex flex-col justify-between overflow-hidden" style={{ padding: pad }}>
+      {/* Header */}
+      <div className="flex items-center justify-between shrink-0">
+        <div className="flex items-center" style={{ gap: 4 * s }}>
           {modeIcon}
           <div className="flex flex-col">
-            <span className="text-xs font-semibold text-white/90 uppercase tracking-tight">
+            <span className="font-semibold text-white/90 uppercase tracking-tight" style={{ fontSize: headerFontPx, lineHeight: 1.2 }}>
               {traits["sdm.devices.traits.Info"]?.customName || 'Nest'}
             </span>
-            <span className={`text-[10px] ${isActive ? 'text-emerald-400 font-bold' : 'text-white/30'}`}>
+            <span className={`${isActive ? 'text-emerald-400 font-bold' : 'text-white/30'}`} style={{ fontSize: statusFontPx, lineHeight: 1.2 }}>
               {hvacState === 'COOLING' ? 'Cooling...' : hvacState === 'HEATING' ? 'Heating...' : 'Idle'}
             </span>
           </div>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none mb-1">{mode}</span>
-          <div className="flex gap-1">
-            <div className={`w-1 h-1 rounded-full ${mode === 'COOL' ? 'bg-blue-400' : 'bg-white/10'}`} />
-            <div className={`w-1 h-1 rounded-full ${mode === 'HEAT' ? 'bg-orange-400' : 'bg-white/10'}`} />
+          <span className="font-bold text-white/40 uppercase tracking-widest leading-none" style={{ fontSize: modeFontPx, marginBottom: 2 * s }}>{mode}</span>
+          <div className="flex" style={{ gap: 2 * s }}>
+            <div className="rounded-full" style={{ width: dotSize, height: dotSize, background: mode === 'COOL' ? '#60a5fa' : 'rgba(255,255,255,0.1)' }} />
+            <div className="rounded-full" style={{ width: dotSize, height: dotSize, background: mode === 'HEAT' ? '#fb923c' : 'rgba(255,255,255,0.1)' }} />
           </div>
         </div>
       </div>
 
+      {/* Center: temp display */}
       <div className="flex flex-col items-center justify-center flex-1 relative">
-        {/* Decorative Ring */}
-        <div className={`absolute inset-0 m-auto ${ringSize} border-2 rounded-full opacity-10 ${isActive ? 'border-emerald-400 scale-110 duration-1000' : 'border-white'}`} />
-
-        <div className="flex items-start">
-          <span className={`${tempSize} font-light tracking-tighter text-white/90`}>
+        <div
+          className={`absolute rounded-full border-2 opacity-10 ${isActive ? 'border-emerald-400 scale-110 duration-1000' : 'border-white'}`}
+          style={{ width: ringPx, height: ringPx, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
+        />
+        <div className="flex items-start relative">
+          <span className="font-light tracking-tighter text-white/90" style={{ fontSize: tempFontPx, lineHeight: 1 }}>
             {toF(ambientTemp).toFixed(0)}
           </span>
-          <span className={`${degreeSize} font-light text-white/40`}>&deg;</span>
+          <span className="font-light text-white/40" style={{ fontSize: degreeFontPx, marginTop: 2 * s }}>&deg;</span>
         </div>
-        <div className="flex items-center gap-1.5 mt-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/40" />
-          <span className="text-xs text-white/50 font-medium tracking-wide">Set to {toF(setpoint).toFixed(0)}&deg;</span>
+        <div className="flex items-center" style={{ gap: 4 * s, marginTop: 3 * s }}>
+          <div className="rounded-full bg-emerald-400/40" style={{ width: dotSize, height: dotSize }} />
+          <span className="text-white/50 font-medium tracking-wide" style={{ fontSize: setFontPx, lineHeight: 1 }}>Set to {toF(setpoint).toFixed(0)}&deg;</span>
         </div>
       </div>
 
-      <div className={`grid grid-cols-2 ${bottomGap} ${bottomMt} ${bottomPt} border-t border-white/5`}>
+      {/* Bottom stats */}
+      <div className="grid grid-cols-2 border-t border-white/5 shrink-0" style={{ gap: 4 * s, paddingTop: 6 * s, marginTop: 4 * s }}>
         <div className="flex flex-col items-center border-r border-white/5">
-          <span className="text-[10px] text-white/30 uppercase font-bold tracking-tighter mb-0.5">Humidity</span>
-          <span className="text-sm font-medium text-white/80">{humidity}%</span>
+          <span className="text-white/30 uppercase font-bold tracking-tighter" style={{ fontSize: labelFontPx, lineHeight: 1, marginBottom: 2 }}>Humidity</span>
+          <span className="font-medium text-white/80" style={{ fontSize: valueFontPx, lineHeight: 1 }}>{humidity}%</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-[10px] text-white/30 uppercase font-bold tracking-tighter mb-0.5">Mode</span>
-          <span className="text-sm font-medium text-white/80 capitalize">{mode.toLowerCase()}</span>
+          <span className="text-white/30 uppercase font-bold tracking-tighter" style={{ fontSize: labelFontPx, lineHeight: 1, marginBottom: 2 }}>Mode</span>
+          <span className="font-medium text-white/80 capitalize" style={{ fontSize: valueFontPx, lineHeight: 1 }}>{mode.toLowerCase()}</span>
         </div>
       </div>
     </div>

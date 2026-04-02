@@ -7,6 +7,7 @@ import {
   Trash2, X, Plus, Minus, Radio, Search, MapPin, Music, GripVertical,
 } from 'lucide-react';
 import { COIN_CATALOG } from '@/components/widgets/CryptoWidget';
+import { STOCK_CATALOG } from '@/components/widgets/StocksWidget';
 import { useAppState } from '@/context/AppState';
 import {
   WIDGET_TYPE_META,
@@ -491,6 +492,129 @@ function CoinPicker({ coins, onChange }: { coins: string[]; onChange: (coins: st
   );
 }
 
+// --- Stock picker with drag-to-reorder ---
+function StockPicker({ symbols, onChange }: { symbols: string[]; onChange: (symbols: string[]) => void }) {
+  const [search, setSearch] = useState('');
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+  const symSet = new Set(symbols);
+  const searchLower = search.toLowerCase();
+
+  const allStocks = Object.entries(STOCK_CATALOG);
+  const filtered = search
+    ? allStocks.filter(([ticker, name]) =>
+        name.toLowerCase().includes(searchLower) ||
+        ticker.toLowerCase().includes(searchLower))
+    : [];
+
+  const toggle = (ticker: string) => {
+    if (symSet.has(ticker)) {
+      onChange(symbols.filter(s => s !== ticker));
+    } else {
+      onChange([...symbols, ticker]);
+    }
+  };
+
+  const handleDragStart = (i: number) => setDragIdx(i);
+  const handleDragOver = (e: React.DragEvent, i: number) => { e.preventDefault(); setOverIdx(i); };
+  const handleDrop = (i: number) => {
+    if (dragIdx === null || dragIdx === i) { setDragIdx(null); setOverIdx(null); return; }
+    const next = [...symbols];
+    const [moved] = next.splice(dragIdx, 1);
+    next.splice(i, 0, moved);
+    onChange(next);
+    setDragIdx(null);
+    setOverIdx(null);
+  };
+  const handleDragEnd = () => { setDragIdx(null); setOverIdx(null); };
+
+  return (
+    <div className="space-y-2">
+      {/* Selected stocks - draggable to reorder */}
+      {symbols.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Selected (drag to reorder)</div>
+          <div className="max-h-[200px] overflow-y-auto scrollbar-hide space-y-px">
+            {symbols.map((ticker, i) => {
+              const name = STOCK_CATALOG[ticker] || ticker;
+              const isDragging = dragIdx === i;
+              const isOver = overIdx === i;
+              return (
+                <div
+                  key={ticker}
+                  draggable
+                  onDragStart={() => handleDragStart(i)}
+                  onDragOver={(e) => handleDragOver(e, i)}
+                  onDrop={() => handleDrop(i)}
+                  onDragEnd={handleDragEnd}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-grab active:cursor-grabbing ${
+                    isDragging ? 'opacity-30' : isOver ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30' : 'bg-white/[0.03] border border-transparent'
+                  }`}
+                >
+                  <GripVertical size={10} className="text-white/15 shrink-0" />
+                  <span className="text-[10px] font-bold text-white/50 w-10 shrink-0">{ticker}</span>
+                  <span className="text-[11px] text-white/70 flex-1 truncate">{name}</span>
+                  <button
+                    onClick={() => toggle(ticker)}
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-red-400/50 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                  >
+                    <X size={8} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Search to add */}
+      <div className="space-y-1">
+        <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Add Stocks</div>
+        <div className="relative">
+          <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-white/20" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by company name (e.g. Apple, Tesla)..."
+            className="w-full bg-[#252528] border border-white/[0.06] rounded-lg pl-6 pr-2 py-1.5 text-[11px] text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
+          />
+        </div>
+        {search && (
+          <div className="max-h-[200px] overflow-y-auto scrollbar-hide space-y-px">
+            {filtered.length === 0 ? (
+              <div className="text-[10px] text-white/25 py-2 text-center">No stocks match &quot;{search}&quot;</div>
+            ) : (
+              filtered.slice(0, 30).map(([ticker, name]) => {
+                const selected = symSet.has(ticker);
+                return (
+                  <button
+                    key={ticker}
+                    onClick={() => { toggle(ticker); if (!selected) setSearch(''); }}
+                    className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-[11px] transition-colors ${
+                      selected
+                        ? 'bg-[#6b8aab]/15 text-white/90'
+                        : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'
+                    }`}
+                  >
+                    <div className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
+                      selected ? 'bg-[#6b8aab] border-[#6b8aab]' : 'border-white/15'
+                    }`}>
+                      {selected && <span className="text-[8px] text-white font-bold">&#10003;</span>}
+                    </div>
+                    <span className="text-[10px] font-bold text-white/40 w-10 shrink-0">{ticker}</span>
+                    <span className="flex-1 truncate">{name}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // --- All teams by league ---
 const ALL_TEAMS: Record<string, { name: string; abbr: string }[]> = {
   NFL: [
@@ -891,11 +1015,9 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
     case 'stocks':
       return (
         <ConfigSection title="Markets Settings">
-          <EditableList
-            label="Tickers"
-            items={(cfg.symbols as string[]) || []}
-            onChange={items => updateConfig({ symbols: items })}
-            placeholder="e.g. AAPL"
+          <StockPicker
+            symbols={(cfg.symbols as string[]) || []}
+            onChange={symbols => updateConfig({ symbols })}
           />
         </ConfigSection>
       );
