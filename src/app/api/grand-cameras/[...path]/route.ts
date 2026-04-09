@@ -34,19 +34,9 @@ export async function GET(
       return new NextResponse(`Upstream returned ${res.status}`, { status: res.statusText === 'Unauthorized' ? 502 : res.status });
     }
 
-    const contentType = res.headers.get('content-type') || 'application/octet-stream';
-    const body = await res.arrayBuffer();
-
-    // For .m3u8 manifests, we might need to rewrite segment URLs
+    // For .m3u8 manifests, read as text (small payload)
     if (subPath.endsWith('.m3u8')) {
-      let manifest = new TextDecoder().decode(body);
-
-      // Rewrite relative segment URLs to go through this proxy
-      // HLS segments are typically relative paths like "stream0.ts" or numbered segments
-      // We need to keep them relative so they route through this same API path
-      // Since Next.js serves this at /api/grand-cameras/[...path], relative URLs
-      // in the manifest will naturally resolve against the same directory
-
+      const manifest = await res.text();
       return new NextResponse(manifest, {
         headers: {
           'Content-Type': 'application/vnd.apple.mpegurl',
@@ -56,10 +46,10 @@ export async function GET(
       });
     }
 
-    // For .ts segments and other binary content
-    return new NextResponse(body, {
+    // For .ts segments, stream the body through instead of buffering
+    return new NextResponse(res.body, {
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': res.headers.get('content-type') || 'video/mp2t',
         'Cache-Control': 'no-cache',
         'Access-Control-Allow-Origin': '*',
       },
