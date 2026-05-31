@@ -17,7 +17,10 @@ export async function POST(request: Request) {
     const response = NextResponse.json({ ok: true });
     response.cookies.set('cc-auth', secret, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      // Secure cookies require HTTPS. When self-hosted on the LAN over plain
+      // http:// (e.g. the Frame TV pointing at http://192.168.4.21:3001), set
+      // COOKIE_INSECURE=1 so the auth cookie is allowed to stick.
+      secure: process.env.NODE_ENV === 'production' && process.env.COOKIE_INSECURE !== '1',
       sameSite: 'lax',
       path: '/',
       // 30 days

@@ -1,0 +1,15 @@
+# Self-hosted Command Center on lenovo-worker.
+# Port 3001 (8080=EOC, 8888=cameras-nginx, 11434=Ollama are already in use).
+# The Frame TV / kiosk points at http://192.168.4.21:3001
+services:
+  command-center-web:
+    build: .
+    image: command-center-web:local
+    container_name: command-center-web
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
