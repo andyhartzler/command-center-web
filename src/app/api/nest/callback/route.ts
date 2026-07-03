@@ -17,12 +17,14 @@ export async function GET(req: NextRequest) {
   }
 
   const origin = req.nextUrl.origin;
+  // Must match the redirect_uri sent in /api/nest/auth exactly (Google enforces byte equality).
+  const publicBase = (process.env.PUBLIC_BASE_URL || 'https://hartzler.app').replace(/\/$/, '');
 
   const params = new URLSearchParams({
     code,
     client_id: clientId,
     client_secret: clientSecret,
-    redirect_uri: `${origin}/api/nest/callback`,
+    redirect_uri: `${publicBase}/api/nest/callback`,
     grant_type: 'authorization_code',
   });
 

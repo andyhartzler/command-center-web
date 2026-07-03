@@ -9,14 +9,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Nest credentials not configured' }, { status: 500 });
   }
 
-  const origin = req.nextUrl.origin;
+  // Google OAuth (Web client) rejects private-IP / http redirect URIs, so the
+  // callback must be a stable, pre-registered HTTPS URL regardless of whether
+  // the dashboard was opened on the LAN IP, localhost, or the public domain.
+  const publicBase = (process.env.PUBLIC_BASE_URL || 'https://hartzler.app').replace(/\/$/, '');
   const state = crypto.randomBytes(16).toString('hex');
 
   const params = new URLSearchParams({
     access_type: 'offline',
     response_type: 'code',
     client_id: clientId,
-    redirect_uri: `${origin}/api/nest/callback`,
+    redirect_uri: `${publicBase}/api/nest/callback`,
     scope: 'https://www.googleapis.com/auth/sdm.service',
     state,
     prompt: 'consent',
