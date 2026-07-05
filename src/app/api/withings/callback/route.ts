@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Withings credentials not configured' }, { status: 500 });
   }
 
-  const origin = req.nextUrl.origin;
-  // Must match the redirect_uri sent in /api/withings/auth exactly.
+  // Public HTTPS base for both the token-exchange redirect_uri and all user-facing
+  // redirects (req.nextUrl.origin is https://localhost:3001 behind the tunnel).
   const publicBase = (process.env.PUBLIC_BASE_URL || 'https://hartzler.app').replace(/\/$/, '');
 
   // Get nonce and sign the request
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
   if (tokenData.status !== 0) {
     console.error('[Withings] Token exchange failed:', JSON.stringify(tokenData));
-    const redirectUrl = new URL('/', origin);
+    const redirectUrl = new URL('/', publicBase);
     redirectUrl.searchParams.set('withings_error', `status_${tokenData.status}`);
     const response = NextResponse.redirect(redirectUrl);
     response.cookies.delete('withings_state');
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 
   await saveTokens(tokens);
 
-  const redirectUrl = new URL('/', origin);
+  const redirectUrl = new URL('/', publicBase);
   redirectUrl.searchParams.set('withings', 'connected');
   const response = NextResponse.redirect(redirectUrl);
   response.cookies.delete('withings_state');

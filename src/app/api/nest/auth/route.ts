@@ -31,7 +31,8 @@ export async function GET(req: NextRequest) {
   const response = NextResponse.redirect(authUrl);
   response.cookies.set('nest_state', state, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    // Match the cc-auth policy so LAN-http-initiated connects can set the state cookie.
+    secure: process.env.NODE_ENV === 'production' && process.env.COOKIE_INSECURE !== '1',
     sameSite: 'lax',
     maxAge: 600,
     path: '/',

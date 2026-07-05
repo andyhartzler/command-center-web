@@ -42,7 +42,7 @@ export function setTokensCookie(response: NextResponse, tokens: StoredTokens): v
   const encoded = Buffer.from(JSON.stringify(tokens)).toString('base64');
   response.cookies.set(COOKIE_NAME, encoded, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === 'production' && process.env.COOKIE_INSECURE !== '1',
     sameSite: 'lax',
     path: '/',
     maxAge: 365 * 24 * 60 * 60, // 1 year (refresh token TTL)

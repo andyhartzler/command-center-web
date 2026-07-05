@@ -16,8 +16,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Nest credentials not configured' }, { status: 500 });
   }
 
-  const origin = req.nextUrl.origin;
-  // Must match the redirect_uri sent in /api/nest/auth exactly (Google enforces byte equality).
+  // Everything user-facing must use the public HTTPS base, not req.nextUrl.origin
+  // (which resolves to https://localhost:3001 behind the Cloudflare tunnel and
+  // dead-ends the browser). Also the token-exchange redirect_uri must match /auth exactly.
   const publicBase = (process.env.PUBLIC_BASE_URL || 'https://hartzler.app').replace(/\/$/, '');
 
   const params = new URLSearchParams({
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   if (tokenData.error) {
     console.error('[Nest] Token exchange failed:', JSON.stringify(tokenData));
-    const redirectUrl = new URL('/', origin);
+    const redirectUrl = new URL('/', publicBase);
     redirectUrl.searchParams.set('nest_error', tokenData.error);
     const response = NextResponse.redirect(redirectUrl);
     response.cookies.delete('nest_state');
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
 
   await saveTokens(tokens);
 
-  const redirectUrl = new URL('/', origin);
+  const redirectUrl = new URL('/', publicBase);
   redirectUrl.searchParams.set('nest', 'connected');
   const response = NextResponse.redirect(redirectUrl);
   response.cookies.delete('nest_state');
