@@ -18,6 +18,8 @@ export async function GET(req: NextRequest) {
   }
 
   const origin = req.nextUrl.origin;
+  // Must match the redirect_uri sent in /api/withings/auth exactly.
+  const publicBase = (process.env.PUBLIC_BASE_URL || 'https://hartzler.app').replace(/\/$/, '');
 
   // Get nonce and sign the request
   const nonce = await getNonce(clientId, clientSecret);
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
     code,
     client_id: clientId,
     client_secret: clientSecret,
-    redirect_uri: `${origin}/api/withings/callback`,
+    redirect_uri: `${publicBase}/api/withings/callback`,
     nonce,
     signature,
   });

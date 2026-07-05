@@ -7,14 +7,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'WITHINGS_CLIENT_ID not configured' }, { status: 500 });
   }
 
-  const origin = req.nextUrl.origin;
+  // Pin to a stable public HTTPS callback (registered with Withings) so the
+  // Cloudflare tunnel's internal http/localhost origin never leaks into redirect_uri.
+  const publicBase = (process.env.PUBLIC_BASE_URL || 'https://hartzler.app').replace(/\/$/, '');
   const state = crypto.randomBytes(16).toString('hex');
 
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
     scope: 'user.metrics,user.activity',
-    redirect_uri: `${origin}/api/withings/callback`,
+    redirect_uri: `${publicBase}/api/withings/callback`,
     state,
   });
 
