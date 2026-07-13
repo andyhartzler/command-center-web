@@ -16,11 +16,16 @@ export async function GET(
   const subPath = path.join('/');
 
   // Only allow hls paths for security
-  if (!subPath.match(/^[0-9]+\//)) {
+  const match = subPath.match(/^([0-9]+)(_sub|_main)?\/(.+)$/);
+  if (!match) {
     return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
   }
 
-  const targetUrl = `${BASE_URL}/hls/${subPath}`;
+  // Widgets get the sub-stream by default: the cameras' main profile is
+  // GOP-bound to irregular 3-10s segments at 4x the bitrate, which cannot
+  // stream smoothly through the tunnel. `{cam}_main` opts back into full res.
+  const dir = match[2] === '_main' ? match[1] : `${match[1]}_sub`;
+  const targetUrl = `${BASE_URL}/hls/${dir}/${match[3]}`;
 
   try {
     const res = await fetch(targetUrl, {

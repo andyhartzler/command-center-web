@@ -38,12 +38,14 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
+        // Not LL-HLS upstream; chasing the live edge too hard causes stalls
+        // when segment delivery jitters through the tunnel.
+        lowLatencyMode: false,
         backBufferLength: 5,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 20,
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 5,
+        maxBufferLength: 15,
+        maxMaxBufferLength: 30,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 8,
         liveBackBufferLength: 5,
         manifestLoadingTimeOut: 8000,
         levelLoadingTimeOut: 8000,
