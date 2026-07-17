@@ -43,3 +43,6 @@ data/withings-tokens.json
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# runtime state (OAuth tokens, flight ledger) on the persistent volume
+data/
