@@ -1,0 +1,73 @@
+version: "3.8"
+name: eoc-pipeline
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eoc
+      POSTGRES_USER: eoc
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eoc -d eoc"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://eoc:${DB_PASSWORD}@db:5432/eoc
+    depends_on:
+      db:
+        condition: service_healthy
+
+  citizen-poller:
+    build:
+      context: ./workers
+    restart: unless-stopped
+    command: python -m workers.citizen_poller
+    environment:
+      DATABASE_URL: postgresql://eoc:${DB_PASSWORD}@db:5432/eoc
+    depends_on:
+      db:
+        condition: service_healthy
+
+  kcpd-poller:
+    build:
+      context: ./workers
+    restart: unless-stopped
+    command: python -m workers.kcpd_poller
+    environment:
+      DATABASE_URL: postgresql://eoc:${DB_PASSWORD}@db:5432/eoc
+    depends_on:
+      db:
+        condition: service_healthy
+
+  scanner:
+    build:
+      context: ./workers
+    restart: unless-stopped
+    command: python -m workers.scanner_worker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: postgresql://eoc:${DB_PASSWORD}@db:5432/eoc
+      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: gemma3:4b
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
