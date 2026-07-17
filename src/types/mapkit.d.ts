@@ -118,6 +118,27 @@ declare namespace mapkit {
     style: OverlayStyle;
   }
 
+  class Style {
+    constructor(options?: Partial<StyleOptions>);
+  }
+
+  interface StyleOptions {
+    lineWidth: number;
+    strokeColor: string;
+    strokeOpacity: number;
+    fillColor: string;
+    fillOpacity: number;
+    lineDash: number[];
+    lineCap: string;
+    lineJoin: string;
+  }
+
+  class PolylineOverlay implements Overlay {
+    constructor(points: Coordinate[], options?: { style?: Style });
+    points: Coordinate[];
+    style: OverlayStyle;
+  }
+
   interface Overlay {
     style: OverlayStyle;
   }

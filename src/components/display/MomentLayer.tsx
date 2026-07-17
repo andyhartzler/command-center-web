@@ -23,7 +23,9 @@ const GLOW_MS = 2600;
 const AUTONAV_HOLD_MS = 90_000;
 
 export function MomentProvider({ children }: { children: ReactNode }) {
-  const { currentPageIndex, setCurrentPageIndex, isDisplayMode } = useAppState();
+  const { pages, currentPageIndex, setCurrentPageIndex, isDisplayMode } = useAppState();
+  const pagesRef = useRef(pages);
+  pagesRef.current = pages;
   const [active, setActive] = useState<Moment | null>(null);
   const queueRef = useRef<Moment[]>([]);
   const busyRef = useRef(false);
@@ -42,16 +44,22 @@ export function MomentProvider({ children }: { children: ReactNode }) {
     busyRef.current = true;
     setActive(next);
 
-    // High-priority moments navigate the kiosk to the source page and return
+    // High-priority moments navigate the kiosk to the source page and return.
+    // The page index is resolved here from the widget id so publishers do not
+    // need to know the page layout.
+    const resolvedIndex =
+      typeof next.pageIndex === 'number'
+        ? next.pageIndex
+        : pagesRef.current.findIndex(p => p.widgets.some(w => w.id === next.widgetId));
     if (
       next.priority === 'high' &&
       displayRef.current &&
-      typeof next.pageIndex === 'number' &&
-      next.pageIndex !== pageRef.current
+      resolvedIndex >= 0 &&
+      resolvedIndex !== pageRef.current
     ) {
       if (returnRef.current) clearTimeout(returnRef.current.timer);
       const homeIndex = returnRef.current?.pageIndex ?? pageRef.current;
-      setCurrentPageIndex(next.pageIndex);
+      setCurrentPageIndex(resolvedIndex);
       returnRef.current = {
         pageIndex: homeIndex,
         timer: setTimeout(() => {

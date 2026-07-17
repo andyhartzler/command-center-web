@@ -63,7 +63,7 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
     case 'liveTV': return <LiveTVWidget config={widgetConfig.config} style={style} />;
     case 'moonPhase': return <MoonPhaseWidget config={widgetConfig.config} style={style} />;
     case 'flightStatus': return <FlightStatusWidget config={widgetConfig.config} style={style} />;
-    case 'aircraftTracker': return <AircraftTrackerWidget config={widgetConfig.config} style={style} />;
+    case 'aircraftTracker': return <AircraftTrackerWidget config={widgetConfig.config} style={style} widgetId={widget.id} />;
     case 'calendar': return <CalendarWidget config={widgetConfig.config} style={style} />;
     case 'airQuality': return <AirQualityWidget config={widgetConfig.config} style={style} />;
     case 'appleMusic': return <AppleMusicWidget config={widgetConfig.config} style={style} />;

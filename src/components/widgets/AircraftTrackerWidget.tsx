@@ -1,12 +1,46 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Plane, PlaneTakeoff } from 'lucide-react';
 import { type AircraftTrackerConfig, type WidgetStyle } from '@/types/widget';
-import { Plane, MapPin, Clock, Calendar } from 'lucide-react';
+import { usePolledData } from '@/hooks/usePolledData';
+import { useSharedClock, formatAge } from '@/hooks/useSharedClock';
+import { useAppleMap } from '@/hooks/useAppleMap';
+import { publishMoment } from '@/lib/moments';
+import { tokens } from '@/lib/tokens';
+import { TickingNumber } from '../motion/TickingNumber';
 
-interface FlightLog {
+// The flagship widget: Dad's plane on a live map.
+// Trust rules: never render a number the pipeline did not measure; always
+// show fix age while airborne; approximations carry a tilde.
+
+type FlightPhase = 'idle' | 'filed' | 'departed' | 'enroute' | 'approaching' | 'landed' | 'unknown';
+
+interface AirportInfo {
+  code: string;
+  name: string;
+  city: string;
+  lat: number;
+  lon: number;
+}
+
+interface LiveFix {
+  lat: number;
+  lon: number;
+  altitudeFt: number | null;
+  onGround: boolean;
+  groundspeedKts: number | null;
+  trackDeg: number | null;
+  seenPosSec: number | null;
+  fetchedAt: number;
+  source: string;
+}
+
+interface FlightLogEntry {
   date: string;
   departure: string;
+  departureAirport: AirportInfo | null;
   arrival: string;
+  arrivalAirport: AirportInfo | null;
   departureTime: string;
   arrivalTime: string;
   duration: string;
@@ -15,209 +49,540 @@ interface FlightLog {
 
 interface TrackerData {
   tailNumber: string;
-  owner: string;
   aircraftType: string;
-  lastSeen: string | null;
+  phase: FlightPhase;
   isAirborne: boolean;
-  currentFlight: {
-    departure: string;
-    arrival: string;
-    altitude: number;
-    speed: number;
-    heading: number;
-    lat: number;
-    lon: number;
+  lastSeen: string | null;
+  live: LiveFix | null;
+  lastFix: LiveFix | null;
+  trail: Array<[number, number, number | null]>;
+  route: {
+    origin: AirportInfo | null;
+    originCode: string;
+    destination: AirportInfo | null;
+    destinationCode: string;
+    totalNm: number | null;
+    remainingNm: number | null;
+    progressPct: number | null;
+    etaMinutes: number | null;
   } | null;
-  recentFlights: FlightLog[];
-  source: string;
+  recentFlights: FlightLogEntry[];
+  stats: { flightsThisMonth: number; minutesThisMonth: number; longestRecentLeg: string | null };
+  photo: { url: string; attribution: string } | null;
 }
+
+const PHASE_LABEL: Record<FlightPhase, string> = {
+  idle: 'On the ground',
+  filed: 'Flight plan filed',
+  departed: 'Departed',
+  enroute: 'Airborne',
+  approaching: 'Approaching',
+  landed: 'Landed',
+  unknown: 'Signal lost',
+};
+
+const PHASE_COLOR: Record<FlightPhase, string> = {
+  idle: 'var(--color-text-3)',
+  filed: 'var(--color-info)',
+  departed: 'var(--color-ok)',
+  enroute: 'var(--color-ok)',
+  approaching: 'var(--color-warn)',
+  landed: 'var(--color-ok)',
+  unknown: 'var(--color-warn)',
+};
+
+const ACTIVE_PHASES: FlightPhase[] = ['filed', 'departed', 'enroute', 'approaching'];
+
+// Home field fallback when history is empty (Lawrence Smith Memorial)
+const HOME_FALLBACK = { lat: 38.6099, lon: -94.3435 };
 
 interface AircraftTrackerWidgetProps {
   config: AircraftTrackerConfig;
   style: WidgetStyle;
+  widgetId?: string;
 }
 
-function formatDuration(mins: number): string {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+function planeGlyph(color: string, size = 26): string {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" style="filter: drop-shadow(0 0 6px ${tokens.accentGlow})"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`;
 }
 
-function formatCentralTime(timeStr: string): string {
-  if (!timeStr || timeStr === '(?)' || timeStr.includes('?')) return '';
-  // Handle FlightAware raw times like "02:56a CDT", "3:23PM CST", "3:23 PM CDT"
-  const rawMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*(a|p|am|pm)\s*\w*$/i);
-  if (rawMatch) {
-    let hour = parseInt(rawMatch[1]);
-    const min = rawMatch[2];
-    const isPM = rawMatch[3].toLowerCase().startsWith('p');
-    if (isPM && hour < 12) hour += 12;
-    if (!isPM && hour === 12) hour = 0;
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    return `${displayHour}:${min} ${ampm}`;
-  }
-  // If it's already a formatted time like "3:23 PM", return as-is
-  if (/\d{1,2}:\d{2}\s*(AM|PM)/i.test(timeStr)) return timeStr;
-  // If ISO date string, convert to Central time
-  try {
-    const d = new Date(timeStr);
-    if (isNaN(d.getTime())) return timeStr;
-    return d.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'America/Chicago',
-    });
-  } catch {
-    return timeStr;
-  }
-}
+export function AircraftTrackerWidget({ config, style, widgetId }: AircraftTrackerWidgetProps) {
+  const now = useSharedClock();
+  const [live, setLive] = useState(false);
 
-export function AircraftTrackerWidget({ config }: AircraftTrackerWidgetProps) {
-  const [data, setData] = useState<TrackerData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isStale, lastUpdated } = usePolledData<TrackerData>(
+    `/api/aircraft?tail=${encodeURIComponent(config.tailNumber)}`,
+    { interval: 15 * 60_000, liveInterval: 20_000, live },
+  );
 
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/aircraft?tail=${encodeURIComponent(config.tailNumber)}`);
-      if (res.ok) {
-        const d = await res.json();
-        setData(d);
-        setError(null);
-      } else {
-        setError('Failed to fetch aircraft data');
-      }
-    } catch (err) {
-      console.error('[AircraftTracker] fetch error', err);
-      setError('Network error');
-    } finally {
-      setLoading(false);
-    }
-  }, [config.tailNumber]);
-
+  // Adaptive cadence follows the server phase
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 15 * 60_000); // check every 15 minutes
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    if (!data) return;
+    setLive(ACTIVE_PHASES.includes(data.phase));
+  }, [data]);
+
+  // Publish moments on real phase transitions
+  const prevPhase = useRef<FlightPhase | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    const prev = prevPhase.current;
+    prevPhase.current = data.phase;
+    if (!prev || prev === data.phase || !widgetId) return;
+
+    const routeText = data.route
+      ? `${data.route.originCode || '...'} to ${data.route.destinationCode || '...'}`
+      : '';
+    if ((prev === 'idle' || prev === 'filed') && (data.phase === 'departed' || data.phase === 'enroute')) {
+      publishMoment({
+        type: 'aircraft.departed',
+        widgetId,
+        headline: `${config.ownerLabel} departed ${routeText}`,
+        priority: config.autoJump === false ? 'normal' : 'high',
+      });
+    }
+    if (data.phase === 'landed' && prev !== 'landed') {
+      publishMoment({
+        type: 'aircraft.landed',
+        widgetId,
+        headline: `${config.ownerLabel} landed`,
+        priority: config.autoJump === false ? 'normal' : 'high',
+      });
+    }
+  }, [data, widgetId, config.ownerLabel, config.autoJump]);
+
+  const phase: FlightPhase = data?.phase ?? 'idle';
+  const isActive = ACTIVE_PHASES.includes(phase) || phase === 'landed';
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#1a1a1c] rounded-2xl overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-violet-500/20 flex items-center justify-center">
-            <Plane size={12} className="text-violet-400" />
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-white/90 tracking-wide">
-                {config.ownerLabel}
-              </span>
-              <span className="text-[9px] text-white/40 font-mono">{config.tailNumber}</span>
-            </div>
-            {data?.aircraftType && (
-              <span className="text-[8px] text-white/30 font-mono leading-tight">{data.aircraftType}</span>
-            )}
-          </div>
+    <div className="w-full h-full relative overflow-hidden" style={{ opacity: style.opacity }}>
+      <TrackerMap data={data} phase={phase} homeAirport={config.homeAirport} />
+
+      {/* Identity chip */}
+      <div className="absolute top-2.5 left-2.5 z-10 glass-chip flex items-center gap-2.5 px-3 py-2">
+        {config.showPhoto !== false && data?.photo?.url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={data.photo.url}
+            alt={`${config.tailNumber}`}
+            className="w-12 h-9 object-cover rounded-[8px]"
+            style={{ border: '1px solid var(--border-card)' }}
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : (
+          <span
+            className="w-8 h-8 rounded-[8px] flex items-center justify-center"
+            style={{ background: 'var(--color-surface-2)' }}
+          >
+            <Plane size={16} style={{ color: 'var(--color-accent-400)' }} aria-hidden />
+          </span>
+        )}
+        <div className="flex flex-col">
+          <span className="type-label" style={{ fontSize: 12 }}>{config.ownerLabel}</span>
+          <span className="font-mono text-[16px] font-semibold" style={{ color: 'var(--color-text-1)' }}>
+            {config.tailNumber}
+          </span>
+          {data?.aircraftType && (
+            <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
+              {data.aircraftType === 'S22T' ? 'CIRRUS SR22T' : data.aircraftType}
+            </span>
+          )}
         </div>
-        {data?.isAirborne && (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[9px] font-semibold text-emerald-400">AIRBORNE</span>
-          </div>
+      </div>
+
+      {/* Phase chip */}
+      <div className="absolute top-2.5 right-2.5 z-10 glass-chip flex items-center gap-2 px-3 py-1.5">
+        {(phase === 'enroute' || phase === 'departed') && <span className="live-dot" aria-hidden />}
+        {phase === 'filed' && (
+          <span className="live-dot" style={{ background: 'var(--color-info)', animationDuration: '3.6s' }} aria-hidden />
+        )}
+        <span
+          className="font-mono text-[13px] font-semibold uppercase"
+          style={{ color: PHASE_COLOR[phase], letterSpacing: 'var(--tracking-caps)' }}
+        >
+          {PHASE_LABEL[phase]}
+        </span>
+        {isStale && lastUpdated && (
+          <span className="font-mono text-[11px]" style={{ color: 'var(--color-warn)' }}>
+            {formatAge(lastUpdated, now)}
+          </span>
         )}
       </div>
 
-      {/* Current flight info when airborne */}
-      {data?.isAirborne && data.currentFlight && (
-        <div className="px-3 py-2 mx-2 mb-1 rounded-lg bg-white/[0.04] border border-white/[0.06] shrink-0">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-white/60">{data.currentFlight.departure}</span>
-            <div className="flex-1 flex items-center mx-2">
-              <div className="flex-1 h-px bg-white/10" />
-              <Plane size={10} className="text-violet-400 mx-1 -rotate-45" />
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
-            <span className="text-[10px] text-white/60">{data.currentFlight.arrival || '???'}</span>
-          </div>
-          <div className="flex items-center gap-3 text-[9px] text-white/30">
-            <span>ALT {data.currentFlight.altitude.toLocaleString()}ft</span>
-            <span>{data.currentFlight.speed}kts</span>
-            <span>HDG {data.currentFlight.heading}°</span>
-          </div>
+      {/* Coverage-drop honesty: airborne without a live fix */}
+      {(phase === 'enroute' || phase === 'departed' || phase === 'unknown') && !data?.live && data?.lastFix && (
+        <div className="absolute top-14 right-2.5 z-10 glass-chip px-2.5 py-1">
+          <span className="font-mono text-[12px]" style={{ color: 'var(--color-warn)' }}>
+            LAST SEEN {formatAge(data.lastFix.fetchedAt, now).toUpperCase()}
+          </span>
         </div>
       )}
 
-      {/* Flight log list */}
-      <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-2">
-              <Plane size={20} className="text-white/20 animate-pulse" />
-              <span className="text-[10px] text-white/30">Tracking {config.tailNumber}...</span>
+      {/* Telemetry strip while flying, or landed summary, or idle rail */}
+      {isActive && phase !== 'landed' && phase !== 'filed' && (
+        <TelemetryStrip data={data} now={now} />
+      )}
+      {phase === 'landed' && <LandedCard data={data} />}
+      {(phase === 'idle' || phase === 'filed') && <IdleRail data={data} now={now} phase={phase} />}
+    </div>
+  );
+}
+
+// ── Map layer ───────────────────────────────────────────────────────────────
+
+function TrackerMap({ data, phase, homeAirport }: {
+  data: TrackerData | null;
+  phase: FlightPhase;
+  homeAirport?: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const home = useMemo(() => {
+    const first = data?.recentFlights?.[0];
+    return (
+      first?.arrivalAirport ??
+      first?.departureAirport ??
+      { lat: HOME_FALLBACK.lat, lon: HOME_FALLBACK.lon }
+    );
+  }, [data?.recentFlights]);
+
+  const { map, ready } = useAppleMap(containerRef, {
+    center: [home.lat, home.lon],
+    zoom: 9,
+    interactive: false,
+  });
+
+  const planeAnnotationRef = useRef<mapkit.Annotation | null>(null);
+  const deadReckonRef = useRef<number>(0);
+
+  // Rebuild overlays when the route or phase changes
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready) return;
+
+    m.removeOverlays(m.overlays);
+    m.removeAnnotations(m.annotations);
+    planeAnnotationRef.current = null;
+
+    const route = data?.route;
+    const origin = route?.origin;
+    const dest = route?.destination;
+    const fix = data?.live ?? data?.lastFix ?? null;
+    const flying = phase === 'enroute' || phase === 'approaching' || phase === 'departed';
+
+    // Idle route-frequency web: last 10 legs as faint arcs
+    if ((phase === 'idle' || phase === 'filed') && data?.recentFlights) {
+      const seen = new Set<string>();
+      for (const f of data.recentFlights.slice(0, 10)) {
+        if (!f.departureAirport || !f.arrivalAirport) continue;
+        const key = [f.departure, f.arrival].sort().join('-');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        m.addOverlay(new mapkit.PolylineOverlay(
+          [
+            new mapkit.Coordinate(f.departureAirport.lat, f.departureAirport.lon),
+            new mapkit.Coordinate(f.arrivalAirport.lat, f.arrivalAirport.lon),
+          ],
+          { style: new mapkit.Style({ lineWidth: 1, strokeColor: tokens.accent400, strokeOpacity: 0.18 }) },
+        ));
+      }
+    }
+
+    // Airport dots + labels
+    const airportDot = (ap: AirportInfo, emphasized: boolean) => {
+      const annotation = new mapkit.Annotation(
+        new mapkit.Coordinate(ap.lat, ap.lon),
+        () => {
+          const el = document.createElement('div');
+          el.style.display = 'flex';
+          el.style.flexDirection = 'column';
+          el.style.alignItems = 'center';
+          el.style.gap = '3px';
+          el.innerHTML = `
+            <div style="width:${emphasized ? 10 : 8}px;height:${emphasized ? 10 : 8}px;border-radius:50%;
+              background:${emphasized ? tokens.accent300 : tokens.text3};
+              border:1.5px solid ${tokens.bg0};box-shadow:0 0 8px ${tokens.accentGlow}"></div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:${tokens.text2};
+              background:${tokens.glassBg};padding:1px 6px;border-radius:6px;white-space:nowrap">
+              ${ap.code}${ap.city ? ` ${ap.city}` : ''}</div>`;
+          return el;
+        },
+        { anchorOffset: new DOMPoint(0, 0) },
+      );
+      m.addAnnotation(annotation);
+    };
+
+    if (origin) airportDot(origin, false);
+    if (dest) airportDot(dest, true);
+
+    // Route arc: flown solid + remaining dotted
+    if (flying && origin && dest) {
+      const toCoord = ([lat, lon]: [number, number]) => new mapkit.Coordinate(lat, lon);
+      // dynamic import would be overkill; the arc math lives server-side too,
+      // so approximate client-side with a flat interpolation for short GA legs
+      const steps = 48;
+      const arc: Array<[number, number]> = [];
+      for (let i = 0; i <= steps; i++) {
+        const f = i / steps;
+        arc.push([origin.lat + (dest.lat - origin.lat) * f, origin.lon + (dest.lon - origin.lon) * f]);
+      }
+      const progress = (route?.progressPct ?? 0) / 100;
+      const split = Math.round(arc.length * progress);
+      if (split > 1) {
+        m.addOverlay(new mapkit.PolylineOverlay(arc.slice(0, split + 1).map(toCoord), {
+          style: new mapkit.Style({ lineWidth: 2, strokeColor: tokens.accent400, strokeOpacity: 0.9 }),
+        }));
+      }
+      m.addOverlay(new mapkit.PolylineOverlay(arc.slice(Math.max(0, split)).map(toCoord), {
+        style: new mapkit.Style({ lineWidth: 2, strokeColor: tokens.accent400, strokeOpacity: 0.35, lineDash: [4, 6] }),
+      }));
+    }
+
+    // Breadcrumb trail
+    if (flying && data?.trail && data.trail.length > 1) {
+      const pts = data.trail.slice(-20).map(([lat, lon]) => new mapkit.Coordinate(lat, lon));
+      m.addOverlay(new mapkit.PolylineOverlay(pts, {
+        style: new mapkit.Style({ lineWidth: 1.5, strokeColor: tokens.accent300, strokeOpacity: 0.4 }),
+      }));
+    }
+
+    // The plane
+    if (fix && (flying || phase === 'landed' || phase === 'idle' || phase === 'unknown')) {
+      const hasSignal = !!data?.live;
+      const dimmed = !hasSignal || phase === 'idle';
+      const annotation = new mapkit.Annotation(
+        new mapkit.Coordinate(fix.lat, fix.lon),
+        () => {
+          const el = document.createElement('div');
+          el.style.transform = `rotate(${fix.trackDeg ?? 0}deg)`;
+          el.style.opacity = dimmed ? '0.5' : '1';
+          el.style.transition = 'opacity 800ms var(--ease-out)';
+          el.innerHTML = planeGlyph(dimmed ? tokens.text3 : tokens.accent300, phase === 'idle' ? 18 : 26);
+          return el;
+        },
+        { anchorOffset: new DOMPoint(0, 0) },
+      );
+      m.addAnnotation(annotation);
+      planeAnnotationRef.current = annotation;
+    }
+
+    // Camera framing
+    if (flying && origin && dest) {
+      const latMid = (origin.lat + dest.lat) / 2;
+      const lonMid = (origin.lon + dest.lon) / 2;
+      const latSpan = Math.max(0.4, Math.abs(origin.lat - dest.lat) * 1.7);
+      const lonSpan = Math.max(0.4, Math.abs(origin.lon - dest.lon) * 1.7);
+      m.setRegionAnimated(
+        new mapkit.CoordinateRegion(
+          new mapkit.Coordinate(latMid, lonMid),
+          new mapkit.CoordinateSpan(latSpan, lonSpan),
+        ),
+        true,
+      );
+    } else if (phase === 'approaching' && dest) {
+      m.setRegionAnimated(
+        new mapkit.CoordinateRegion(
+          new mapkit.Coordinate(dest.lat, dest.lon),
+          new mapkit.CoordinateSpan(0.5, 0.5),
+        ),
+        true,
+      );
+    } else if (!flying) {
+      const center = fix ?? home;
+      m.setRegionAnimated(
+        new mapkit.CoordinateRegion(
+          new mapkit.Coordinate(center.lat, center.lon),
+          new mapkit.CoordinateSpan(1.6, 1.6),
+        ),
+        true,
+      );
+    }
+  }, [map, ready, data, phase, home, homeAirport]);
+
+  // Dead-reckoning: glide the marker along its track between polls
+  useEffect(() => {
+    const fix = data?.live;
+    if (!fix || phase !== 'enroute' || !fix.groundspeedKts || !fix.trackDeg) return;
+
+    const kts = fix.groundspeedKts;
+    const trackRad = (fix.trackDeg * Math.PI) / 180;
+    const startLat = fix.lat;
+    const startLon = fix.lon;
+    const startTime = performance.now();
+
+    const stepFrame = () => {
+      const annotation = planeAnnotationRef.current;
+      if (!annotation) return;
+      const elapsedHr = (performance.now() - startTime) / 3_600_000;
+      const dNm = kts * elapsedHr;
+      const dLat = (dNm / 60) * Math.cos(trackRad);
+      const dLon = (dNm / 60) * Math.sin(trackRad) / Math.cos((startLat * Math.PI) / 180);
+      annotation.coordinate = new mapkit.Coordinate(startLat + dLat, startLon + dLon);
+      deadReckonRef.current = requestAnimationFrame(stepFrame);
+    };
+    deadReckonRef.current = requestAnimationFrame(stepFrame);
+    return () => cancelAnimationFrame(deadReckonRef.current);
+  }, [data?.live, phase]);
+
+  return <div ref={containerRef} className="absolute inset-0" />;
+}
+
+// ── Telemetry strip (enroute/approaching) ───────────────────────────────────
+
+function TelemetryStrip({ data, now }: { data: TrackerData | null; now: number }) {
+  const live = data?.live;
+  const route = data?.route;
+
+  const cells: Array<{ label: string; node: React.ReactNode }> = [];
+  if (live?.altitudeFt != null) {
+    cells.push({
+      label: 'ALT',
+      node: <><TickingNumber value={live.altitudeFt} className="text-[17px] font-medium" /> <span className="text-[11px]">FT</span></>,
+    });
+  }
+  if (live?.groundspeedKts != null) {
+    cells.push({
+      label: 'GS',
+      node: <><TickingNumber value={live.groundspeedKts} className="text-[17px] font-medium" /> <span className="text-[11px]">KTS</span></>,
+    });
+  }
+  if (live?.trackDeg != null) {
+    cells.push({ label: 'HDG', node: <span className="font-mono text-[17px] font-medium">{live.trackDeg}&deg;</span> });
+  }
+  if (route?.etaMinutes != null && route.etaMinutes >= 0) {
+    cells.push({
+      label: 'ETA',
+      node: <><TickingNumber value={route.etaMinutes} className="text-[17px] font-medium" /> <span className="text-[11px]">MIN</span></>,
+    });
+  }
+
+  return (
+    <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 glass-chip px-4 pt-2 pb-2.5">
+      <div className="flex items-center justify-between gap-3">
+        {route && (
+          <span className="font-mono text-[13px] shrink-0" style={{ color: 'var(--color-text-2)' }}>
+            {route.originCode || '...'}
+            <span style={{ color: 'var(--color-text-3)' }}> to </span>
+            {route.destinationCode || '...'}
+          </span>
+        )}
+        <div className="flex items-center gap-4 ml-auto">
+          {cells.map(cell => (
+            <div key={cell.label} className="flex items-baseline gap-1.5">
+              <span className="type-label" style={{ fontSize: 11 }}>{cell.label}</span>
+              <span style={{ color: 'var(--color-text-1)' }}>{cell.node}</span>
             </div>
-          </div>
-        ) : error || !data ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-2">
-              <Plane size={20} className="text-white/20" />
-              <span className="text-[10px] text-white/30">{error || 'No data available'}</span>
-              <span className="text-[8px] text-white/20">Set FLIGHTAWARE_KEY or ADSBX_KEY</span>
-            </div>
-          </div>
-        ) : data.recentFlights.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-2">
-              <Calendar size={18} className="text-white/20" />
-              <span className="text-[10px] text-white/30">No recent flights</span>
-              <span className="text-[8px] text-white/20">Last seen: {data.lastSeen || 'Unknown'}</span>
-            </div>
-          </div>
-        ) : (
-          data.recentFlights.map((flight, i) => (
-            <div
-              key={`${flight.date}-${flight.departure}-${i}`}
-              className={`px-3 py-2 hover:bg-white/[0.03] transition-colors ${
-                i !== data.recentFlights.length - 1 ? 'border-b border-white/[0.04]' : ''
-              }`}
-            >
-              <div className="flex items-center justify-between mb-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-white/50">{flight.date}</span>
-                  {flight.status === 'in_progress' && (
-                    <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">LIVE</span>
-                  )}
-                </div>
-                <span className="text-[9px] text-white/30">{flight.duration}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="flex items-center gap-1">
-                  <MapPin size={8} className="text-white/30" />
-                  <span className="text-[11px] font-semibold text-white/80">{flight.departure}</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-px bg-white/15" />
-                  <Plane size={8} className="text-violet-400/60 mx-0.5" />
-                  <div className="w-4 h-px bg-white/15" />
-                </div>
-                <span className="text-[11px] font-semibold text-white/80">{flight.arrival || '---'}</span>
-                <div className="flex-1" />
-                <div className="flex items-center gap-1 text-[9px] text-white/30">
-                  <Clock size={8} />
-                  <span>
-                    {formatCentralTime(flight.departureTime)}
-                    {formatCentralTime(flight.arrivalTime) ? ` - ${formatCentralTime(flight.arrivalTime)}` : ''}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))
+          ))}
+          {live && (
+            <span className="font-mono text-[11px]" style={{ color: 'var(--color-text-3)' }}>
+              fix {formatAge(live.fetchedAt, now)}
+            </span>
+          )}
+        </div>
+      </div>
+      {route?.progressPct != null && (
+        <div className="mt-1.5 h-[2px] rounded-full overflow-hidden" style={{ background: 'var(--color-surface-2)' }}>
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${route.progressPct}%`,
+              background: 'var(--color-accent-400)',
+              transition: 'width 2s var(--ease-out)',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Landed summary (holds 3 hours) ──────────────────────────────────────────
+
+function LandedCard({ data }: { data: TrackerData | null }) {
+  const lastFlight = data?.recentFlights?.[0];
+  const dest = data?.route?.destination ?? lastFlight?.arrivalAirport ?? null;
+  const destCode = data?.route?.destinationCode || lastFlight?.arrival || '';
+
+  return (
+    <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 glass-chip flex items-center gap-3 px-4 py-3">
+      <span
+        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+        style={{ background: 'rgba(95,206,143,0.15)' }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-ok)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      </span>
+      <div className="min-w-0">
+        <div className="type-body font-medium truncate" style={{ color: 'var(--color-text-1)' }}>
+          Landed{destCode ? ` at ${destCode}` : ''}{dest?.city ? `, ${dest.city}` : ''}
+        </div>
+        <div className="font-mono text-[13px] truncate" style={{ color: 'var(--color-text-3)' }}>
+          {lastFlight?.arrivalTime ? `${lastFlight.arrivalTime}` : ''}
+          {lastFlight?.duration ? ` after ${lastFlight.duration}` : ''}
+          {lastFlight?.departure ? ` from ${lastFlight.departure}` : ''}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Idle rail: flight log + month stats ─────────────────────────────────────
+
+function IdleRail({ data, now, phase }: { data: TrackerData | null; now: number; phase: FlightPhase }) {
+  const flights = data?.recentFlights ?? [];
+  const stats = data?.stats;
+
+  return (
+    <>
+      {/* Status line, bottom-left */}
+      <div className="absolute bottom-2.5 left-2.5 z-10 glass-chip px-3 py-1.5 flex items-center gap-2">
+        <PlaneTakeoff size={13} style={{ color: 'var(--color-text-3)' }} aria-hidden />
+        <span className="font-mono text-[13px]" style={{ color: 'var(--color-text-2)' }}>
+          {phase === 'filed'
+            ? 'Preparing to fly'
+            : data?.lastSeen
+              ? `Last flight ${data.lastSeen}`
+              : 'No recent flights'}
+        </span>
+        {stats && stats.flightsThisMonth > 0 && (
+          <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
+            {stats.flightsThisMonth} this month
+          </span>
         )}
       </div>
 
-    </div>
+      {/* Flight log rail, hidden on narrow widgets */}
+      {flights.length > 0 && (
+        <div
+          className="absolute top-2.5 bottom-12 right-2.5 z-10 glass-chip w-[220px] hidden flex-col overflow-hidden @[440px]:flex"
+        >
+          <div className="px-3 pt-2 pb-1 type-label" style={{ fontSize: 11 }}>Recent flights</div>
+          <div className="flex-1 overflow-y-auto scrollbar-thin">
+            {flights.slice(0, 8).map((f, i) => (
+              <div
+                key={`${f.date}-${f.departure}-${f.arrival}`}
+                className="px-3 py-1.5"
+                style={{
+                  borderTop: '1px solid var(--border-card)',
+                  background: i === 0 ? 'rgba(138,167,195,0.06)' : undefined,
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[13px] font-medium" style={{ color: 'var(--color-text-1)' }}>
+                    {f.departure} <span style={{ color: 'var(--color-text-3)' }}>to</span> {f.arrival || '...'}
+                  </span>
+                  <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>{f.duration}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] truncate" style={{ color: 'var(--color-text-3)' }}>
+                    {f.arrivalAirport?.city || f.departureAirport?.city || ''}
+                  </span>
+                  <span className="font-mono text-[11px] shrink-0" style={{ color: 'var(--color-text-3)' }}>{f.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
