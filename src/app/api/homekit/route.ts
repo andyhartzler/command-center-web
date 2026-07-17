@@ -5,16 +5,12 @@ export async function GET(request: Request) {
   const baseUrl = process.env.HOME_ASSISTANT_URL || 'http://192.168.4.32:8123';
 
   if (!token) {
-    // If no token, return mock data for development as fallback
-    const mockDevices = [
-      { entity_id: 'fan.dyson', state: 'on', attributes: { friendly_name: 'Dyson Purifier' } },
-      { entity_id: 'fan.molekule', state: 'off', attributes: { friendly_name: 'Molekule Air' } },
-      { entity_id: 'media_player.samsung_tv', state: 'playing', attributes: { friendly_name: 'Living Room TV' } },
-      { entity_id: 'sensor.leafypod', state: 'healthy', attributes: { friendly_name: 'Leafypod' } },
-      { entity_id: 'vacuum.litter_robot', state: 'docked', attributes: { friendly_name: 'Litter-Robot' } },
-      { entity_id: 'light.living_room', state: 'on', attributes: { friendly_name: 'Main Lights' } },
-    ];
-    return NextResponse.json(mockDevices);
+    // Never fabricate device states: without a Home Assistant token the
+    // widget renders its not-connected state instead of fake devices.
+    return NextResponse.json(
+      { error: 'HOME_ASSISTANT_TOKEN not configured', configured: false },
+      { status: 503 },
+    );
   }
 
   try {

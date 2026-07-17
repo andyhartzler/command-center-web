@@ -1,4 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+
+// NASA FIRMS active fire detections via the public keyless 24h CSV exports.
+// The map-key API was dropped after the bundled key expired ("Invalid
+// MAP_KEY"); these public files carry the same VIIRS columns.
 
 export interface WildfireData {
   lat: number;
@@ -9,6 +13,16 @@ export interface WildfireData {
   acqTime: string;
   frp: number;
 }
+
+const US_SOURCES = [
+  'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv',
+  'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv',
+  'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Alaska_24h.csv',
+];
+
+const WORLD_SOURCES = [
+  'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Global_24h.csv',
+];
 
 function parseCSV(csv: string): WildfireData[] {
   const lines = csv.trim().split('\n');
@@ -49,31 +63,50 @@ function parseCSV(csv: string): WildfireData[] {
   return results;
 }
 
-export async function GET() {
-  const apiKey = process.env.NASA_FIRMS_KEY || '5568f3e7dfe8e988f3b0e2c2741e6278';
+let cache: { key: string; data: WildfireData[]; ts: number } | null = null;
+const TTL = 10 * 60_000;
+
+export async function GET(request: NextRequest) {
+  const region = request.nextUrl.searchParams.get('region') === 'world' ? 'world' : 'us';
+
+  if (cache && cache.key === region && Date.now() - cache.ts < TTL) {
+    return NextResponse.json(cache.data);
+  }
 
   try {
-    const res = await fetch(
-      `https://firms.modaps.eosdis.nasa.gov/api/country/csv/${apiKey}/VIIRS_SNPP_NRT/USA/1`,
-      { next: { revalidate: 600 } }
+    const sources = region === 'world' ? WORLD_SOURCES : US_SOURCES;
+    const results = await Promise.allSettled(
+      sources.map(url =>
+        fetch(url, { signal: AbortSignal.timeout(20000), cache: 'no-store' }).then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.text();
+        }),
+      ),
     );
 
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: 'Failed to fetch wildfire data' },
-        { status: res.status }
-      );
+    const fires: WildfireData[] = [];
+    const seen = new Set<string>();
+    for (const r of results) {
+      if (r.status !== 'fulfilled') continue;
+      for (const f of parseCSV(r.value)) {
+        const key = `${f.lat.toFixed(3)},${f.lon.toFixed(3)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        fires.push(f);
+      }
     }
 
-    const csvText = await res.text();
-    const fires = parseCSV(csvText);
+    if (fires.length === 0 && results.every(r => r.status === 'rejected')) {
+      // All sources down: serve stale if any, else a real error
+      if (cache?.key === region) return NextResponse.json(cache.data);
+      return NextResponse.json({ error: 'FIRMS sources unavailable' }, { status: 502 });
+    }
 
+    cache = { key: region, data: fires, ts: Date.now() };
     return NextResponse.json(fires);
   } catch (err) {
     console.error('Wildfire API error:', err);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    if (cache?.key === region) return NextResponse.json(cache.data);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
