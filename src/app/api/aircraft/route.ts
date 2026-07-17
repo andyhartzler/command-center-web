@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { lookupAirport, distanceNm, type Airport } from '@/lib/airports';
 import { parseFlightTime, formatFlightTime, formatDuration, minutesToDuration } from '@/lib/flightTime';
+import { mergeFlights, type LedgerFlight, type MergeCandidate } from '@/lib/flightLedger';
 
 // Aircraft tracker data layer.
 // Event edges (fast, reliable) come from the FlightAware email alert worker;
@@ -71,7 +72,12 @@ interface TrackerResponse {
   trail: Array<[number, number, number | null]>;
   route: RouteInfo | null;
   recentFlights: FlightLogEntry[];
-  stats: { flightsThisMonth: number; minutesThisMonth: number; longestRecentLeg: string | null };
+  stats: {
+    flightsThisMonth: number;
+    minutesThisMonth: number;
+    longestRecentLeg: string | null;
+    totalFlights: number;
+  };
   photo: { url: string; attribution: string } | null;
   source: string;
   cached?: boolean;
@@ -97,6 +103,10 @@ const responseCache = new Map<string, CacheEntry<TrackerResponse>>();
 const HISTORY_TTL = 15 * 60_000;
 const ALERT_TTL = 60_000;
 const LIVE_TTL = 20_000;
+// The email alert worker died 2026-03-28, so ADS-B is the departure edge:
+// a cheap keyless check every 5 minutes catches a flight within minutes of
+// takeoff, then the active cadence takes over at 20s.
+const IDLE_LIVE_TTL = 5 * 60_000;
 const PHOTO_TTL = 24 * 60 * 60_000;
 const TRAIL_CAP = 240;
 const LANDED_HOLD_MS = 3 * 60 * 60_000;
@@ -385,6 +395,60 @@ function buildFlightLog(scrape: ScrapeResult | null): FlightLogEntry[] {
   });
 }
 
+/** Pair departure/arrival alert events into completed legs for the ledger */
+function alertLegs(alerts: AlertResult | null): MergeCandidate[] {
+  if (!alerts) return [];
+  const legs: MergeCandidate[] = [];
+  const events = alerts.events; // newest first
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i];
+    if (ev.type !== 'arrival') continue;
+    const arrAt = new Date(ev.receivedAt).getTime();
+    if (isNaN(arrAt)) continue;
+    const arrParsed = parseSubject(ev.rawSubject);
+    const dep = events[i + 1]?.type === 'departure' ? events[i + 1] : null;
+    const depAt = dep ? new Date(dep.receivedAt).getTime() : NaN;
+    const depParsed = dep ? parseSubject(dep.rawSubject) : null;
+
+    const durationMin = dep && !isNaN(depAt) ? Math.round((arrAt - depAt) / 60_000) : null;
+    legs.push({
+      date: arrAt,
+      departure: dep?.origin || depParsed?.origin || arrParsed.origin,
+      arrival: ev.destination || arrParsed.destination,
+      departureTime: dep && !isNaN(depAt)
+        ? new Date(depAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago' })
+        : '',
+      arrivalTime: new Date(arrAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago' }),
+      // Email receipt deltas approximate block time; the tilde marks that
+      duration: durationMin && durationMin > 0 && durationMin < 20 * 60 ? minutesToDuration(durationMin, true) : '',
+      status: 'completed',
+      source: 'flight-alerts',
+    });
+    if (dep) i++;
+  }
+  return legs;
+}
+
+const DISPLAY_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function ledgerToLog(flights: LedgerFlight[]): FlightLogEntry[] {
+  return flights.map(f => {
+    const [y, m, d] = f.date.split('-').map(Number);
+    const display = m >= 1 && m <= 12 ? `${DISPLAY_MONTHS[m - 1]} ${d}, ${y}` : f.date;
+    return {
+      date: display,
+      departure: f.departure,
+      departureAirport: lookupAirport(f.departure),
+      arrival: f.arrival,
+      arrivalAirport: lookupAirport(f.arrival),
+      departureTime: f.departureTime,
+      arrivalTime: f.arrivalTime,
+      duration: f.duration,
+      status: f.status,
+    };
+  });
+}
+
 // ── Aircraft photo (planespotters pub API, 24h cache) ───────────────────────
 
 async function fetchPhoto(tail: string): Promise<{ url: string; attribution: string } | null> {
@@ -510,9 +574,9 @@ export async function GET(request: NextRequest) {
     if (believedActive) {
       live = await fetchLiveFix(tail);
     } else {
-      // Piggyback a cheap idle check on the slow cadence
+      // Cheap idle check so departures are caught within minutes
       const lastLive = liveCache.get(tail);
-      if (!lastLive || Date.now() - lastLive.ts > HISTORY_TTL) {
+      if (!lastLive || Date.now() - lastLive.ts > IDLE_LIVE_TTL) {
         live = await fetchLiveFix(tail);
       } else {
         live = fresh(lastLive, LIVE_TTL) ?? null;
@@ -574,16 +638,32 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // Idle-mode stats from the history that used to be discarded
-    const nowDate = new Date();
-    const monthPrefix = nowDate.toLocaleDateString('en-US', { month: 'short' });
+    // Durable ledger: merge everything seen this poll (scrape window + alert
+    // legs), then serve history FROM the ledger so flights never age out
+    // when FlightAware's anonymous window rolls forward.
+    const ledger = mergeFlights(tail, [
+      ...log.map(f => ({
+        date: f.date,
+        departure: f.departure,
+        arrival: f.arrival,
+        departureTime: f.departureTime,
+        arrivalTime: f.arrivalTime,
+        duration: f.duration,
+        status: f.status,
+        source: 'flightaware-web',
+      })),
+      ...alertLegs(alerts),
+    ]);
+    const history = ledgerToLog(ledger).slice(0, 60);
+
+    const monthIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }).slice(0, 7);
     let flightsThisMonth = 0;
     let minutesThisMonth = 0;
     let longestMin = 0;
-    for (const f of log) {
+    for (const f of ledger) {
       const durMatch = f.duration.match(/(?:(\d+)h )?(\d+)m/);
       const mins = durMatch ? (parseInt(durMatch[1] || '0', 10) * 60 + parseInt(durMatch[2], 10)) : 0;
-      if (f.date.includes(monthPrefix)) {
+      if (f.date.startsWith(monthIso)) {
         flightsThisMonth++;
         minutesThisMonth += mins;
       }
@@ -601,16 +681,17 @@ export async function GET(request: NextRequest) {
       hex: hexCache.get(tail) ?? null,
       phase,
       isAirborne,
-      lastSeen: log[0]?.date ?? null,
+      lastSeen: history[0]?.date ?? log[0]?.date ?? null,
       live: live && !live.onGround ? live : null,
       lastFix,
       trail: isAirborne ? trail : [],
       route: phase === 'idle' ? null : route,
-      recentFlights: log,
+      recentFlights: history,
       stats: {
         flightsThisMonth,
         minutesThisMonth,
         longestRecentLeg: longestMin > 0 ? minutesToDuration(longestMin) : null,
+        totalFlights: ledger.length,
       },
       photo,
       source: live ? live.source : scrape ? 'flightaware-web' : alerts ? 'flight-alerts' : 'none',

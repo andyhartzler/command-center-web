@@ -67,7 +67,12 @@ interface TrackerData {
     etaMinutes: number | null;
   } | null;
   recentFlights: FlightLogEntry[];
-  stats: { flightsThisMonth: number; minutesThisMonth: number; longestRecentLeg: string | null };
+  stats: {
+    flightsThisMonth: number;
+    minutesThisMonth: number;
+    longestRecentLeg: string | null;
+    totalFlights: number;
+  };
   photo: { url: string; attribution: string } | null;
 }
 
@@ -112,7 +117,9 @@ export function AircraftTrackerWidget({ config, style, widgetId }: AircraftTrack
 
   const { data, isStale, lastUpdated } = usePolledData<TrackerData>(
     `/api/aircraft?tail=${encodeURIComponent(config.tailNumber)}`,
-    { interval: 15 * 60_000, liveInterval: 20_000, live },
+    // 5 min idle (the server's idle ADS-B check rides this cadence, catching
+    // a departure within minutes), 20s while a flight is active
+    { interval: 5 * 60_000, liveInterval: 20_000, live },
   );
 
   // Adaptive cadence follows the server phase
@@ -546,6 +553,12 @@ function IdleRail({ data, now, phase }: { data: TrackerData | null; now: number;
         {stats && stats.flightsThisMonth > 0 && (
           <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
             {stats.flightsThisMonth} this month
+            {stats.minutesThisMonth > 0 ? ` / ${Math.floor(stats.minutesThisMonth / 60)}h ${stats.minutesThisMonth % 60}m` : ''}
+          </span>
+        )}
+        {stats && stats.totalFlights > 0 && (
+          <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
+            {stats.totalFlights} logged
           </span>
         )}
       </div>
@@ -557,7 +570,7 @@ function IdleRail({ data, now, phase }: { data: TrackerData | null; now: number;
         >
           <div className="px-3 pt-2 pb-1 type-label" style={{ fontSize: 11 }}>Recent flights</div>
           <div className="flex-1 overflow-y-auto scrollbar-thin">
-            {flights.slice(0, 8).map((f, i) => (
+            {flights.slice(0, 14).map((f, i) => (
               <div
                 key={`${f.date}-${f.departure}-${f.arrival}`}
                 className="px-3 py-1.5"
