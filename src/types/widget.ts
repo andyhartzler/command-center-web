@@ -1,5 +1,7 @@
 // Widget types ported from Swift CommandCenter
 
+import { DEFAULT_STOCK_SYMBOLS, DEFAULT_COIN_IDS } from '@/data/marketCatalogs';
+
 export type WidgetFamily = 'small' | 'medium' | 'large' | 'wide' | 'extraLarge';
 
 export type WidgetCategory =
@@ -335,8 +337,8 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'weather': return { type: 'weather', config: { latitude: 39.0997, longitude: -94.5786, locationName: 'Kansas City', units: 'fahrenheit' } };
     case 'news': return { type: 'news', config: { maxItems: 15, categories: ['local'] } };
     case 'worldNews': return { type: 'worldNews', config: { maxItems: 15, categories: ['world', 'us', 'tech', 'finance'] } };
-    case 'stocks': return { type: 'stocks', config: { symbols: ['SPY', 'QQQ', 'DIA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'TSM', 'AVGO', 'JPM', 'V', 'UNH', 'MA', 'HD', 'COST', 'NFLX', 'CRM', 'AMD', 'ORCL', 'ADBE', 'BA', 'DIS', 'GS', 'CAT', 'GE', 'XOM', 'COIN'] } };
-    case 'crypto': return { type: 'crypto', config: { coins: ['bitcoin', 'ethereum', 'binancecoin', 'ripple', 'solana', 'cardano', 'dogecoin', 'tron', 'avalanche-2', 'polkadot', 'chainlink', 'litecoin', 'uniswap', 'stellar', 'near', 'bitcoin-cash', 'monero', 'cosmos', 'hedera', 'aptos', 'sui', 'arbitrum', 'filecoin', 'kaspa', 'render-token'] } };
+    case 'stocks': return { type: 'stocks', config: { symbols: [...DEFAULT_STOCK_SYMBOLS] } };
+    case 'crypto': return { type: 'crypto', config: { coins: [...DEFAULT_COIN_IDS] } };
     case 'sports': return { type: 'sports', config: { leagues: ['nfl', 'nba', 'mlb', 'nhl', 'mls'], favoriteTeams: ['Kansas City Chiefs', 'Kansas City Royals', 'Sporting Kansas City', 'Kansas City Current'] } };
     case 'sun': return { type: 'sun', config: { latitude: 39.0997, longitude: -94.5786 } };
     case 'earthquakes': return { type: 'earthquakes', config: { minMagnitude: 2.5, maxQuakes: 50, region: 'us' } };

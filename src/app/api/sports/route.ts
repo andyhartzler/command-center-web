@@ -45,6 +45,7 @@ interface ESPNCompetition {
 
 interface ESPNEvent {
   id?: string;
+  date?: string;
   name?: string;
   shortName?: string;
   competitions?: ESPNCompetition[];
@@ -59,14 +60,18 @@ export interface NormalizedGame {
   league: string;
   name: string;
   shortName: string;
+  /** ISO start time of the game */
+  startTime: string;
   homeTeam: string;
   homeAbbr: string;
   homeLogo: string;
   homeScore: string;
+  homeWinner: boolean;
   awayTeam: string;
   awayAbbr: string;
   awayLogo: string;
   awayScore: string;
+  awayWinner: boolean;
   statusName: string;
   statusDetail: string;
   isLive: boolean;
@@ -74,6 +79,14 @@ export interface NormalizedGame {
   displayClock: string;
   period: number;
 }
+
+// In-progress plus intermission states all count as a live game on the wall
+const LIVE_STATUSES = new Set([
+  'STATUS_IN_PROGRESS',
+  'STATUS_HALFTIME',
+  'STATUS_END_PERIOD',
+  'STATUS_END_OF_HALF',
+]);
 
 export async function GET(request: NextRequest) {
   const leagueParam = request.nextUrl.searchParams.get('leagues') || 'nfl,nba,mlb';
@@ -108,17 +121,20 @@ export async function GET(request: NextRequest) {
             league: leagueKey.toUpperCase(),
             name: event.name || '',
             shortName: event.shortName || '',
+            startTime: event.date || '',
             homeTeam: home?.team?.displayName || 'TBD',
             homeAbbr: home?.team?.abbreviation || '',
             homeLogo: home?.team?.logo || '',
             homeScore: home?.score || '0',
+            homeWinner: home?.winner === true,
             awayTeam: away?.team?.displayName || 'TBD',
             awayAbbr: away?.team?.abbreviation || '',
             awayLogo: away?.team?.logo || '',
             awayScore: away?.score || '0',
+            awayWinner: away?.winner === true,
             statusName,
             statusDetail: status?.type?.shortDetail || '',
-            isLive: statusName === 'STATUS_IN_PROGRESS',
+            isLive: LIVE_STATUSES.has(statusName),
             isCompleted: status?.type?.completed || false,
             displayClock: status?.displayClock || '',
             period: status?.period || 0,

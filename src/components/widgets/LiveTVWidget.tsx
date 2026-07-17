@@ -1,74 +1,11 @@
 'use client';
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import Hls from 'hls.js';
-import { Tv, Volume2, VolumeX, Search, X, Radio, ChevronDown } from 'lucide-react';
+import { Volume2, VolumeX, Search, X, Radio, ChevronDown } from 'lucide-react';
+import { ALL_CHANNELS, CORS_SAFE_DOMAINS, type Channel } from '@/app/api/livetv/channels';
+import { useHlsSlot } from '@/lib/hlsBudget';
+import { useAppState } from '@/context/AppState';
 import type { LiveTVConfig, WidgetStyle } from '@/types/widget';
-
-interface Channel {
-  name: string;
-  url: string;
-  category: string;
-  resolver?: 'kmbc' | 'kshb' | 'wdaf'; // dynamic URL resolution
-}
-
-// All channels - KC Local + National + Free-TV IPTV
-// Sources: direct CDN, jmp2.uk (Samsung TV Plus proxy), YouTube HLS proxy
-const ALL_CHANNELS: Channel[] = [
-  // KC Local
-  { name: 'KSHB 41 (NBC)', url: '', category: 'KC Local', resolver: 'kshb' },
-  { name: 'KMBC 9 (ABC)', url: '', category: 'KC Local', resolver: 'kmbc' },
-  { name: 'KCTV5 (CBS)', url: 'https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00312-graytelevisioni-kctv5news-vizious/playlist.m3u8', category: 'KC Local' },
-  { name: 'WDAF FOX 4', url: '', category: 'KC Local', resolver: 'wdaf' },
-  { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'KC Local' },
-
-  // US News - all confirmed working direct streams
-  { name: 'CNN', url: 'https://turnerlive.warnermediacdn.com/hls/live/586495/cnngo/cnn_slate/VIDEO_2_1964000.m3u8', category: 'US News' },
-  { name: 'Fox News', url: 'https://jmp2.uk/plu-63d025db4e83e700086eaa96.m3u8', category: 'US News' },
-  { name: 'MSNBC', url: 'https://radiovid.foxnews.com/hls/live/661547/RADIOVID/index.m3u8', category: 'US News' }, // Fox News Radio video fallback - no free MSNBC stream exists
-  { name: 'ABC News Live', url: 'https://abcnews-streams.akamaized.net/hls/live/2023560/abcnewshudson1/master_4000.m3u8', category: 'US News' },
-  { name: 'CBS News', url: 'https://cbsnews.akamaized.net/hls/live/2020607/cbsnlineup_8/master.m3u8', category: 'US News' },
-  { name: 'NBC News NOW', url: 'https://xumo-drct-nbcnn-ir8ze.fast.nbcuni.com/live/master.m3u8', category: 'US News' },
-  { name: 'Bloomberg', url: 'https://bloomberg.com/media-manifest/streams/us.m3u8', category: 'US News' },
-  { name: 'Fox Weather', url: 'https://247wlive.foxweather.com/stream/index.m3u8', category: 'US News' },
-  { name: 'Scripps News', url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8', category: 'US News' },
-  { name: 'Newsmax', url: 'https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8', category: 'US News' },
-  { name: 'CNBC', url: 'https://stream.livenewsplay.com:9443/hls/cnbc/cnbcsd.m3u8', category: 'US News' },
-  { name: 'Court TV', url: 'https://jmp2.uk/plu-64dab1f835425100080e1e7b.m3u8', category: 'US News' },
-  { name: 'Reuters', url: 'https://ythls.armelin.one/channel/UChqUTb7kYRX8-EiaN3XFrSQ.m3u8', category: 'US News' },
-  { name: 'USA Today', url: 'https://live.enhdtv.com:8081/8192/index.m3u8', category: 'US News' },
-  { name: 'AccuWeather', url: 'https://cdn-ue1-prod.tsv2.amagi.tv/linear/amg00684-accuweather-accuweather-plex/playlist.m3u8', category: 'US News' },
-
-  // World News
-  { name: 'BBC News', url: 'https://pb-iiczlgfysam0q.akamaized.net/v1/amcnetworks_bbcnews_1/samsungheadend_us/latest/main/hls/playlist.m3u8', category: 'World News' },
-  { name: 'Sky News UK', url: 'https://ythls.armelin.one/channel/UCoMdktPbSTixAyNGwb-UYkQ.m3u8', category: 'World News' },
-  { name: 'Al Jazeera', url: 'https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8', category: 'World News' },
-  { name: 'France 24', url: 'https://ythls.armelin.one/channel/UCQfwfsi5VrQ8yKZ-UWmAEFg.m3u8', category: 'World News' },
-  { name: 'DW News', url: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', category: 'World News' },
-  { name: 'Euronews', url: 'https://ythls.armelin.one/channel/UCW2QcKZiU8aUGg4yxCIditg.m3u8', category: 'World News' },
-  { name: 'CGTN', url: 'https://news.cgtn.com/resource/live/english/cgtn-news.m3u8', category: 'World News' },
-  { name: 'India Today', url: 'https://indiatodaylive.akamaized.net/hls/live/2014320/indiatoday/indiatodaylive/playlist.m3u8', category: 'World News' },
-  { name: 'CBC News', url: 'https://ythls.armelin.one/channel/UCuFFtHWoLl5fauMMD5Ww2jA.m3u8', category: 'World News' },
-  { name: 'RT', url: 'https://rt-glb.rttv.com/live/rtnews/playlist.m3u8', category: 'World News' },
-  { name: 'GB News', url: 'https://ythls.armelin.one/channel/UC0vn8ISa4LKMunLbzaXLnOQ.m3u8', category: 'World News' },
-
-  // Sports - confirmed working free streams only
-  { name: 'NFL Channel', url: 'https://jmp2.uk/plu-5a4d3a00ad95e4718ae8d8db.m3u8', category: 'Sports' },
-  { name: 'beIN SPORTS XTRA', url: 'https://jmp2.uk/plu-5d8d180092e97a5e107638d3.m3u8', category: 'Sports' },
-
-  // Public / Government
-  { name: 'NASA TV', url: 'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8', category: 'Public' },
-  { name: 'PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'Public' },
-  { name: 'Univision', url: 'https://streaming-live-fcdn.api.prd.univisionnow.com/kuvn/kuvn.isml/hls/kuvn.m3u8', category: 'Public' },
-  { name: 'Telemundo', url: 'https://cdn.igocast.com/wkrp_channel1_hls/wkrp_channel1_master.m3u8', category: 'Public' },
-];
-
-// URLs from these domains have proper CORS headers and can be played directly
-const CORS_SAFE_DOMAINS = [
-  'akamaized.net', 'akamaihd.net',
-  'cbsnews.akamaized.net',
-  'uplynk.com',
-  'warnermediacdn.com',
-];
 
 function proxyUrl(url: string): string {
   try {
@@ -78,21 +15,44 @@ function proxyUrl(url: string): string {
   return `/api/livetv?proxy=${encodeURIComponent(url)}`;
 }
 
+type PlaybackState = 'connecting' | 'playing' | 'reconnecting' | 'offline';
+
 interface LiveTVWidgetProps {
   config: LiveTVConfig;
   style: WidgetStyle;
 }
 
 export function LiveTVWidget({ config }: LiveTVWidgetProps) {
+  const { pages, updateWidget } = useAppState();
   const [isMuted, setIsMuted] = useState(config.isMuted);
   const [showGuide, setShowGuide] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
-  const [resolving, setResolving] = useState<string | null>(null);
+  const [playback, setPlayback] = useState<PlaybackState>('connecting');
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<Channel | null>(null);
+  const hasPlayedRef = useRef(false);
+  channelRef.current = currentChannel;
+
+  const slotGranted = useHlsSlot(true);
+
+  // Persist channel + mute back through the app-state config path so a
+  // reboot restores them. The widget locates itself by config reference.
+  const persistConfig = useCallback((patch: Partial<LiveTVConfig>) => {
+    for (const page of pages) {
+      for (const w of page.widgets) {
+        if (w.widgetConfig.type === 'liveTV' && w.widgetConfig.config === config) {
+          updateWidget(w.id, {
+            widgetConfig: { type: 'liveTV', config: { ...w.widgetConfig.config, ...patch } },
+          });
+          return;
+        }
+      }
+    }
+  }, [pages, updateWidget, config]);
 
   // Resolve dynamic channel URLs on mount (KC local stations only)
   useEffect(() => {
@@ -131,7 +91,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     return url ? proxyUrl(url) : '';
   }, [resolvedUrls]);
 
-  // Select initial channel
+  // Select initial channel from persisted config
   useEffect(() => {
     if (config.selectedChannelURL) {
       const found = ALL_CHANNELS.find(c => c.url === config.selectedChannelURL || c.name === config.selectedChannelName);
@@ -145,13 +105,42 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     }
   }, [config.selectedChannelURL, config.selectedChannelName]);
 
+  const currentUrl = currentChannel ? getChannelUrl(currentChannel) : '';
+
+  // Reset playback truth whenever the source changes
+  useEffect(() => {
+    hasPlayedRef.current = false;
+    setPlayback('connecting');
+  }, [currentUrl]);
+
+  // Bind LIVE state to actual video element playback
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onPlaying = () => {
+      hasPlayedRef.current = true;
+      setPlayback('playing');
+    };
+    const onBuffering = () => {
+      setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
+    };
+
+    video.addEventListener('playing', onPlaying);
+    video.addEventListener('waiting', onBuffering);
+    video.addEventListener('stalled', onBuffering);
+
+    return () => {
+      video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('waiting', onBuffering);
+      video.removeEventListener('stalled', onBuffering);
+    };
+  }, []);
+
   // Attach HLS player
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !currentChannel) return;
-
-    const url = getChannelUrl(currentChannel);
-    if (!url) return;
+    if (!video || !currentUrl || !slotGranted) return;
 
     if (hlsRef.current) {
       hlsRef.current.destroy();
@@ -176,10 +165,9 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
         enableCEA708Captions: false,
         renderTextTracksNatively: false,
       });
-      hls.loadSource(url);
+      hls.loadSource(currentUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.muted = isMuted;
         video.play().catch(() => {});
         if (hls.subtitleTrack !== -1) hls.subtitleTrack = -1;
         disableCaptions();
@@ -191,29 +179,30 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            if (currentChannel.resolver) {
-              setResolving(currentChannel.resolver);
-              fetch(`/api/livetv?channel=${currentChannel.resolver}`)
+            setPlayback(hasPlayedRef.current ? 'reconnecting' : 'offline');
+            const channel = channelRef.current;
+            if (channel?.resolver) {
+              // Stale resolved URL: re-resolve and let the effect re-attach
+              fetch(`/api/livetv?channel=${channel.resolver}`)
                 .then(r => r.json())
                 .then(d => {
                   if (d.url) {
-                    setResolvedUrls(prev => ({ ...prev, [currentChannel.resolver!]: d.url }));
+                    setResolvedUrls(prev => ({ ...prev, [channel.resolver!]: d.url }));
                   }
-                  setResolving(null);
                 })
-                .catch(() => setResolving(null));
+                .catch(() => {});
             } else {
               setTimeout(() => hls.startLoad(), 3000);
             }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
             hls.recoverMediaError();
           }
         }
       });
       hlsRef.current = hls;
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
-      video.muted = isMuted;
+      video.src = currentUrl;
       video.play().catch(() => {});
     }
 
@@ -224,7 +213,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
         hlsRef.current = null;
       }
     };
-  }, [currentChannel, getChannelUrl, resolvedUrls]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUrl, slotGranted]);
 
   // Update mute state
   useEffect(() => {
@@ -254,73 +243,103 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     setCurrentChannel(channel);
     setShowGuide(false);
     setSearchQuery('');
+    persistConfig({ selectedChannelName: channel.name, selectedChannelURL: channel.url });
+  };
+
+  const toggleMute = () => {
+    setIsMuted(prev => {
+      const next = !prev;
+      persistConfig({ isMuted: next });
+      return next;
+    });
   };
 
   if (!currentChannel) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black">
-        <Tv size={24} className="text-white/30" />
-        <span className="text-xs text-white/30">No channel selected</span>
+      <div className="w-full h-full flex items-center justify-center bg-black">
+        <span className="type-label">No channel selected</span>
       </div>
     );
   }
 
-  const currentUrl = getChannelUrl(currentChannel);
-  const isResolving = currentChannel.resolver && !currentUrl;
+  const paused = !slotGranted;
+  const isResolving = !!currentChannel.resolver && !currentUrl;
+  const showConnecting = !paused && (isResolving || playback === 'connecting');
+  const showOffline = !paused && !isResolving && playback === 'offline';
 
   return (
     <div
       ref={containerRef}
       className="relative w-full h-full bg-black group"
     >
-      {/* Video player */}
-      {isResolving ? (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-          <div className="w-4 h-4 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
-          <span className="text-xs text-white/30">Loading {currentChannel.name}...</span>
+      <video
+        ref={videoRef}
+        className="w-full h-full object-cover"
+        playsInline
+        muted={isMuted}
+        autoPlay
+      />
+
+      {/* Connecting / offline overlays instead of a silent black rectangle */}
+      {(showConnecting || showOffline || paused) && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className="glass-chip px-3 py-1.5 font-mono text-[12px] uppercase"
+            style={{
+              letterSpacing: 'var(--tracking-caps)',
+              color: paused
+                ? 'var(--color-text-3)'
+                : showOffline
+                  ? 'var(--color-critical)'
+                  : 'var(--color-text-2)',
+            }}
+          >
+            {paused ? 'Paused' : showOffline ? 'Offline, retrying' : 'Connecting'}
+          </span>
         </div>
-      ) : (
-        <video
-          ref={videoRef}
-          className="w-full h-full object-cover"
-          playsInline
-          muted={isMuted}
-          autoPlay
-        />
       )}
 
-      {/* Channel selector dropdown at top */}
-      <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      {/* Bottom-left mono channel chip; live dot binds to actual playback */}
+      <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2">
         <button
           onClick={() => setShowGuide(!showGuide)}
-          className="flex items-center gap-2 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 transition-colors"
+          className="glass-chip flex items-center gap-2 px-2.5 py-1.5 hover:brightness-125 transition-[filter]"
         >
-          <span className="relative flex h-1.5 w-1.5 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
-          </span>
-          <span className="text-xs font-medium text-white/90 truncate">
+          {playback === 'playing' && !paused && (
+            <span className="live-dot live-dot--live shrink-0" aria-hidden />
+          )}
+          <span
+            className="font-mono text-[12px] uppercase truncate max-w-[180px]"
+            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-text-2)' }}
+          >
             {currentChannel.name}
           </span>
-          <ChevronDown size={12} className={`text-white/50 transition-transform ${showGuide ? 'rotate-180' : ''}`} />
+          <ChevronDown
+            size={12}
+            className={`shrink-0 transition-transform ${showGuide ? 'rotate-180' : ''}`}
+            style={{ color: 'var(--color-text-3)' }}
+          />
         </button>
+        {playback === 'reconnecting' && !paused && (
+          <span
+            className="glass-chip px-2.5 py-1.5 font-mono text-[12px] uppercase"
+            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-warn)' }}
+          >
+            Reconnecting
+          </span>
+        )}
       </div>
 
-      {/* Bottom controls bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="flex items-center gap-2 min-w-0">
-          {resolving && (
-            <span className="text-[9px] text-yellow-400/60">reconnecting...</span>
-          )}
-        </div>
+      {/* Bottom-right: mute toggle on hover */}
+      <div className="absolute bottom-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
-          onClick={(e) => { e.stopPropagation(); setIsMuted(prev => !prev); }}
-          className="w-7 h-7 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors"
+          onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+          className="glass-chip w-8 h-8 flex items-center justify-center hover:brightness-125 transition-[filter]"
         >
           {isMuted ? (
-            <VolumeX size={13} className="text-white/70" />
+            <VolumeX size={13} style={{ color: 'var(--color-text-2)' }} />
           ) : (
-            <Volume2 size={13} className="text-white/70" />
+            <Volume2 size={13} style={{ color: 'var(--color-text-2)' }} />
           )}
         </button>
       </div>
@@ -328,39 +347,44 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       {/* Channel guide overlay */}
       {showGuide && (
         <div
-          className="absolute inset-0 bg-[#1c1c1e]/95 backdrop-blur-xl flex flex-col overflow-hidden z-20"
+          className="absolute inset-0 backdrop-blur-xl flex flex-col overflow-hidden z-20"
+          style={{ background: 'var(--glass-bg)' }}
           onClick={e => e.stopPropagation()}
         >
           {/* Guide header */}
           <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between shrink-0">
-            <span className="text-xs font-semibold text-white/80">Channel Guide</span>
+            <span className="type-label">Channels</span>
             <button
               onClick={() => { setShowGuide(false); setSearchQuery(''); }}
               className="w-5 h-5 rounded flex items-center justify-center hover:bg-white/10 transition-colors"
             >
-              <X size={12} className="text-white/50" />
+              <X size={12} style={{ color: 'var(--color-text-3)' }} />
             </button>
           </div>
 
           {/* Search */}
           <div className="px-3 py-2 border-b border-white/5 shrink-0">
             <div className="flex items-center gap-2 bg-white/5 rounded px-2 py-1.5">
-              <Search size={11} className="text-white/30 shrink-0" />
+              <Search size={12} className="shrink-0" style={{ color: 'var(--color-text-3)' }} />
               <input
                 type="text"
-                placeholder="Search channels..."
+                placeholder="Search channels"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="bg-transparent text-xs text-white/80 placeholder-white/25 outline-none w-full"
+                className="bg-transparent text-[12px] placeholder-white/25 outline-none w-full"
+                style={{ color: 'var(--color-text-2)' }}
               />
             </div>
           </div>
 
           {/* Channel list */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto scrollbar-thin">
             {Object.entries(channelsByCategory).map(([category, channels]) => (
               <div key={category}>
-                <div className="px-3 py-1.5 text-[10px] font-semibold text-white/30 uppercase tracking-wider sticky top-0 bg-[#1c1c1e]/95 backdrop-blur-sm">
+                <div
+                  className="px-3 py-1.5 type-label sticky top-0 backdrop-blur-sm"
+                  style={{ background: 'var(--glass-bg)' }}
+                >
                   {category}
                 </div>
                 {channels.map(channel => {
@@ -378,19 +402,21 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
                     >
                       <Radio
                         size={10}
-                        className={isActive ? 'text-red-400' : 'text-white/20'}
+                        style={{ color: isActive ? 'var(--color-live)' : 'var(--color-text-3)' }}
                       />
-                      <span className={`text-xs truncate flex-1 ${isActive ? 'text-white font-medium' : 'text-white/60'}`}>
+                      <span
+                        className={`text-[12px] truncate flex-1 ${isActive ? 'font-medium' : ''}`}
+                        style={{ color: isActive ? 'var(--color-text-1)' : 'var(--color-text-2)' }}
+                      >
                         {channel.name}
                       </span>
-                      {isActive && (
-                        <span className="relative flex h-1.5 w-1.5 shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
-                        </span>
+                      {isActive && playback === 'playing' && (
+                        <span className="live-dot live-dot--live shrink-0" aria-hidden />
                       )}
                       {isUnavailable && (
-                        <span className="text-[8px] text-white/30">loading...</span>
+                        <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
+                          resolving
+                        </span>
                       )}
                     </button>
                   );
@@ -399,7 +425,9 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
             ))}
             {filteredChannels.length === 0 && (
               <div className="px-3 py-4 text-center">
-                <span className="text-xs text-white/25">No channels match</span>
+                <span className="text-[12px]" style={{ color: 'var(--color-text-3)' }}>
+                  No channels match
+                </span>
               </div>
             )}
           </div>

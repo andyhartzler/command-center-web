@@ -1,19 +1,30 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { Moon } from 'lucide-react';
 import { type MoonPhaseConfig, type WidgetStyle } from '@/types/widget';
+import { WidgetShell } from './WidgetShell';
+import { tokens } from '@/lib/tokens';
 
 interface Props {
   config: MoonPhaseConfig;
   style: WidgetStyle;
 }
 
+const SYNODIC_MONTH = 29.530588853;
+
 /** Compute moon phase value 0-1 (0=new, 0.5=full, 1=new) */
-function getMoonPhase(): { phase: number; name: string; illumination: number; age: number } {
+function getMoonPhase(): {
+  phase: number;
+  name: string;
+  illumination: number;
+  age: number;
+  daysToFull: number;
+} {
   const now = new Date();
   const jd = Math.floor(now.getTime() / 86400000) + 2440587.5;
-  let moonAge = (jd - 2451550.1) % 29.530588853;
-  if (moonAge < 0) moonAge += 29.530588853;
-  const phase = moonAge / 29.530588853;
+  let moonAge = (jd - 2451550.1) % SYNODIC_MONTH;
+  if (moonAge < 0) moonAge += SYNODIC_MONTH;
+  const phase = moonAge / SYNODIC_MONTH;
   const illumination = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
 
   let name: string;
@@ -27,14 +38,17 @@ function getMoonPhase(): { phase: number; name: string; illumination: number; ag
   else if (phase < 0.9375) name = 'Waning Crescent';
   else name = 'New Moon';
 
-  return { phase, name, illumination, age: moonAge };
+  const fullAge = SYNODIC_MONTH / 2;
+  const daysToFull = (fullAge - moonAge + SYNODIC_MONTH) % SYNODIC_MONTH;
+
+  return { phase, name, illumination, age: moonAge, daysToFull };
 }
 
 /**
- * Draw phase shadow over a real moon photograph.
- * Loads /moon-texture.jpg, draws it, then overlays the shadow terminator.
+ * Draw phase shadow over the moon disc. Uses the real photograph when it
+ * loaded; falls back to a procedural shaded disc if the image errored.
  */
-function drawMoon(canvas: HTMLCanvasElement, phase: number, moonImg: HTMLImageElement) {
+function drawMoon(canvas: HTMLCanvasElement, phase: number, moonImg: HTMLImageElement | null) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
@@ -51,11 +65,21 @@ function drawMoon(canvas: HTMLCanvasElement, phase: number, moonImg: HTMLImageEl
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.clip();
 
-  // Draw the real moon photograph, scaled up slightly to eliminate black border
-  // The photo has a black background around the moon disc - overfill to crop it out
-  const scale = 1.22;
-  const offset = (size * (scale - 1)) / 2;
-  ctx.drawImage(moonImg, -offset, -offset, size * scale, size * scale);
+  if (moonImg) {
+    // Draw the real moon photograph, scaled up slightly to eliminate black border
+    // The photo has a black background around the moon disc - overfill to crop it out
+    const scale = 1.22;
+    const offset = (size * (scale - 1)) / 2;
+    ctx.drawImage(moonImg, -offset, -offset, size * scale, size * scale);
+  } else {
+    // Procedural fallback: soft grey disc with limb darkening
+    const grad = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.25, r * 0.1, cx, cy, r);
+    grad.addColorStop(0, tokens.text1);
+    grad.addColorStop(0.7, tokens.text2);
+    grad.addColorStop(1, tokens.surface3);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+  }
 
   // Phase shadow using pixel manipulation for smooth terminator
   const imageData = ctx.getImageData(0, 0, size, size);
@@ -110,29 +134,34 @@ function drawMoon(canvas: HTMLCanvasElement, phase: number, moonImg: HTMLImageEl
   ctx.restore();
 }
 
-export function MoonPhaseWidget({ config }: Props) {
+export function MoonPhaseWidget({ style }: Props) {
   const [moonData, setMoonData] = useState(() => getMoonPhase());
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState(200);
   const moonImgRef = useRef<HTMLImageElement | null>(null);
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgState, setImgState] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
-  // Load moon texture once
+  // Load moon texture once; fall back to the procedural disc on error
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       moonImgRef.current = img;
-      setImgLoaded(true);
+      setImgState('loaded');
+    };
+    img.onerror = () => {
+      moonImgRef.current = null;
+      setImgState('failed');
     };
     img.src = '/moon-texture.jpg';
   }, []);
 
+  // The terminator moves ~0.5px per hour at this size; hourly is plenty
   useEffect(() => {
     const interval = setInterval(() => {
       setMoonData(getMoonPhase());
-    }, 60_000);
+    }, 3600_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -143,7 +172,7 @@ export function MoonPhaseWidget({ config }: Props) {
 
     const update = () => {
       const rect = container.getBoundingClientRect();
-      const maxSize = Math.min(rect.width - 16, rect.height - 50);
+      const maxSize = Math.min(rect.width - 16, rect.height - 58);
       setCanvasSize(Math.max(80, Math.floor(maxSize)));
     };
 
@@ -153,11 +182,10 @@ export function MoonPhaseWidget({ config }: Props) {
     return () => ro.disconnect();
   }, []);
 
-  // Draw moon when phase, size, or image changes
+  // Draw moon when phase, size, or image state changes
   useEffect(() => {
     const canvas = canvasRef.current;
-    const moonImg = moonImgRef.current;
-    if (!canvas || !moonImg || !imgLoaded) return;
+    if (!canvas || imgState === 'loading') return;
 
     const dpr = window.devicePixelRatio || 1;
     const drawSize = canvasSize * dpr;
@@ -166,24 +194,41 @@ export function MoonPhaseWidget({ config }: Props) {
     canvas.style.width = `${canvasSize}px`;
     canvas.style.height = `${canvasSize}px`;
 
-    drawMoon(canvas, moonData.phase, moonImg);
-  }, [moonData.phase, canvasSize, imgLoaded]);
+    drawMoon(canvas, moonData.phase, moonImgRef.current);
+  }, [moonData.phase, canvasSize, imgState]);
 
-  const { name, illumination } = moonData;
+  const { name, illumination, daysToFull } = moonData;
+  const daysOut = Math.round(daysToFull);
+  const fullMoonLine =
+    name === 'Full Moon' || daysOut === 0
+      ? 'Full moon tonight'
+      : `Full moon in ${daysOut} ${daysOut === 1 ? 'day' : 'days'}`;
 
   return (
-    <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center p-2 gap-1 bg-[#1a1a1c]">
-      <div className="flex-1 flex items-center justify-center w-full min-h-0">
-        <canvas
-          ref={canvasRef}
-          className="rounded-full"
-          style={{ filter: 'drop-shadow(0 0 12px rgba(200, 205, 215, 0.08))' }}
-        />
+    <WidgetShell icon={<Moon size={18} strokeWidth={1.75} />} title="Moon" style={style}>
+      <div
+        ref={containerRef}
+        className="w-full h-full flex flex-col items-center justify-center px-3.5 pb-3 gap-1.5"
+      >
+        <div className="flex-1 flex items-center justify-center w-full min-h-0">
+          <canvas
+            ref={canvasRef}
+            className="rounded-full"
+            style={{ filter: `drop-shadow(0 0 12px ${tokens.borderCard})` }}
+          />
+        </div>
+        <div className="text-center shrink-0">
+          <div className="text-[13px] font-medium leading-tight" style={{ color: 'var(--color-text-1)' }}>
+            {name}
+          </div>
+          <div className="text-[12px]" style={{ color: 'var(--color-text-3)' }}>
+            <span className="font-mono">{Math.round(illumination * 100)}%</span> illuminated
+          </div>
+          <div className="text-[12px]" style={{ color: 'var(--color-text-3)' }}>
+            {fullMoonLine}
+          </div>
+        </div>
       </div>
-      <div className="text-center shrink-0 pb-1">
-        <div className="text-[11px] font-semibold text-white/80 leading-tight">{name}</div>
-        <div className="text-[9px] text-white/35">{Math.round(illumination * 100)}% illuminated</div>
-      </div>
-    </div>
+    </WidgetShell>
   );
 }

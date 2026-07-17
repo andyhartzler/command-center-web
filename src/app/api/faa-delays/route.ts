@@ -5,7 +5,21 @@ interface FAAStatus {
   delay: boolean;
   delayType: string | null;
   avgDelay: string | null;
+  /** avgDelay parsed to minutes so clients can map severity without string parsing */
+  avgDelayMinutes: number | null;
   reason: string | null;
+}
+
+// FAA average delay strings arrive as "41 minutes", "1 hour and 15 minutes", etc.
+function parseAvgDelayMinutes(raw: string | null): number | null {
+  if (!raw) return null;
+  const hours = raw.match(/(\d+)\s*h(?:ou)?r/i);
+  const mins = raw.match(/(\d+)\s*min/i);
+  if (!hours && !mins) {
+    const bare = raw.match(/\d+/);
+    return bare ? parseInt(bare[0], 10) : null;
+  }
+  return (hours ? parseInt(hours[1], 10) * 60 : 0) + (mins ? parseInt(mins[1], 10) : 0);
 }
 
 export async function GET(request: NextRequest) {
@@ -35,7 +49,7 @@ export async function GET(request: NextRequest) {
           );
 
           if (!res.ok) {
-            return { airport: code, delay: false, delayType: null, avgDelay: null, reason: null };
+            return { airport: code, delay: false, delayType: null, avgDelay: null, avgDelayMinutes: null, reason: null };
           }
 
           const data = await res.json();
@@ -53,9 +67,16 @@ export async function GET(request: NextRequest) {
             reason = first.reason || null;
           }
 
-          return { airport: code, delay: hasDelay, delayType, avgDelay, reason };
+          return {
+            airport: code,
+            delay: hasDelay,
+            delayType,
+            avgDelay,
+            avgDelayMinutes: parseAvgDelayMinutes(avgDelay),
+            reason,
+          };
         } catch {
-          return { airport: code, delay: false, delayType: null, avgDelay: null, reason: null };
+          return { airport: code, delay: false, delayType: null, avgDelay: null, avgDelayMinutes: null, reason: null };
         }
       }),
     );

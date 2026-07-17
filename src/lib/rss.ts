@@ -1,4 +1,4 @@
-// Server-side RSS parsing utility — no external dependencies
+// Server-side RSS parsing utility: no external dependencies
 
 export interface Article {
   title: string;
@@ -118,7 +118,7 @@ export function parseRSS(xml: string, source: string, category: string): Article
     const title = stripHTML(getElementText(item, 'title'));
     if (!title) continue;
 
-    // Link — handle Atom <link href="..." /> and RSS <link>text</link>
+    // Link: handle Atom <link href="..." /> and RSS <link>text</link>
     let link = '';
     if (isAtom) {
       const atomLink = item.match(/<link[^>]+rel=["']alternate["'][^>]+href=["']([^"']+)["']/i)

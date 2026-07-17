@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
+import { useHlsSlot } from '@/lib/hlsBudget';
 import type { CameraConfig, WidgetStyle } from '@/types/widget';
 
 interface CameraWidgetProps {
@@ -8,12 +9,39 @@ interface CameraWidgetProps {
   style: WidgetStyle;
 }
 
+type PlaybackState = 'connecting' | 'playing' | 'reconnecting' | 'offline';
+
 export function CameraWidget({ config }: CameraWidgetProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const stallTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTimeRef = useRef(0);
   const stallCountRef = useRef(0);
+  const hasPlayedRef = useRef(false);
+
+  // State-based remount: bumping the counter re-keys the <video> element and
+  // re-runs the attach effect, replacing the old hlsrestart custom-event hack.
+  const [instance, setInstance] = useState(0);
+  const [playback, setPlayback] = useState<PlaybackState>('connecting');
+  // Drives the 400ms fade-from-black on the first playing event per URL
+  const [hasPlayed, setHasPlayed] = useState(false);
+
+  const slotGranted = useHlsSlot(!!config.url);
+
+  // Reset the first-frame fade whenever the source changes
+  useEffect(() => {
+    setHasPlayed(false);
+    hasPlayedRef.current = false;
+    setPlayback('connecting');
+  }, [config.url]);
+
+  const scheduleRestart = useCallback((delayMs: number) => {
+    if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+    restartTimerRef.current = setTimeout(() => {
+      setInstance(i => i + 1);
+    }, delayMs);
+  }, []);
 
   const seekToLive = useCallback(() => {
     const video = videoRef.current;
@@ -26,9 +54,34 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     video.play().catch(() => {});
   }, []);
 
+  // Bind playback truth to the actual video element
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !config.url) return;
+    if (!video || !config.url || !slotGranted) return;
+
+    const onPlaying = () => {
+      hasPlayedRef.current = true;
+      setHasPlayed(true);
+      setPlayback('playing');
+    };
+    const onBuffering = () => {
+      setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
+    };
+
+    video.addEventListener('playing', onPlaying);
+    video.addEventListener('waiting', onBuffering);
+    video.addEventListener('stalled', onBuffering);
+
+    return () => {
+      video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('waiting', onBuffering);
+      video.removeEventListener('stalled', onBuffering);
+    };
+  }, [config.url, slotGranted, instance]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !config.url || !slotGranted) return;
 
     if (hlsRef.current) {
       hlsRef.current.destroy();
@@ -60,22 +113,20 @@ export function CameraWidget({ config }: CameraWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            setPlayback(hasPlayedRef.current ? 'reconnecting' : 'offline');
             setTimeout(() => {
               hls.startLoad();
               seekToLive();
             }, 3000);
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
             hls.recoverMediaError();
           } else {
-            // Unrecoverable - full restart
+            // Unrecoverable: destroy and remount the player via key counter
             hls.destroy();
             hlsRef.current = null;
-            setTimeout(() => {
-              if (videoRef.current) {
-                // Re-trigger the effect by dispatching a rebuild
-                videoRef.current.dispatchEvent(new Event('hlsrestart'));
-              }
-            }, 5000);
+            setPlayback('offline');
+            scheduleRestart(5000);
           }
         }
       });
@@ -89,6 +140,7 @@ export function CameraWidget({ config }: CameraWidgetProps) {
         const currentTime = video.currentTime;
         if (currentTime === lastTimeRef.current && currentTime > 0) {
           stallCountRef.current++;
+          setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
           if (stallCountRef.current >= 2) {
             // Stalled for 10+ seconds, seek to live edge
             seekToLive();
@@ -119,49 +171,84 @@ export function CameraWidget({ config }: CameraWidgetProps) {
         clearInterval(stallTimerRef.current);
         stallTimerRef.current = null;
       }
+      if (restartTimerRef.current) {
+        clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = null;
+      }
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [config.url, config.isMuted, seekToLive]);
+  }, [config.url, config.isMuted, slotGranted, instance, seekToLive, scheduleRestart]);
 
   if (!config.url) {
     return (
       <div className="w-full h-full flex items-center justify-center">
-        <span className="text-xs text-white/30">No camera URL configured</span>
+        <span className="type-label">No camera stream configured</span>
       </div>
     );
   }
 
+  const paused = !slotGranted;
+  const showConnecting = !paused && playback === 'connecting' && !hasPlayed;
+  const showOffline = !paused && playback === 'offline' && !hasPlayed;
+
   return (
     <div className="relative w-full h-full bg-black">
       <video
+        key={instance}
         ref={videoRef}
         className="w-full h-full object-cover"
+        style={{
+          opacity: hasPlayed ? 1 : 0,
+          transition: 'opacity 400ms var(--ease-out)',
+        }}
         playsInline
         muted={config.isMuted}
         autoPlay
       />
 
-      {/* Label overlay - matches Swift: bottom-left capsule pill with ultraThinMaterial */}
-      <div className="absolute bottom-3 left-3">
-        <div
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
-          style={{
-            background: 'rgba(0, 0, 0, 0.4)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-          }}
-        >
-          <div className="w-[5px] h-[5px] rounded-full bg-red-500/80" />
+      {/* Connecting / offline overlays instead of a silent black rectangle */}
+      {(showConnecting || showOffline || paused) && (
+        <div className="absolute inset-0 flex items-center justify-center">
           <span
-            className="text-[9px] font-medium text-white/80 uppercase"
-            style={{ letterSpacing: '1px' }}
+            className="glass-chip px-3 py-1.5 font-mono text-[12px] uppercase"
+            style={{
+              letterSpacing: 'var(--tracking-caps)',
+              color: paused
+                ? 'var(--color-text-3)'
+                : showOffline
+                  ? 'var(--color-critical)'
+                  : 'var(--color-text-2)',
+            }}
+          >
+            {paused ? 'Paused' : showOffline ? 'Offline, retrying' : 'Connecting'}
+          </span>
+        </div>
+      )}
+
+      {/* Bottom-left mono label chip; live dot binds to actual playback */}
+      <div className="absolute bottom-3 left-3 flex items-center gap-2">
+        <div className="glass-chip flex items-center gap-2 px-2.5 py-1.5">
+          {playback === 'playing' && !paused && (
+            <span className="live-dot live-dot--live shrink-0" aria-hidden />
+          )}
+          <span
+            className="font-mono text-[12px] uppercase"
+            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-text-2)' }}
           >
             {config.label || 'Camera'}
           </span>
         </div>
+        {playback === 'reconnecting' && !paused && (
+          <span
+            className="glass-chip px-2.5 py-1.5 font-mono text-[12px] uppercase"
+            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-warn)' }}
+          >
+            Reconnecting
+          </span>
+        )}
       </div>
     </div>
   );

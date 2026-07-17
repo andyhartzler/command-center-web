@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useSharedClock } from '@/hooks/useSharedClock';
 import { type ClockConfig, type WidgetStyle } from '@/types/widget';
 
 interface Props {
@@ -8,20 +9,17 @@ interface Props {
 }
 
 export function ClockWidget({ config }: Props) {
-  const [time, setTime] = useState(new Date());
+  const now = useSharedClock();
+  const time = new Date(now || Date.now());
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const measure = useCallback(() => {
     const container = containerRef.current;
     const content = contentRef.current;
     if (!container || !content) return;
+    // offsetWidth/Height ignore the transform, so this is layout size
     const cw = content.offsetWidth;
     const ch = content.offsetHeight;
     const w = container.clientWidth;
@@ -30,17 +28,17 @@ export function ClockWidget({ config }: Props) {
     setScale(Math.min(w / cw, h / ch) * 0.92);
   }, []);
 
+  // Observe both the container and the content: digit-count changes resize
+  // the content box, so the same observer callback handles every re-measure.
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    measure();
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
+    ro.observe(container);
+    ro.observe(content);
     return () => ro.disconnect();
   }, [measure]);
-
-  // Re-measure when content changes (e.g. hour digit count changes)
-  useEffect(() => { measure(); });
 
   const tz = config.timezone || 'America/Chicago';
 
@@ -95,8 +93,13 @@ export function ClockWidget({ config }: Props) {
       >
         {/* Location label */}
         <div
-          className="font-bold text-white/30 uppercase"
-          style={{ letterSpacing: '4px', fontSize: '10px', lineHeight: 1 }}
+          className="font-medium uppercase"
+          style={{
+            letterSpacing: 'var(--tracking-caps)',
+            fontSize: '12px',
+            lineHeight: 1,
+            color: 'var(--color-text-3)',
+          }}
         >
           {config.label}
         </div>
@@ -104,34 +107,34 @@ export function ClockWidget({ config }: Props) {
         {/* Time */}
         <div className="flex items-baseline">
           <span
-            className="font-extralight text-white/95 tabular-nums"
-            style={{ fontSize: '72px', lineHeight: 1, fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            className="font-extralight font-mono tabular-nums"
+            style={{ fontSize: '72px', lineHeight: 1, color: 'var(--color-text-1)' }}
           >
             {hours}
           </span>
           <span
-            className="font-extralight text-white/30"
-            style={{ fontSize: '64px', lineHeight: 1, position: 'relative', top: '-2px' }}
+            className="font-extralight"
+            style={{ fontSize: '64px', lineHeight: 1, position: 'relative', top: '-2px', color: 'var(--color-text-3)' }}
           >
             :
           </span>
           <span
-            className="font-extralight text-white/95 tabular-nums"
-            style={{ fontSize: '72px', lineHeight: 1, fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            className="font-extralight font-mono tabular-nums"
+            style={{ fontSize: '72px', lineHeight: 1, color: 'var(--color-text-1)' }}
           >
             {minutes}
           </span>
           {seconds && (
             <>
               <span
-                className="font-extralight text-white/30"
-                style={{ fontSize: '40px', lineHeight: 1, position: 'relative', top: '-2px' }}
+                className="font-extralight"
+                style={{ fontSize: '40px', lineHeight: 1, position: 'relative', top: '-2px', color: 'var(--color-text-3)' }}
               >
                 :
               </span>
               <span
-                className="font-extralight text-white/60 tabular-nums"
-                style={{ fontSize: '40px', lineHeight: 1, fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                className="font-extralight font-mono tabular-nums"
+                style={{ fontSize: '40px', lineHeight: 1, color: 'var(--color-text-2)' }}
               >
                 {seconds}
               </span>
@@ -139,8 +142,8 @@ export function ClockWidget({ config }: Props) {
           )}
           {period && (
             <span
-              className="font-medium text-white/25"
-              style={{ fontSize: '18px', marginLeft: '6px', position: 'relative', top: '-4px' }}
+              className="font-medium"
+              style={{ fontSize: '18px', marginLeft: '6px', position: 'relative', top: '-4px', color: 'var(--color-text-3)' }}
             >
               {period}
             </span>
@@ -149,8 +152,8 @@ export function ClockWidget({ config }: Props) {
 
         {/* Date */}
         <div
-          className="font-light text-white/35"
-          style={{ fontSize: '14px', marginTop: '2px', lineHeight: 1 }}
+          className="font-light"
+          style={{ fontSize: '14px', marginTop: '2px', lineHeight: 1, color: 'var(--color-text-2)' }}
         >
           {dateString}
         </div>

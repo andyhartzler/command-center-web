@@ -1,8 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
+import { ShieldAlert } from 'lucide-react';
 import { useAppleMap } from '@/hooks/useAppleMap';
+import { usePolledData } from '@/hooks/usePolledData';
+import { WidgetShell, Freshness } from './WidgetShell';
+import { TickingNumber } from '../motion/TickingNumber';
+import { tokens } from '@/lib/tokens';
 import type { ConflictConfig, WidgetStyle } from '@/types/widget';
+
+const POLL_INTERVAL = 10 * 60_000;
 
 interface ConflictData {
   name: string;
@@ -17,145 +24,149 @@ interface ConflictWidgetProps {
   style: WidgetStyle;
 }
 
-function createPulsingElement(): HTMLElement {
+/** Coverage (urlCount) sets dot size; GDELT tone (more negative = worse) sets heat. */
+function markerSize(urlCount: number): number {
+  return Math.max(10, Math.min(22, 8 + Math.sqrt(Math.max(0, urlCount)) * 2.2));
+}
+
+function markerHeat(tone: number): number {
+  const severity = Math.min(1, Math.max(0, -tone) / 12);
+  return 0.4 + severity * 0.6;
+}
+
+function conflictElement(size: number, heat: number): HTMLElement {
   const el = document.createElement('div');
   el.style.position = 'relative';
-  el.style.width = '16px';
-  el.style.height = '16px';
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
   el.style.cursor = 'pointer';
+  const core = Math.round(size * 0.5);
   el.innerHTML = `
     <div style="
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 8px; height: 8px; border-radius: 50%;
-      background: #ef4444;
-      box-shadow: 0 0 6px rgba(239, 68, 68, 0.8);
+      width: ${core}px; height: ${core}px; border-radius: 50%;
+      background: ${tokens.critical};
+      opacity: ${heat.toFixed(2)};
+      box-shadow: 0 0 ${Math.round(size * 0.5)}px ${tokens.critical};
     "></div>
     <div style="
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 16px; height: 16px; border-radius: 50%;
-      border: 1.5px solid rgba(239, 68, 68, 0.6);
+      width: ${size}px; height: ${size}px; border-radius: 50%;
+      border: 1.5px solid ${tokens.critical};
       animation: conflictPulse 2s ease-out infinite;
     "></div>
   `;
   return el;
 }
 
-export function ConflictWidget({ config }: ConflictWidgetProps) {
+function cleanEventName(name: string): string {
+  const clean = name
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+  return clean.length > 80 ? clean.substring(0, 80) + '...' : clean;
+}
+
+export function ConflictWidget({ config, style }: ConflictWidgetProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [events, setEvents] = useState<ConflictData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const dataFetchedRef = useRef(false);
   const annotationsRef = useRef<mapkit.Annotation[]>([]);
 
-  const { map, isReady } = useAppleMap(mapRef, {
+  const { map, ready } = useAppleMap(mapRef, {
     center: [25, 30],
     zoom: 2,
   });
 
-  const updateMarkers = useCallback((data: ConflictData[]) => {
+  const { data, phase, isStale, lastUpdated } = usePolledData<ConflictData[]>(
+    `/api/conflicts?max=${config.maxEvents}`,
+    { interval: POLL_INTERVAL },
+  );
+
+  useEffect(() => {
     const m = map.current;
-    if (!m) return;
+    if (!ready || !m || !data) return;
 
     if (annotationsRef.current.length > 0) {
       m.removeAnnotations(annotationsRef.current);
     }
     annotationsRef.current = [];
 
-    data.forEach((event) => {
-      const cleanName = event.name
-        .replace(/<[^>]*>/g, '')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'");
-      const displayName = cleanName.length > 80 ? cleanName.substring(0, 80) + '...' : cleanName;
+    data.forEach(event => {
+      const displayName = cleanEventName(event.name);
+      const size = markerSize(event.urlCount);
+      const heat = markerHeat(event.tone);
 
       const annotation = new mapkit.Annotation(
         new mapkit.Coordinate(event.lat, event.lon),
-        () => createPulsingElement(),
+        () => conflictElement(size, heat),
         {
           anchorOffset: new DOMPoint(0, 0),
           callout: {
             calloutContentForAnnotation: () => {
               const el = document.createElement('div');
-              el.innerHTML = `<div style="font-family: system-ui; font-size: 11px; color: #fff; background: rgba(0,0,0,0.85); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2); max-width: 240px;">
-                <div style="font-weight: 600; font-size: 12px; color: #fca5a5; line-height: 1.3;">${displayName}</div>
-                <div style="color: rgba(255,255,255,0.4); margin-top: 4px; font-size: 10px;">
-                  ${event.lat.toFixed(2)}, ${event.lon.toFixed(2)}
-                </div>
+              el.innerHTML = `<div style="font-family:var(--font-sans);font-size:12px;color:${tokens.text1};background:${tokens.glassBg};padding:8px 12px;border-radius:10px;border:1px solid ${tokens.borderCard};backdrop-filter:blur(20px);max-width:240px">
+                <div style="font-weight:600;color:${tokens.critical};line-height:1.3">${displayName}</div>
+                <div style="font-family:var(--font-mono);font-size:12px;color:${tokens.text2};margin-top:4px">${event.urlCount} reports, tone ${event.tone.toFixed(1)}</div>
+                <div style="font-family:var(--font-mono);font-size:12px;color:${tokens.text3};margin-top:2px">${event.lat.toFixed(2)}, ${event.lon.toFixed(2)}</div>
               </div>`;
               return el;
             },
           },
-        }
+        },
       );
 
       m.addAnnotation(annotation);
       annotationsRef.current.push(annotation);
     });
-  }, [map]);
-
-  const fetchData = useCallback(async () => {
-    if (dataFetchedRef.current) return;
-    try {
-      const res = await fetch(`/api/conflicts?max=${config.maxEvents}`);
-      if (!res.ok) return;
-      const data: ConflictData[] = await res.json();
-      setEvents(data);
-      updateMarkers(data);
-      dataFetchedRef.current = true;
-    } catch (err) {
-      console.error('Failed to fetch conflicts:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [config.maxEvents, updateMarkers]);
-
-  useEffect(() => {
-    const check = setInterval(() => {
-      if (isReady()) {
-        fetchData();
-        clearInterval(check);
-      }
-    }, 200);
-    return () => clearInterval(check);
-  }, [isReady, fetchData]);
+  }, [ready, map, data]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      <div ref={mapRef} className="w-full h-full" />
+    <WidgetShell
+      icon={<ShieldAlert size={18} />}
+      title="Conflict events"
+      style={style}
+      status={<Freshness lastUpdated={lastUpdated} interval={POLL_INTERVAL} isStale={isStale} />}
+    >
+      <div className="relative w-full h-full overflow-hidden">
+        <div ref={mapRef} className="w-full h-full" />
 
-      <div
-        className="absolute top-2.5 left-2.5 z-[1000] px-2.5 py-2 rounded-lg"
-        style={{
-          background: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-        }}
-      >
-        <div
-          className="text-[9px] font-bold text-white/50 uppercase mb-1"
-          style={{ letterSpacing: '3px' }}
-        >
-          Conflict Monitor
+        {/* Count HUD */}
+        <div className="absolute top-2.5 left-2.5 z-10 glass-chip px-3 py-2">
+          <div className="flex items-baseline gap-1.5">
+            {data ? (
+              <TickingNumber value={data.length} className="text-[18px] font-medium" />
+            ) : (
+              <span className="font-mono text-[18px]" style={{ color: 'var(--color-text-3)' }}>--</span>
+            )}
+            <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
+              events (24h)
+            </span>
+          </div>
+          <div className="text-[12px] mt-0.5" style={{ color: 'var(--color-text-3)' }}>
+            size coverage, heat tone
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-[5px] h-[5px] rounded-full bg-red-500" />
-          <span className="text-[11px] font-medium text-white/70">
-            {loading ? '--' : events.length} events (24h)
-          </span>
-        </div>
+
+        {/* Feed unreachable and nothing cached yet */}
+        {!data && phase === 'error' && (
+          <div className="absolute inset-x-0 bottom-12 z-10 flex justify-center">
+            <span className="glass-chip px-3 py-1.5 font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
+              no event feed yet, retrying
+            </span>
+          </div>
+        )}
+
+        <style jsx global>{`
+          @keyframes conflictPulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+            100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+          }
+        `}</style>
       </div>
-
-      <style jsx global>{`
-        @keyframes conflictPulse {
-          0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
-          100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
-        }
-      `}</style>
-    </div>
+    </WidgetShell>
   );
 }

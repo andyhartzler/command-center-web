@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isAllowedProxyHost } from './channels';
 
 // In-memory cache for resolved URLs
 const urlCache: Record<string, { url: string; ts: number }> = {};
@@ -8,7 +9,18 @@ const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 const KMBC_CHANNEL_ID = '47d92d1bd8e44e2383563530c2a305fd';
 
 // Proxy HLS manifests/segments to bypass CORS
-async function proxyStream(url: string): Promise<NextResponse> {
+async function proxyStream(url: string): Promise<Response> {
+  // Only proxy hosts derived from the channel catalog; this is an open
+  // fetch endpoint otherwise.
+  try {
+    const host = new URL(url).hostname;
+    if (!isAllowedProxyHost(host)) {
+      return NextResponse.json({ error: 'Host not allowlisted' }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: 'Invalid proxy URL' }, { status: 400 });
+  }
+
   try {
     // Some streams require specific referer headers
     const headers: Record<string, string> = {
@@ -39,10 +51,13 @@ async function proxyStream(url: string): Promise<NextResponse> {
 
     if (isManifest) {
       let manifest = await res.text();
-      // Rewrite relative URLs to absolute through our proxy
-      const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
+      // Rewrite relative URLs to absolute through our proxy. Resolve against
+      // the post-redirect URL so redirected manifests (jmp2.uk, amagi) keep
+      // their segment paths intact.
+      const finalUrl = res.url || url;
+      const baseUrl = finalUrl.substring(0, finalUrl.lastIndexOf('/') + 1);
       manifest = manifest.replace(/^(?!#)(?!https?:\/\/)(.+)$/gm, (match) => {
-        const absolute = match.startsWith('/') ? new URL(match, url).href : baseUrl + match;
+        const absolute = match.startsWith('/') ? new URL(match, finalUrl).href : baseUrl + match;
         return `/api/livetv?proxy=${encodeURIComponent(absolute)}`;
       });
       // Rewrite AES-128 key URIs to go through proxy (for CORS)
@@ -58,9 +73,10 @@ async function proxyStream(url: string): Promise<NextResponse> {
       });
     }
 
-    // Binary segment passthrough
-    const body = await res.arrayBuffer();
-    return new NextResponse(body, {
+    // Binary segment passthrough: stream the upstream body straight
+    // through instead of buffering whole segments in memory.
+    return new Response(res.body, {
+      status: res.status,
       headers: {
         'Content-Type': contentType,
         'Access-Control-Allow-Origin': '*',

@@ -12,13 +12,11 @@ interface FeedDef {
 }
 
 const LOCAL_FEEDS: FeedDef[] = [
-  // KSHB local-news feed — already KC-focused
+  // KSHB local-news feed: already KC-focused
   { url: 'https://www.kshb.com/news/local-news.rss', source: 'KSHB', category: 'local' },
   { url: 'https://www.kshb.com/news/crime.rss', source: 'KSHB', category: 'crime' },
-  // KMBC — top stories (filtered server-side for KC relevance)
+  // KMBC: top stories (filtered server-side for KC relevance)
   { url: 'https://www.kmbc.com/topstories-rss', source: 'KMBC', category: 'local' },
-  // KC Star — latest news (filtered server-side for KC relevance)
-  { url: 'https://www.kansascity.com/latest-news/article742801.ece/BINARY/rss', source: 'KC Star', category: 'local' },
   // KCTV5 local
   { url: 'https://www.kctv5.com/search/?f=rss&t=article&c=news/local&l=50&s=start_time&sd=desc', source: 'KCTV5', category: 'local' },
   // Fox4 KC
@@ -26,7 +24,6 @@ const LOCAL_FEEDS: FeedDef[] = [
 ];
 
 const WORLD_FEEDS: FeedDef[] = [
-  { url: 'https://feeds.reuters.com/reuters/topNews', source: 'Reuters', category: 'world' },
   { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', source: 'BBC', category: 'world' },
   { url: 'https://feeds.npr.org/1001/rss.xml', source: 'NPR', category: 'us' },
   { url: 'https://www.aljazeera.com/xml/rss/all.xml', source: 'Al Jazeera', category: 'world' },
@@ -69,7 +66,7 @@ async function fetchFeed(def: FeedDef): Promise<Article[]> {
 }
 
 // ---------------------------------------------------------------------------
-// KC relevance filter — only show articles actually *about* KC
+// KC relevance filter: only show articles actually *about* KC
 // ---------------------------------------------------------------------------
 
 const KC_KEYWORDS = new RegExp(
@@ -183,7 +180,7 @@ function deduplicateArticles(articles: Article[]): Article[] {
 }
 
 // ---------------------------------------------------------------------------
-// Route handler — GET /api/news
+// Route handler: GET /api/news
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {

@@ -1,8 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
+import { Plane } from 'lucide-react';
 import { useAppleMap } from '@/hooks/useAppleMap';
+import { usePolledData } from '@/hooks/usePolledData';
+import { useSharedClock, formatAge } from '@/hooks/useSharedClock';
+import { WidgetShell } from './WidgetShell';
+import { TickingNumber } from '../motion/TickingNumber';
+import { ALTITUDE_RAMP, rampColor } from '@/lib/dataviz-ramps';
+import { tokens } from '@/lib/tokens';
 import type { AirTrafficConfig, WidgetStyle } from '@/types/widget';
+
+const POLL_INTERVAL = 10_000;
 
 interface AircraftData {
   lat: number;
@@ -20,12 +29,9 @@ interface AirTrafficWidgetProps {
   style: WidgetStyle;
 }
 
-function getAltitudeColor(alt: number): string {
-  if (alt <= 0) return '#6b7280';
-  if (alt < 5000) return '#22c55e';
-  if (alt < 15000) return '#facc15';
-  if (alt < 30000) return '#f97316';
-  return '#06b6d4';
+function aircraftColor(altitude: number): string {
+  if (altitude <= 0) return tokens.text3;
+  return rampColor(ALTITUDE_RAMP, altitude);
 }
 
 function createAircraftElement(heading: number, color: string): HTMLElement {
@@ -39,59 +45,79 @@ function createAircraftElement(heading: number, color: string): HTMLElement {
   return el;
 }
 
-export function AirTrafficWidget({ config }: AirTrafficWidgetProps) {
+export function AirTrafficWidget({ config, style }: AirTrafficWidgetProps) {
+  const now = useSharedClock();
   const mapRef = useRef<HTMLDivElement>(null);
-  const [aircraft, setAircraft] = useState<AircraftData[]>([]);
-  const [loading, setLoading] = useState(true);
   const annotationsRef = useRef<mapkit.Annotation[]>([]);
+  const circleRef = useRef<mapkit.CircleOverlay | null>(null);
 
   let zoom = 9;
   if (config.radiusNm > 200) zoom = 6;
   else if (config.radiusNm > 100) zoom = 7;
   else if (config.radiusNm > 50) zoom = 8;
 
-  const { map, isReady } = useAppleMap(mapRef, {
+  const { map, ready } = useAppleMap(mapRef, {
     center: [config.centerLat, config.centerLon],
     zoom,
   });
 
-  // Add radius circle overlay once map is ready
+  const { data, isStale, lastUpdated } = usePolledData<AircraftData[]>(
+    `/api/air-traffic?lat=${config.centerLat}&lon=${config.centerLon}&radius=${config.radiusNm}`,
+    { interval: POLL_INTERVAL },
+  );
+
+  // Radius circle: always remove the previous overlay before adding a new one
+  // so config changes cannot accumulate stacked circles.
   useEffect(() => {
-    const check = setInterval(() => {
-      if (isReady() && map.current) {
-        clearInterval(check);
-        const radiusMeters = config.radiusNm * 1852;
-        const circle = new mapkit.CircleOverlay(
-          new mapkit.Coordinate(config.centerLat, config.centerLon),
-          radiusMeters,
-          {
-            style: {
-              fillColor: 'rgba(6, 182, 212, 0.05)',
-              fillOpacity: 1,
-              strokeColor: 'rgba(6, 182, 212, 0.3)',
-              strokeOpacity: 1,
-              lineWidth: 1,
-            },
-          }
-        );
-        map.current.addOverlay(circle);
-      }
-    }, 200);
-    return () => clearInterval(check);
-  }, [isReady, map, config.centerLat, config.centerLon, config.radiusNm]);
-
-  const updateMarkers = useCallback((data: AircraftData[]) => {
     const m = map.current;
-    if (!m) return;
+    if (!ready || !m) return;
 
-    // Remove old annotations
+    if (circleRef.current) {
+      m.removeOverlay(circleRef.current);
+      circleRef.current = null;
+    }
+
+    const circle = new mapkit.CircleOverlay(
+      new mapkit.Coordinate(config.centerLat, config.centerLon),
+      config.radiusNm * 1852,
+      {
+        style: new mapkit.Style({
+          fillColor: tokens.info,
+          fillOpacity: 0.05,
+          strokeColor: tokens.info,
+          strokeOpacity: 0.3,
+          lineWidth: 1,
+        }),
+      },
+    );
+    m.addOverlay(circle);
+    circleRef.current = circle;
+
+    return () => {
+      if (circleRef.current && map.current) {
+        // The map may already be destroyed during unmount teardown
+        try {
+          map.current.removeOverlay(circleRef.current);
+        } catch {
+          // no-op: destroyed map
+        }
+        circleRef.current = null;
+      }
+    };
+  }, [ready, map, config.centerLat, config.centerLon, config.radiusNm]);
+
+  // Aircraft markers: previous annotations are removed on every refresh.
+  useEffect(() => {
+    const m = map.current;
+    if (!ready || !m || !data) return;
+
     if (annotationsRef.current.length > 0) {
       m.removeAnnotations(annotationsRef.current);
     }
     annotationsRef.current = [];
 
-    data.forEach((ac) => {
-      const color = getAltitudeColor(ac.altitude);
+    data.forEach(ac => {
+      const color = aircraftColor(ac.altitude);
       const altDisplay = ac.altitude > 0 ? `${(ac.altitude / 100).toFixed(0)}FL` : 'GND';
       const speedDisplay = ac.groundSpeed > 0 ? `${ac.groundSpeed}kt` : '';
 
@@ -103,10 +129,10 @@ export function AirTrafficWidget({ config }: AirTrafficWidgetProps) {
           callout: {
             calloutContentForAnnotation: () => {
               const el = document.createElement('div');
-              el.innerHTML = `<div style="font-family: system-ui; font-size: 11px; color: #fff; background: rgba(0,0,0,0.85); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                <div style="font-weight: 700; font-size: 13px; color: ${color};">${ac.callsign || ac.hex}</div>
-                ${ac.type ? `<div style="color: rgba(255,255,255,0.5); margin-top: 1px;">${ac.type}</div>` : ''}
-                <div style="margin-top: 4px; display: flex; gap: 8px;">
+              el.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:${tokens.text1};background:${tokens.glassBg};padding:8px 12px;border-radius:10px;border:1px solid ${tokens.borderCard};backdrop-filter:blur(20px)">
+                <div style="font-weight:600;font-size:13px;color:${color}">${ac.callsign || ac.hex}</div>
+                ${ac.type ? `<div style="color:${tokens.text3};margin-top:1px">${ac.type}</div>` : ''}
+                <div style="margin-top:4px;display:flex;gap:8px">
                   <span>${altDisplay}</span>
                   ${speedDisplay ? `<span>${speedDisplay}</span>` : ''}
                   <span>${ac.heading.toFixed(0)}&deg;</span>
@@ -115,102 +141,66 @@ export function AirTrafficWidget({ config }: AirTrafficWidgetProps) {
               return el;
             },
           },
-        }
+        },
       );
 
       m.addAnnotation(annotation);
       annotationsRef.current.push(annotation);
     });
-  }, [map]);
-
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch(
-        `/api/air-traffic?lat=${config.centerLat}&lon=${config.centerLon}&radius=${config.radiusNm}`
-      );
-      if (!res.ok) return;
-      const data: AircraftData[] = await res.json();
-      setAircraft(data);
-      updateMarkers(data);
-    } catch (err) {
-      console.error('Failed to fetch air traffic:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [config.centerLat, config.centerLon, config.radiusNm, updateMarkers]);
-
-  // Fetch after map ready
-  useEffect(() => {
-    const check = setInterval(() => {
-      if (isReady()) {
-        fetchData();
-        clearInterval(check);
-      }
-    }, 200);
-    return () => clearInterval(check);
-  }, [isReady, fetchData]);
-
-  // Poll every 10s
-  useEffect(() => {
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [ready, map, data]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      <div ref={mapRef} className="w-full h-full" />
+    <WidgetShell icon={<Plane size={18} />} title="Air traffic" style={style} chromeless>
+      <div className="relative w-full h-full overflow-hidden">
+        <div ref={mapRef} className="w-full h-full" />
 
-      <div
-        className="absolute top-2.5 left-2.5 z-[1000] px-3 py-2.5 rounded-lg"
-        style={{
-          background: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-        }}
-      >
-        <div
-          className="text-[9px] font-bold text-white/50 uppercase mb-1"
-          style={{ letterSpacing: '3px' }}
-        >
-          Air Traffic
+        {/* Count HUD */}
+        <div className="absolute top-2.5 left-2.5 z-10 glass-chip flex items-baseline gap-1.5 px-3 py-2">
+          <Plane size={13} className="self-center shrink-0" style={{ color: 'var(--color-accent-400)' }} aria-hidden />
+          {data ? (
+            <TickingNumber value={data.length} className="text-[18px] font-medium" />
+          ) : (
+            <span className="font-mono text-[18px]" style={{ color: 'var(--color-text-3)' }}>--</span>
+          )}
+          <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>aircraft</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-[5px] h-[5px] rounded-full bg-green-500" />
-          <span className="text-[11px] font-medium text-white/70">
-            {loading ? '--' : aircraft.length} aircraft
+
+        {/* Freshness stamp */}
+        <div className="absolute top-2.5 right-2.5 z-10 glass-chip flex items-center gap-2 px-2.5 py-1.5">
+          {!isStale && lastUpdated && <span className="live-dot" aria-hidden />}
+          <span
+            className="font-mono text-[12px]"
+            style={{ color: isStale ? 'var(--color-warn)' : 'var(--color-text-3)' }}
+          >
+            {lastUpdated
+              ? isStale
+                ? `stale, updated ${formatAge(lastUpdated, now)}`
+                : `updated ${formatAge(lastUpdated, now)}`
+              : 'connecting'}
           </span>
         </div>
-      </div>
 
-      <div
-        className="absolute bottom-2 left-2 z-[1000] px-2 py-1.5 rounded-md flex items-center gap-3"
-        style={{
-          background: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-        }}
-      >
-        <div className="flex items-center gap-1">
-          <div className="w-0 h-0" style={{ borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderBottom: '7px solid #22c55e' }} />
-          <span className="text-[9px] text-white/50">&lt;10k</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-0 h-0" style={{ borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderBottom: '7px solid #facc15' }} />
-          <span className="text-[9px] text-white/50">10-30k</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-0 h-0" style={{ borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderBottom: '7px solid #06b6d4' }} />
-          <span className="text-[9px] text-white/50">&gt;30k</span>
+        {/* Legend generated from ALTITUDE_RAMP */}
+        <div className="absolute bottom-2.5 left-2.5 z-10 glass-chip flex items-center gap-3 flex-wrap px-2.5 py-1.5">
+          {ALTITUDE_RAMP.map(stop => (
+            <span key={stop.label} className="flex items-center gap-1.5">
+              <span
+                className="shrink-0"
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderLeft: '4px solid transparent',
+                  borderRight: '4px solid transparent',
+                  borderBottom: `7px solid ${stop.color}`,
+                }}
+              />
+              <span className="text-[12px] whitespace-nowrap" style={{ color: 'var(--color-text-3)' }}>
+                {stop.label}
+              </span>
+            </span>
+          ))}
         </div>
       </div>
-
-      <div
-        className="absolute top-2 right-2 z-[1000] px-2 py-1 rounded-md flex items-center gap-1.5"
-        style={{ background: 'rgba(0, 0, 0, 0.5)' }}
-      >
-        <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22c55e' }} />
-        <span className="text-[9px] text-white/50 font-medium">LIVE</span>
-      </div>
-    </div>
+    </WidgetShell>
   );
 }

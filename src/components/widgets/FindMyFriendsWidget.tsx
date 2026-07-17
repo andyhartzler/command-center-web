@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Users, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Users } from 'lucide-react';
+import { WidgetShell, Freshness } from './WidgetShell';
+import { usePolledData } from '@/hooks/usePolledData';
+import { useSharedClock, formatAge } from '@/hooks/useSharedClock';
 import { useAppleMap } from '@/hooks/useAppleMap';
 import type { FindMyFriendsConfig, WidgetStyle } from '@/types/widget';
 
@@ -21,19 +24,11 @@ interface FindMyData {
   avatars: Record<string, string>;
 }
 
-function timeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return 'now';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return `${Math.floor(diff / 86_400_000)}d ago`;
-}
-
 function statusColor(status: string): string {
   switch (status) {
-    case 'live': return '#22c55e';
-    case 'legacy': return '#eab308';
-    default: return '#6b7280';
+    case 'live': return 'var(--color-ok)';
+    case 'legacy': return 'var(--color-warn)';
+    default: return 'var(--color-text-3)';
   }
 }
 
@@ -42,129 +37,66 @@ interface Props {
   style: WidgetStyle;
 }
 
-/** Format coords as a readable fallback location (e.g. "39.1°N, 94.6°W") */
-function coordsToLabel(lat: number, lng: number): string {
-  const latDir = lat >= 0 ? 'N' : 'S';
-  const lngDir = lng >= 0 ? 'E' : 'W';
-  return `${Math.abs(lat).toFixed(1)}°${latDir}, ${Math.abs(lng).toFixed(1)}°${lngDir}`;
-}
+export function FindMyFriendsWidget({ config, style }: Props) {
+  const interval = Math.max(60, config.refreshInterval || 180) * 1000;
+  const { data, phase, isStale, lastUpdated } = usePolledData<FindMyData>('/api/findmy', {
+    interval,
+  });
 
-/** Client-side reverse geocode using Nominatim */
-async function reverseGeocodeClient(lat: number, lng: number): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const addr = data.address;
-    if (!addr) return null;
-    const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || '';
-    const state = addr.state || '';
-    if (city && state) return `${city}, ${state}`;
-    if (city) return city;
-    if (state) return state;
-    return data.display_name?.split(',').slice(0, 2).join(',').trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-/** Enrich friends client-side: fill missing addresses and fix status */
-async function enrichFriendsClient(friends: FriendLocation[]): Promise<FriendLocation[]> {
-  return Promise.all(friends.map(async (f) => {
-    const hasCoords = f.lat !== 0 || f.lng !== 0;
-    // If we have valid coords, treat as live
-    const status = hasCoords && f.status !== 'live' && f.status !== 'legacy' ? 'live' : f.status;
-    if (f.address) return status !== f.status ? { ...f, status } : f;
-    if (!hasCoords) return f;
-    // Try reverse geocoding, fall back to formatted coordinates
-    const location = await reverseGeocodeClient(f.lat, f.lng);
-    const label = location || coordsToLabel(f.lat, f.lng);
-    return { ...f, address: label, subtitle: label, status };
-  }));
-}
-
-export function FindMyFriendsWidget({ config, style: _style }: Props) {
-  const [data, setData] = useState<FindMyData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const fetchData = useCallback(async (refresh = false) => {
-    try {
-      const url = refresh ? '/api/findmy?action=refresh' : '/api/findmy';
-      const res = await fetch(url);
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text.includes('error') ? JSON.parse(text).error : `HTTP ${res.status}`);
-      }
-      const json: FindMyData = await res.json();
-      // Enrich client-side: fill missing addresses + fix status
-      json.friends = await enrichFriendsClient(json.friends);
-      setData(json);
-      setError(null);
-    } catch (err) {
-      console.error('[FindMy] fetch error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(() => fetchData(true), 20 * 60 * 1000); // refresh every 20 minutes
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
-  // Filter friends
-  const friends = data?.friends.filter(f =>
-    config.trackedHandles.length === 0 || config.trackedHandles.includes(f.handle)
-  ) ?? [];
-
+  // Labels arrive prepared from the server; the widget only filters and renders
+  const friends =
+    data?.friends.filter(
+      f => config.trackedHandles.length === 0 || config.trackedHandles.includes(f.handle),
+    ) ?? [];
   const avatars = data?.avatars ?? {};
-
-  if (loading) {
-    return (
-      <div ref={containerRef} className="w-full h-full flex items-center justify-center">
-        <Loader2 size={20} className="text-white/20 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center gap-2 px-4">
-        <MapPin size={20} className="text-white/15" />
-        <p className="text-[10px] text-white/25 text-center">Find My unavailable</p>
-      </div>
-    );
-  }
-
-  if (friends.length === 0) {
-    return (
-      <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center gap-2 px-4">
-        <Users size={20} className="text-white/15" />
-        <p className="text-[10px] text-white/25 text-center">No locations found</p>
-      </div>
-    );
-  }
 
   const mode = config.displayMode || 'map';
 
   return (
-    <div ref={containerRef} className="w-full h-full overflow-hidden relative">
-      {mode === 'map' && (
-        <MapMode friends={friends} avatars={avatars} />
+    <WidgetShell
+      icon={<Users size={18} />}
+      title="Friends"
+      status={<Freshness lastUpdated={lastUpdated} interval={interval} isStale={isStale} />}
+      style={style}
+    >
+      {phase === 'loading' && !data && (
+        <div className="w-full h-full flex flex-col gap-2 px-3.5 pt-1 pb-2">
+          {[...Array(3)].map((_, i) => (
+            <div
+              key={i}
+              className="h-10 rounded-[10px] animate-pulse"
+              style={{ background: 'var(--color-surface-2)', opacity: 0.5 }}
+            />
+          ))}
+        </div>
       )}
-      {mode === 'pins' && (
-        <PinsMode friends={friends} avatars={avatars} />
+
+      {phase === 'error' && !data && (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-2 px-4">
+          <Users size={20} style={{ color: 'var(--color-text-3)' }} />
+          <span className="type-body" style={{ color: 'var(--color-text-3)' }}>
+            Locations unavailable
+          </span>
+        </div>
       )}
-      {mode === 'list' && (
-        <ListMode friends={friends} avatars={avatars} />
+
+      {data && friends.length === 0 && (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-2 px-4">
+          <Users size={20} style={{ color: 'var(--color-text-3)' }} />
+          <span className="type-body" style={{ color: 'var(--color-text-3)' }}>
+            No shared locations
+          </span>
+        </div>
       )}
-    </div>
+
+      {friends.length > 0 && (
+        <div className="w-full h-full overflow-hidden relative">
+          {mode === 'map' && <MapMode friends={friends} avatars={avatars} />}
+          {mode === 'pins' && <PinsMode friends={friends} avatars={avatars} />}
+          {mode === 'list' && <ListMode friends={friends} avatars={avatars} />}
+        </div>
+      )}
+    </WidgetShell>
   );
 }
 
@@ -174,6 +106,7 @@ function MapMode({ friends, avatars }: {
   friends: FriendLocation[];
   avatars: Record<string, string>;
 }) {
+  const now = useSharedClock();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const prevFriendsKey = useRef('');
 
@@ -241,7 +174,7 @@ function MapMode({ friends, avatars }: {
             el.appendChild(img);
           } else {
             const placeholder = document.createElement('div');
-            placeholder.style.cssText = `width:36px;height:36px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);background:#374151;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:600;`;
+            placeholder.style.cssText = `width:36px;height:36px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);background:var(--color-surface-3);display:flex;align-items:center;justify-content:center;color:var(--color-text-1);font-size:14px;font-weight:600;`;
             placeholder.textContent = friend.name.charAt(0).toUpperCase();
             el.appendChild(placeholder);
           }
@@ -292,22 +225,31 @@ function MapMode({ friends, avatars }: {
       {/* Full-bleed map */}
       <div ref={mapContainerRef} className="absolute inset-0" />
 
-      {/* Friend list overlay — bottom left */}
-      <div className="absolute bottom-2 left-2 z-10 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+      {/* Friend list overlay, bottom left */}
+      <div className="glass-chip absolute bottom-2 left-2 z-10 px-2.5 py-1.5">
         {friends.map(f => (
           <div key={f.handle} className="flex items-center gap-2 py-0.5">
             {avatars[f.handle] ? (
-              <img src={avatars[f.handle]} className="w-4 h-4 rounded-full object-cover shrink-0" alt="" />
+              <img src={avatars[f.handle]} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
             ) : (
-              <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] text-white/60 font-semibold shrink-0">
+              <div
+                className="w-5 h-5 rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0"
+                style={{ background: 'var(--color-surface-3)', color: 'var(--color-text-2)' }}
+              >
                 {f.name.charAt(0)}
               </div>
             )}
-            <span className="text-[10px] text-white/80 font-medium whitespace-nowrap">{f.name.split(' ')[0]}</span>
+            <span className="text-[12px] font-medium whitespace-nowrap" style={{ color: 'var(--color-text-1)' }}>
+              {f.name.split(' ')[0]}
+            </span>
             {f.subtitle && (
-              <span className="text-[9px] text-white/35 whitespace-nowrap">{f.subtitle}</span>
+              <span className="text-[12px] whitespace-nowrap" style={{ color: 'var(--color-text-3)' }}>
+                {f.subtitle}
+              </span>
             )}
-            <span className="text-[8px] text-white/20 whitespace-nowrap">{timeAgo(f.lastUpdated)}</span>
+            <span className="text-[12px] font-mono whitespace-nowrap" style={{ color: 'var(--color-text-3)' }}>
+              {formatAge(f.lastUpdated, now)}
+            </span>
           </div>
         ))}
       </div>
@@ -321,8 +263,12 @@ function PinsMode({ friends, avatars }: {
   friends: FriendLocation[];
   avatars: Record<string, string>;
 }) {
+  const now = useSharedClock();
   return (
-    <div className="w-full h-full bg-[#1a1a1c] flex items-center justify-center p-4">
+    <div
+      className="w-full h-full flex items-center justify-center p-4"
+      style={{ background: 'var(--color-well)' }}
+    >
       <div className="flex flex-wrap items-center justify-center gap-4">
         {friends.map(f => (
           <div key={f.handle} className="flex flex-col items-center gap-1.5 min-w-0">
@@ -330,22 +276,34 @@ function PinsMode({ friends, avatars }: {
               {avatars[f.handle] ? (
                 <img
                   src={avatars[f.handle]}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-white/20"
+                  className="w-12 h-12 rounded-full object-cover"
+                  style={{ border: '2px solid var(--border-hover)' }}
                   alt=""
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center text-white/60 text-lg font-semibold">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold"
+                  style={{
+                    background: 'var(--color-surface-3)',
+                    border: '2px solid var(--border-hover)',
+                    color: 'var(--color-text-2)',
+                  }}
+                >
                   {f.name.charAt(0)}
                 </div>
               )}
               <div
-                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#1a1a1c]"
-                style={{ background: statusColor(f.status) }}
+                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full"
+                style={{ background: statusColor(f.status), border: '2px solid var(--color-well)' }}
               />
             </div>
-            <div className="text-center max-w-[80px]">
-              <div className="text-[10px] text-white/80 font-medium truncate">{f.name.split(' ')[0]}</div>
-              <div className="text-[8px] text-white/30 truncate">{f.address || f.subtitle || timeAgo(f.lastUpdated)}</div>
+            <div className="text-center max-w-[96px]">
+              <div className="text-[12px] font-medium truncate" style={{ color: 'var(--color-text-1)' }}>
+                {f.name.split(' ')[0]}
+              </div>
+              <div className="text-[12px] truncate" style={{ color: 'var(--color-text-3)' }}>
+                {f.address || f.subtitle || formatAge(f.lastUpdated, now)}
+              </div>
             </div>
           </div>
         ))}
@@ -360,6 +318,7 @@ function ListMode({ friends, avatars }: {
   friends: FriendLocation[];
   avatars: Record<string, string>;
 }) {
+  const now = useSharedClock();
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -382,14 +341,22 @@ function ListMode({ friends, avatars }: {
   }, [friends.length]);
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-[#1a1a1c] overflow-hidden flex items-center justify-center">
+    <div
+      ref={containerRef}
+      className="w-full h-full overflow-hidden flex items-center justify-center"
+      style={{ background: 'var(--color-well)' }}
+    >
       <div
         ref={contentRef}
         className="w-full px-3 py-2 origin-center"
         style={{ transform: `scale(${scale})` }}
       >
         {friends.map(f => (
-          <div key={f.handle} className="flex items-center gap-2.5 py-1.5 border-b border-white/[0.04] last:border-0">
+          <div
+            key={f.handle}
+            className="flex items-center gap-2.5 py-1.5 last:border-0"
+            style={{ borderBottom: '1px solid var(--border-card)' }}
+          >
             <div className="relative shrink-0">
               {avatars[f.handle] ? (
                 <img
@@ -398,20 +365,32 @@ function ListMode({ friends, avatars }: {
                   alt=""
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 text-sm font-semibold">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold"
+                  style={{ background: 'var(--color-surface-3)', color: 'var(--color-text-2)' }}
+                >
                   {f.name.charAt(0)}
                 </div>
               )}
               <div
-                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-[1.5px] border-[#1a1a1c]"
-                style={{ background: statusColor(f.status) }}
+                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full"
+                style={{
+                  background: statusColor(f.status),
+                  border: '1.5px solid var(--color-well)',
+                }}
               />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] text-white/80 font-medium truncate">{f.name}</div>
-              <div className="text-[9px] text-white/30 truncate">{f.address || f.subtitle || 'Location unavailable'}</div>
+              <div className="text-[13px] font-medium truncate" style={{ color: 'var(--color-text-1)' }}>
+                {f.name}
+              </div>
+              <div className="text-[12px] truncate" style={{ color: 'var(--color-text-3)' }}>
+                {f.address || f.subtitle || 'Location unavailable'}
+              </div>
             </div>
-            <div className="text-[9px] text-white/25 shrink-0">{timeAgo(f.lastUpdated)}</div>
+            <div className="text-[12px] font-mono shrink-0" style={{ color: 'var(--color-text-3)' }}>
+              {formatAge(f.lastUpdated, now)}
+            </div>
           </div>
         ))}
       </div>

@@ -80,6 +80,8 @@ export async function GET(request: NextRequest) {
     // (same shape as Open-Meteo so the widget doesn't need changes)
     const isFahrenheit = units !== 'celsius';
     const toUnit = (c: number) => isFahrenheit ? (c * 9) / 5 + 32 : c;
+    // WeatherKit wind speeds are km/h; serve mph alongside fahrenheit
+    const toWindUnit = (kmh: number) => isFahrenheit ? kmh * 0.621371 : kmh;
 
     const currentWeather = wk.currentWeather || {};
     const hourlyForecast = wk.forecastHourly?.hours || [];
@@ -89,7 +91,7 @@ export async function GET(request: NextRequest) {
       current: {
         temperature_2m: Math.round(toUnit(currentWeather.temperature ?? 0) * 10) / 10,
         weather_code: conditionToWMO(currentWeather.conditionCode || 'Clear'),
-        wind_speed_10m: Math.round((currentWeather.windSpeed ?? 0) * 10) / 10,
+        wind_speed_10m: Math.round(toWindUnit(currentWeather.windSpeed ?? 0) * 10) / 10,
       },
       hourly: {
         time: hourlyForecast.map((h: { forecastStart: string }) => h.forecastStart),
@@ -99,6 +101,9 @@ export async function GET(request: NextRequest) {
         weather_code: hourlyForecast.map((h: { conditionCode: string }) =>
           conditionToWMO(h.conditionCode || 'Clear')
         ),
+        precipitation_probability: hourlyForecast.map((h: { precipitationChance?: number }) =>
+          Math.round((h.precipitationChance ?? 0) * 100)
+        ),
       },
       daily: {
         temperature_2m_max: dailyForecast.map((d: { temperatureMax: number }) =>
@@ -107,6 +112,8 @@ export async function GET(request: NextRequest) {
         temperature_2m_min: dailyForecast.map((d: { temperatureMin: number }) =>
           Math.round(toUnit(d.temperatureMin ?? 0) * 10) / 10
         ),
+        sunrise: dailyForecast.map((d: { sunrise?: string }) => d.sunrise ?? null),
+        sunset: dailyForecast.map((d: { sunset?: string }) => d.sunset ?? null),
       },
     };
 

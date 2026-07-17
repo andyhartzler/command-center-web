@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Music, ExternalLink } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Music } from 'lucide-react';
+import { WidgetShell, Freshness } from './WidgetShell';
+import { usePolledData } from '@/hooks/usePolledData';
 import type { WidgetStyle } from '@/types/widget';
 
 interface ChartSong {
@@ -14,10 +16,17 @@ interface ChartSong {
   durationMs: number;
 }
 
+interface ChartsPayload {
+  songs?: ChartSong[];
+  error?: string;
+}
+
 interface Props {
   config: Record<string, never>;
   style: WidgetStyle;
 }
+
+const POLL_INTERVAL = 15 * 60 * 1000;
 
 function formatDuration(ms: number): string {
   const mins = Math.floor(ms / 60000);
@@ -25,119 +34,108 @@ function formatDuration(ms: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function AppleMusicWidget({}: Props) {
-  const [songs, setSongs] = useState<ChartSong[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function AppleMusicWidget({ style }: Props) {
+  const { data, phase, isStale, lastUpdated } = usePolledData<ChartsPayload>('/api/apple-music', {
+    interval: POLL_INTERVAL,
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dims, setDims] = useState({ w: 300, h: 300 });
+  const [compact, setCompact] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const update = () => setDims({ w: el.clientWidth, h: el.clientHeight });
-    update();
-    const ro = new ResizeObserver(update);
+    const ro = new ResizeObserver(() => setCompact(el.clientWidth < 280));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  const fetchCharts = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/apple-music');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setSongs(data.songs || []);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCharts();
-    const interval = setInterval(fetchCharts, 15 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchCharts]);
-
-  const isCompact = dims.w < 280;
-
-  if (loading && songs.length === 0) {
-    return (
-      <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center bg-[#1a1a1c] rounded-2xl">
-        <div className="w-4 h-4 border-2 border-white/10 border-t-[#fa2d48]/50 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (error && songs.length === 0) {
-    return (
-      <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center gap-2 bg-[#1a1a1c] rounded-2xl p-4">
-        <Music size={20} className="text-[#fa2d48]/40" />
-        <span className="text-[10px] text-white/30 text-center">{error}</span>
-      </div>
-    );
-  }
+  const songs = data?.songs ?? [];
 
   return (
-    <div ref={containerRef} className="w-full h-full flex flex-col bg-[#1a1a1c] rounded-2xl overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 shrink-0">
-        <Music size={14} className="text-[#fa2d48]" />
-        <span className="text-[11px] font-semibold text-white/90 tracking-wide">Top Charts</span>
-        <span className="text-[9px] text-white/20 ml-auto">Apple Music</span>
-      </div>
+    <WidgetShell
+      icon={<Music size={18} />}
+      title="Top Charts"
+      status={<Freshness lastUpdated={lastUpdated} interval={POLL_INTERVAL} isStale={isStale} />}
+      style={style}
+    >
+      <div ref={containerRef} className="w-full h-full overflow-y-auto scrollbar-thin px-2.5 pb-2">
+        {phase === 'loading' && songs.length === 0 && (
+          <div className="flex flex-col gap-1.5 pt-1">
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="h-11 rounded-[10px] animate-pulse"
+                style={{ background: 'var(--color-surface-2)', opacity: 0.5 }}
+              />
+            ))}
+          </div>
+        )}
 
-      {/* Songs list */}
-      <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin px-1">
+        {phase !== 'loading' && songs.length === 0 && (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+            <Music size={20} style={{ color: 'var(--color-text-3)' }} />
+            <span className="type-body" style={{ color: 'var(--color-text-3)' }}>
+              Charts unavailable
+            </span>
+          </div>
+        )}
+
         {songs.map((song, i) => (
           <a
             key={song.id}
             href={song.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/[0.04] rounded-lg transition-colors group"
+            className="flex items-center gap-2.5 px-1 py-1.5 rounded-[10px] transition-colors hover:bg-[var(--color-surface-2)]"
           >
-            {/* Rank */}
-            <span className="text-[10px] font-bold text-white/20 w-5 text-right shrink-0 tabular-nums">
+            <span
+              className="text-[12px] font-mono w-6 text-right shrink-0"
+              style={{ color: 'var(--color-text-3)' }}
+            >
               {i + 1}
             </span>
 
-            {/* Album art */}
-            <div className="w-9 h-9 rounded-md overflow-hidden shrink-0 bg-white/[0.05]">
+            <div
+              className="w-9 h-9 rounded-md overflow-hidden shrink-0"
+              style={{
+                background: 'var(--color-surface-2)',
+                boxShadow: 'inset 0 0 0 1px var(--border-card)',
+              }}
+            >
               <img
                 src={song.artwork}
                 alt=""
                 className="w-full h-full object-cover"
+                style={{ boxShadow: 'inset 0 0 0 1px var(--border-card)' }}
                 loading="lazy"
               />
             </div>
 
-            {/* Song info */}
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-medium text-white/85 truncate leading-tight">
+              <div
+                className="text-[13px] font-medium truncate leading-tight"
+                style={{ color: 'var(--color-text-1)' }}
+              >
                 {song.name}
               </div>
-              <div className="text-[9px] text-white/35 truncate">
+              <div className="text-[12px] truncate" style={{ color: 'var(--color-text-3)' }}>
                 {song.artistName}
-                {!isCompact && ` — ${song.albumName}`}
+                {!compact && song.albumName ? ` · ${song.albumName}` : ''}
               </div>
             </div>
 
-            {/* Duration + link */}
-            {!isCompact && (
-              <span className="text-[9px] text-white/20 tabular-nums shrink-0">
+            {!compact && (
+              <span
+                className="text-[12px] font-mono shrink-0"
+                style={{ color: 'var(--color-text-3)' }}
+              >
                 {formatDuration(song.durationMs)}
               </span>
             )}
-            <ExternalLink size={10} className="text-white/0 group-hover:text-white/20 transition-colors shrink-0" />
           </a>
         ))}
       </div>
-    </div>
+    </WidgetShell>
   );
 }

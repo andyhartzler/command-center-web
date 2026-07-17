@@ -43,14 +43,23 @@ export async function GET() {
 
     const data: USGSResponse = await res.json();
 
-    const features: EarthquakeData[] = data.features.map((f) => ({
-      id: f.id,
-      lat: f.geometry.coordinates[1],
-      lon: f.geometry.coordinates[0],
-      mag: f.properties.mag,
-      place: f.properties.place,
-      time: f.properties.time,
-    }));
+    // USGS can emit null magnitudes on fresh events; drop anything we cannot
+    // place or band honestly rather than plotting fabricated values.
+    const features: EarthquakeData[] = data.features
+      .filter(
+        (f) =>
+          Number.isFinite(f.properties?.mag) &&
+          Number.isFinite(f.geometry?.coordinates?.[0]) &&
+          Number.isFinite(f.geometry?.coordinates?.[1]),
+      )
+      .map((f) => ({
+        id: f.id,
+        lat: f.geometry.coordinates[1],
+        lon: f.geometry.coordinates[0],
+        mag: f.properties.mag,
+        place: f.properties.place ?? '',
+        time: f.properties.time,
+      }));
 
     return NextResponse.json(features);
   } catch (err) {

@@ -7,12 +7,35 @@ interface YahooQuote {
   shortName?: string;
 }
 
+export interface StockQuote {
+  symbol: string;
+  price: number | null;
+  changePercent: number | null;
+  /** 1d/5m close series for the sparkline, oldest first */
+  spark: number[] | null;
+}
+
+const SPARK_POINTS = 40;
+
+/** Drop nulls and downsample the intraday close series to a fixed budget. */
+function toSpark(closes: unknown): number[] | null {
+  if (!Array.isArray(closes)) return null;
+  const clean = closes.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (clean.length < 2) return null;
+  if (clean.length <= SPARK_POINTS) return clean;
+  const out: number[] = [];
+  for (let i = 0; i < SPARK_POINTS; i++) {
+    out.push(clean[Math.round((i / (SPARK_POINTS - 1)) * (clean.length - 1))]);
+  }
+  return out;
+}
+
 export async function GET(request: NextRequest) {
   const symbols = request.nextUrl.searchParams.get('symbols') || 'SPY,QQQ,AAPL';
   const symbolList = symbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
 
   try {
-    // Use Yahoo Finance v8 quote endpoint (no API key needed)
+    // Use Yahoo Finance v8 spark endpoint (no API key needed)
     const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${symbolList.join(',')}&range=1d&interval=5m`;
     const res = await fetch(url, {
       headers: {
@@ -23,34 +46,41 @@ export async function GET(request: NextRequest) {
 
     if (res.ok) {
       const data = await res.json();
-      const results = symbolList.map(sym => {
+      const results: StockQuote[] = symbolList.map(sym => {
         // New format: data[SYMBOL] = { close: [...], previousClose, chartPreviousClose, ... }
         const symData = data[sym];
         if (symData && Array.isArray(symData.close) && symData.close.length > 0) {
-          const price = symData.close[symData.close.length - 1] ?? 0;
-          const prevClose = symData.previousClose ?? symData.chartPreviousClose ?? price;
-          const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
-          return { symbol: sym, price, changePercent };
+          const spark = toSpark(symData.close);
+          const price = spark?.[spark.length - 1] ?? symData.close[symData.close.length - 1] ?? null;
+          const prevClose = symData.previousClose ?? symData.chartPreviousClose ?? null;
+          const changePercent = price !== null && typeof prevClose === 'number' && prevClose > 0
+            ? ((price - prevClose) / prevClose) * 100
+            : null;
+          return { symbol: sym, price, changePercent, spark };
         }
         // Legacy format: data.spark.result[].response[0].meta
         const spark = data.spark?.result?.find((r: { symbol: string }) => r.symbol === sym);
-        const meta = spark?.response?.[0]?.meta;
+        const response = spark?.response?.[0];
+        const meta = response?.meta;
         if (meta) {
-          const price = meta.regularMarketPrice ?? 0;
-          const prevClose = meta.previousClose ?? meta.chartPreviousClose ?? price;
-          const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
-          return { symbol: sym, price, changePercent };
+          const price = meta.regularMarketPrice ?? null;
+          const prevClose = meta.previousClose ?? meta.chartPreviousClose ?? null;
+          const changePercent = typeof price === 'number' && typeof prevClose === 'number' && prevClose > 0
+            ? ((price - prevClose) / prevClose) * 100
+            : null;
+          const series = toSpark(response?.indicators?.quote?.[0]?.close);
+          return { symbol: sym, price, changePercent, spark: series };
         }
-        return { symbol: sym, price: 0, changePercent: 0 };
+        return { symbol: sym, price: null, changePercent: null, spark: null };
       });
 
       // If we got valid data, return it
-      if (results.some(r => r.price > 0)) {
+      if (results.some(r => r.price !== null && r.price > 0)) {
         return NextResponse.json(results);
       }
     }
 
-    // Fallback: try Yahoo v7 quote endpoint
+    // Fallback: try Yahoo v7 quote endpoint (no spark series available)
     const v7Url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbolList.join(',')}`;
     const v7Res = await fetch(v7Url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -60,40 +90,43 @@ export async function GET(request: NextRequest) {
     if (v7Res.ok) {
       const v7Data = await v7Res.json();
       const quotes: YahooQuote[] = v7Data.quoteResponse?.result ?? [];
-      const results = symbolList.map(sym => {
+      const results: StockQuote[] = symbolList.map(sym => {
         const q = quotes.find(qq => qq.symbol === sym);
         return {
           symbol: sym,
-          price: q?.regularMarketPrice ?? 0,
-          changePercent: q?.regularMarketChangePercent ?? 0,
+          price: q?.regularMarketPrice ?? null,
+          changePercent: q?.regularMarketChangePercent ?? null,
+          spark: null,
         };
       });
-      if (results.some(r => r.price > 0)) {
+      if (results.some(r => r.price !== null && r.price > 0)) {
         return NextResponse.json(results);
       }
     }
 
-    // Fallback 2: try Twelve Data if key is set
+    // Fallback 2: try Twelve Data if key is set (no spark series available)
     const apiKey = process.env.TWELVE_DATA_KEY;
     if (apiKey && apiKey !== 'demo') {
       const tdUrl = `https://api.twelvedata.com/quote?symbol=${symbols}&apikey=${apiKey}`;
       const tdRes = await fetch(tdUrl, { next: { revalidate: 30 } });
       if (tdRes.ok) {
         const raw = await tdRes.json();
-        let parsed: { symbol: string; price: number; changePercent: number }[];
+        let parsed: StockQuote[];
         if (symbolList.length === 1) {
           parsed = [{
             symbol: raw.symbol ?? symbolList[0],
-            price: parseFloat(raw.close) || 0,
-            changePercent: parseFloat(raw.percent_change) || 0,
+            price: parseFloat(raw.close) || null,
+            changePercent: parseFloat(raw.percent_change) || null,
+            spark: null,
           }];
         } else {
           parsed = symbolList.map(sym => {
             const d = raw[sym] || {};
             return {
               symbol: d.symbol ?? sym,
-              price: parseFloat(d.close) || 0,
-              changePercent: parseFloat(d.percent_change) || 0,
+              price: parseFloat(d.close) || null,
+              changePercent: parseFloat(d.percent_change) || null,
+              spark: null,
             };
           });
         }
@@ -101,9 +134,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // If all fail, return zeros with error indication
+    // If all sources fail, return explicit no-data rows
     return NextResponse.json(
-      symbolList.map(sym => ({ symbol: sym, price: 0, changePercent: 0 }))
+      symbolList.map((sym): StockQuote => ({ symbol: sym, price: null, changePercent: null, spark: null }))
     );
   } catch (err) {
     console.error('[stocks] fetch error', err);

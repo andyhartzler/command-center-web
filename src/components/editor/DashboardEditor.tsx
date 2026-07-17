@@ -1,10 +1,11 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Monitor, ShieldAlert, Plus, Play, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Monitor, ShieldAlert, Plus, Play, ChevronDown, PanelLeftClose, PanelLeftOpen, Settings2 } from 'lucide-react';
 import { useAppState } from '@/context/AppState';
 import { WidgetSidebar } from './WidgetSidebar';
 import { EditorGrid } from './EditorGrid';
 import { WidgetConfigPanel } from './WidgetConfigPanel';
+import { PageSettingsSheet } from './PageSettingsSheet';
 
 export function DashboardEditor() {
   const {
@@ -24,6 +25,7 @@ export function DashboardEditor() {
   } = useAppState();
 
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
+  const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
   const [contextMenuPage, setContextMenuPage] = useState<{ index: number; x: number; y: number } | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
@@ -162,9 +164,9 @@ export function DashboardEditor() {
   };
 
   return (
-    <div className="w-screen h-screen flex flex-col bg-[#1c1c1e] overflow-hidden">
+    <div className="w-screen h-screen flex flex-col bg-bg-0 overflow-hidden">
       {/* Top bar */}
-      <div className="shrink-0 h-11 border-b border-white/[0.06] flex items-center px-4 gap-3 bg-[#1a1a1c]">
+      <div className="shrink-0 h-11 border-b border-white/[0.06] flex items-center px-4 gap-3 bg-bg-1">
         {/* Sidebar toggle (narrow screens) */}
         {isNarrow && (
           <button
@@ -179,9 +181,9 @@ export function DashboardEditor() {
         <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.04] rounded-lg">
           <button
             onClick={() => setAppMode('dashboard')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
               appMode === 'dashboard'
-                ? 'bg-[#6b8aab] text-white'
+                ? 'bg-accent-500 text-white'
                 : 'text-white/40 hover:text-white/60'
             }`}
           >
@@ -193,17 +195,17 @@ export function DashboardEditor() {
             <div className="relative" ref={eocMenuRef}>
               <button
                 onClick={() => setEocMenuOpen(!eocMenuOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-red-600 text-white transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-red-600 text-white transition-colors"
               >
                 <ShieldAlert size={11} />
                 EOC
-                <span className="text-[9px] font-bold font-mono opacity-70">
+                <span className="text-xs font-bold font-mono opacity-70">
                   {eocScope.toUpperCase()}
                 </span>
                 <ChevronDown size={8} className="opacity-50" />
               </button>
               {eocMenuOpen && (
-                <div className="absolute top-full left-0 mt-1 w-44 bg-[#252528] border border-white/[0.08] rounded-xl shadow-xl z-50 py-1 backdrop-blur-xl">
+                <div className="absolute top-full left-0 mt-1 w-44 bg-surface-2 border border-white/[0.08] rounded-xl shadow-xl z-50 py-1 backdrop-blur-xl">
                   {(['kc', 'usa', 'global'] as const).map(scope => (
                     <button
                       key={scope}
@@ -211,7 +213,7 @@ export function DashboardEditor() {
                       className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/5 flex items-center justify-between"
                     >
                       {scopeDisplayName(scope)}
-                      {eocScope === scope && <span className="text-[#6b8aab] text-[10px]">&#10003;</span>}
+                      {eocScope === scope && <span className="text-accent-500 text-xs">&#10003;</span>}
                     </button>
                   ))}
                   <div className="border-t border-white/5 my-1" />
@@ -227,7 +229,7 @@ export function DashboardEditor() {
           ) : (
             <button
               onClick={() => setAppMode('eoc')}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/40 hover:text-white/60 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-white/40 hover:text-white/60 transition-colors"
             >
               <ShieldAlert size={11} />
               EOC
@@ -264,9 +266,9 @@ export function DashboardEditor() {
                   >
                     {page.name}
                     <span
-                      className={`text-[9px] font-bold px-1.5 py-px rounded-full ${
+                      className={`text-xs font-mono font-bold px-1.5 py-px rounded-full ${
                         isSelected
-                          ? 'bg-[#6b8aab] text-white'
+                          ? 'bg-accent-500 text-white'
                           : 'bg-white/[0.08] text-white/40'
                       }`}
                     >
@@ -281,6 +283,22 @@ export function DashboardEditor() {
               >
                 <Plus size={13} />
               </button>
+              {currentPage && (
+                <button
+                  onClick={() => {
+                    setSelectedWidgetId(null);
+                    setPageSettingsOpen(prev => !prev);
+                  }}
+                  title="Page Settings"
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                    pageSettingsOpen
+                      ? 'bg-accent-500/15 text-accent-500'
+                      : 'text-white/25 hover:text-white/50 hover:bg-white/5'
+                  }`}
+                >
+                  <Settings2 size={13} />
+                </button>
+              )}
             </div>
           </>
         )}
@@ -290,7 +308,7 @@ export function DashboardEditor() {
         {/* Right: display button */}
         <button
           onClick={() => setDisplayMode(true)}
-          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-[#6b8aab] text-white hover:bg-[#7d9bbc] transition-all shadow-lg shadow-black/20"
+          className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-accent-500 text-white hover:bg-accent-400 transition-all shadow-lg shadow-black/20"
         >
           <Play size={12} fill="currentColor" />
           Display
@@ -301,7 +319,7 @@ export function DashboardEditor() {
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left: Widget sidebar */}
         {sidebarOpen && (
-          <div className={`shrink-0 w-[280px] border-r border-white/[0.08] overflow-y-auto bg-[#1a1a1c] ${
+          <div className={`shrink-0 w-[280px] border-r border-white/[0.08] overflow-y-auto bg-bg-1 ${
             isNarrow ? 'absolute left-0 top-11 bottom-0 z-40 shadow-2xl shadow-black/50' : ''
           }`}>
             <WidgetSidebar />
@@ -313,7 +331,10 @@ export function DashboardEditor() {
           {currentPage ? (
             <EditorGrid
               selectedWidgetId={selectedWidgetId}
-              onSelectWidget={setSelectedWidgetId}
+              onSelectWidget={id => {
+                setSelectedWidgetId(id);
+                if (id) setPageSettingsOpen(false);
+              }}
             />
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -328,7 +349,7 @@ export function DashboardEditor() {
 
         {/* Right: Config panel (only when widget selected) */}
         {selectedWidgetId && (
-          <div className={`shrink-0 w-[280px] border-l border-white/[0.08] overflow-y-auto bg-[#1a1a1c] ${
+          <div className={`shrink-0 w-[280px] border-l border-white/[0.08] overflow-y-auto bg-bg-1 ${
             isNarrow ? 'absolute right-0 top-11 bottom-0 z-40 shadow-2xl shadow-black/50' : ''
           }`}>
             <WidgetConfigPanel
@@ -337,13 +358,25 @@ export function DashboardEditor() {
             />
           </div>
         )}
+
+        {/* Right: Page settings sheet */}
+        {pageSettingsOpen && !selectedWidgetId && currentPage && (
+          <div className={`shrink-0 w-[280px] border-l border-white/[0.08] overflow-y-auto bg-bg-1 ${
+            isNarrow ? 'absolute right-0 top-11 bottom-0 z-40 shadow-2xl shadow-black/50' : ''
+          }`}>
+            <PageSettingsSheet
+              pageIndex={currentPageIndex}
+              onClose={() => setPageSettingsOpen(false)}
+            />
+          </div>
+        )}
       </div>
 
       {/* Overlay backdrop for narrow sidebars */}
-      {isNarrow && (sidebarOpen || selectedWidgetId) && (
+      {isNarrow && (sidebarOpen || selectedWidgetId || pageSettingsOpen) && (
         <div
           className="fixed inset-0 top-11 z-30 bg-black/30"
-          onClick={() => { setSidebarOpen(false); setSelectedWidgetId(null); }}
+          onClick={() => { setSidebarOpen(false); setSelectedWidgetId(null); setPageSettingsOpen(false); }}
         />
       )}
 
@@ -351,7 +384,7 @@ export function DashboardEditor() {
       {contextMenuPage && (
         <div
           ref={contextMenuRef}
-          className="fixed z-[100] bg-[#252528] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[160px] backdrop-blur-xl"
+          className="fixed z-[100] bg-surface-2 border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[160px] backdrop-blur-xl"
           style={{ left: contextMenuPage.x, top: contextMenuPage.y }}
         >
           {isRenaming ? (
@@ -365,7 +398,7 @@ export function DashboardEditor() {
                   if (e.key === 'Escape') { setContextMenuPage(null); setIsRenaming(false); }
                 }}
                 onBlur={handleRenameSubmit}
-                className="w-full bg-[#252528] border border-white/[0.1] rounded px-2 py-1 text-xs text-white/90 outline-none focus:border-white/20"
+                className="w-full bg-surface-2 border border-white/[0.1] rounded px-2 py-1 text-xs text-white/90 outline-none focus:border-white/20"
               />
             </div>
           ) : (

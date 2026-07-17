@@ -209,7 +209,7 @@ export function AircraftTrackerWidget({ config, style, widgetId }: AircraftTrack
           {PHASE_LABEL[phase]}
         </span>
         {isStale && lastUpdated && (
-          <span className="font-mono text-[11px]" style={{ color: 'var(--color-warn)' }}>
+          <span className="font-mono text-[12px]" style={{ color: 'var(--color-warn)' }}>
             {formatAge(lastUpdated, now)}
           </span>
         )}
@@ -442,13 +442,13 @@ function TelemetryStrip({ data, now }: { data: TrackerData | null; now: number }
   if (live?.altitudeFt != null) {
     cells.push({
       label: 'ALT',
-      node: <><TickingNumber value={live.altitudeFt} className="text-[17px] font-medium" /> <span className="text-[11px]">FT</span></>,
+      node: <><TickingNumber value={live.altitudeFt} className="text-[17px] font-medium" /> <span className="text-[12px]">FT</span></>,
     });
   }
   if (live?.groundspeedKts != null) {
     cells.push({
       label: 'GS',
-      node: <><TickingNumber value={live.groundspeedKts} className="text-[17px] font-medium" /> <span className="text-[11px]">KTS</span></>,
+      node: <><TickingNumber value={live.groundspeedKts} className="text-[17px] font-medium" /> <span className="text-[12px]">KTS</span></>,
     });
   }
   if (live?.trackDeg != null) {
@@ -457,7 +457,7 @@ function TelemetryStrip({ data, now }: { data: TrackerData | null; now: number }
   if (route?.etaMinutes != null && route.etaMinutes >= 0) {
     cells.push({
       label: 'ETA',
-      node: <><TickingNumber value={route.etaMinutes} className="text-[17px] font-medium" /> <span className="text-[11px]">MIN</span></>,
+      node: <><TickingNumber value={route.etaMinutes} className="text-[17px] font-medium" /> <span className="text-[12px]">MIN</span></>,
     });
   }
 
@@ -479,7 +479,7 @@ function TelemetryStrip({ data, now }: { data: TrackerData | null; now: number }
             </div>
           ))}
           {live && (
-            <span className="font-mono text-[11px]" style={{ color: 'var(--color-text-3)' }}>
+            <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
               fix {formatAge(live.fetchedAt, now)}
             </span>
           )}
@@ -589,7 +589,7 @@ function IdleRail({ data, now, phase }: { data: TrackerData | null; now: number;
                   <span className="text-[12px] truncate" style={{ color: 'var(--color-text-3)' }}>
                     {f.arrivalAirport?.city || f.departureAirport?.city || ''}
                   </span>
-                  <span className="font-mono text-[11px] shrink-0" style={{ color: 'var(--color-text-3)' }}>{f.date}</span>
+                  <span className="font-mono text-[12px] shrink-0" style={{ color: 'var(--color-text-3)' }}>{f.date}</span>
                 </div>
               </div>
             ))}

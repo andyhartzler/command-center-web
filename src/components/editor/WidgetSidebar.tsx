@@ -12,7 +12,7 @@ import {
   FAMILY_DISPLAY_NAME,
   FAMILY_GRID_SIZE,
   type WidgetType,
-  type WidgetCategory,
+  type WidgetTier,
   type WidgetFamily,
 } from '@/types/widget';
 import { CameraBrowser } from './CameraBrowser';
@@ -27,9 +27,13 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   flame: Flame, heart: Heart, home: Home, cpu: Cpu, wind: Wind, music: Music,
 };
 
-const CATEGORY_ORDER: WidgetCategory[] = [
-  'Time & Location', 'Media', 'Finance', 'World Monitor', 'Productivity', 'System',
-];
+const TIER_ORDER: WidgetTier[] = ['ambient', 'glance', 'alert'];
+
+const TIER_LABELS: Record<WidgetTier, string> = {
+  ambient: 'Ambient',
+  glance: 'Glance',
+  alert: 'Alerts',
+};
 
 // Grand security cameras
 const GRAND_CAMERAS: { label: string; url: string }[] = [
@@ -46,27 +50,27 @@ export function WidgetSidebar() {
 
   const currentPage = pages[currentPageIndex];
 
-  const widgetsByCategory = useMemo(() => {
-    const groups: Record<WidgetCategory, { type: WidgetType; meta: (typeof WIDGET_TYPE_META)[WidgetType] }[]> = {
-      'Time & Location': [], 'Productivity': [], 'Media': [], 'Finance': [], 'World Monitor': [], 'System': [],
+  const widgetsByTier = useMemo(() => {
+    const groups: Record<WidgetTier, { type: WidgetType; meta: (typeof WIDGET_TYPE_META)[WidgetType] }[]> = {
+      ambient: [], glance: [], alert: [],
     };
     for (const [type, meta] of Object.entries(WIDGET_TYPE_META)) {
-      groups[meta.category].push({ type: type as WidgetType, meta });
+      groups[meta.tier].push({ type: type as WidgetType, meta });
     }
     return groups;
   }, []);
 
-  const filteredCategories = useMemo(() => {
-    if (!search.trim()) return CATEGORY_ORDER;
+  const filteredTiers = useMemo(() => {
+    if (!search.trim()) return TIER_ORDER;
     const q = search.toLowerCase();
-    return CATEGORY_ORDER.filter(cat =>
-      widgetsByCategory[cat].some(w =>
+    return TIER_ORDER.filter(tier =>
+      widgetsByTier[tier].some(w =>
         w.meta.displayName.toLowerCase().includes(q) || w.type.toLowerCase().includes(q)
       )
     );
-  }, [search, widgetsByCategory]);
+  }, [search, widgetsByTier]);
 
-  const filterWidgets = (widgets: typeof widgetsByCategory[WidgetCategory]) => {
+  const filterWidgets = (widgets: typeof widgetsByTier[WidgetTier]) => {
     if (!search.trim()) return widgets;
     const q = search.toLowerCase();
     return widgets.filter(w =>
@@ -101,7 +105,7 @@ export function WidgetSidebar() {
           >
             <X size={12} className="text-white/50" />
           </button>
-          <span className="text-[11px] font-semibold text-white/70">KC Scout Cameras</span>
+          <span className="text-xs font-semibold text-white/70">KC Scout Cameras</span>
         </div>
         <div className="flex-1 overflow-y-auto">
           <CameraBrowser onClose={() => setShowCameraBrowser(false)} />
@@ -121,7 +125,7 @@ export function WidgetSidebar() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search widgets..."
-            className="w-full pl-7 pr-7 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/80 placeholder:text-white/20 focus:outline-none focus:border-white/15 focus:bg-white/[0.06] transition-colors"
+            className="w-full pl-7 pr-7 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white/80 placeholder:text-white/20 focus:outline-none focus:border-white/15 focus:bg-white/[0.06] transition-colors"
           />
           {search && (
             <button
@@ -142,7 +146,7 @@ export function WidgetSidebar() {
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <Shield size={10} className="text-emerald-400/60" />
-              <span className="text-[9px] font-bold text-white/25 uppercase tracking-[1.5px]">Security</span>
+              <span className="text-xs font-bold text-white/25 uppercase tracking-[var(--tracking-caps)]">Security</span>
             </div>
             <div className="grid grid-cols-1 gap-1">
               {GRAND_CAMERAS.map(cam => (
@@ -155,7 +159,7 @@ export function WidgetSidebar() {
                   className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group"
                 >
                   <Camera size={11} className="text-emerald-400/50 shrink-0" />
-                  <span className="text-[11px] text-white/50 group-hover:text-white/80 transition-colors flex-1 text-left truncate">
+                  <span className="text-xs text-white/50 group-hover:text-white/80 transition-colors flex-1 text-left truncate">
                     {cam.label}
                   </span>
                   <PlusCircle size={12} className="text-white/0 group-hover:text-white/60 transition-all shrink-0" />
@@ -172,23 +176,23 @@ export function WidgetSidebar() {
             className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-orange-500/[0.06] border border-orange-500/10 hover:bg-orange-500/[0.12] hover:border-orange-500/20 transition-all group"
           >
             <MapPin size={12} className="text-orange-400/70 shrink-0" />
-            <span className="text-[11px] font-medium text-orange-300/70 group-hover:text-orange-200 transition-colors flex-1 text-left">
+            <span className="text-xs font-medium text-orange-300/70 group-hover:text-orange-200 transition-colors flex-1 text-left">
               KC Scout Traffic Cameras
             </span>
-            <span className="text-[9px] text-orange-400/30">341</span>
+            <span className="text-xs font-mono text-orange-400/30">341</span>
           </button>
         )}
 
-        {/* Widget categories with inline widgets */}
-        {filteredCategories.map(category => {
-          const widgets = filterWidgets(widgetsByCategory[category]);
+        {/* Widget tiers with inline widgets */}
+        {filteredTiers.map(tier => {
+          const widgets = filterWidgets(widgetsByTier[tier]);
           if (widgets.length === 0) return null;
 
           return (
-            <div key={category}>
+            <div key={tier}>
               <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-[9px] font-bold text-white/25 uppercase tracking-[1.5px]">{category}</span>
-                <span className="text-[9px] text-white/10">{widgets.length}</span>
+                <span className="text-xs font-bold text-white/25 uppercase tracking-[var(--tracking-caps)]">{TIER_LABELS[tier]}</span>
+                <span className="text-xs font-mono text-white/10">{widgets.length}</span>
               </div>
 
               <div className="grid grid-cols-1 gap-1.5">
@@ -218,7 +222,7 @@ export function WidgetSidebar() {
                           <Icon size={14} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[12px] font-semibold text-white/85 leading-tight">{meta.displayName}</div>
+                          <div className="text-xs font-semibold text-white/85 leading-tight">{meta.displayName}</div>
                         </div>
                         <button
                           onClick={() => handleAddWidget(type, meta.defaultFamily)}
@@ -226,7 +230,7 @@ export function WidgetSidebar() {
                           className="w-6 h-6 rounded-md bg-white/[0.06] flex items-center justify-center hover:bg-white/[0.12] transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
                           title={canFit ? `Add ${meta.displayName}` : 'No space on grid'}
                         >
-                          <PlusCircle size={13} className="text-[#6b8aab]" />
+                          <PlusCircle size={13} className="text-accent-500" />
                         </button>
                       </div>
 
@@ -241,7 +245,7 @@ export function WidgetSidebar() {
                                 key={family}
                                 onClick={() => handleAddWidget(type, family)}
                                 disabled={!fits}
-                                className={`px-2 py-0.5 rounded text-[9px] font-medium transition-all ${
+                                className={`px-2 py-0.5 rounded text-xs font-medium transition-all ${
                                   family === meta.defaultFamily
                                     ? 'bg-white/[0.06] text-white/50 hover:bg-white/[0.1] hover:text-white/70'
                                     : 'text-white/25 hover:bg-white/[0.04] hover:text-white/40'

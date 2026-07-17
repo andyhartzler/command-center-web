@@ -50,7 +50,7 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
     case 'worldNews': return <WorldNewsWidget config={widgetConfig.config} style={style} />;
     case 'stocks': return <StocksWidget config={widgetConfig.config} style={style} />;
     case 'crypto': return <CryptoWidget config={widgetConfig.config} style={style} />;
-    case 'sports': return <SportsWidget config={widgetConfig.config} style={style} />;
+    case 'sports': return <SportsWidget config={widgetConfig.config} style={style} widgetId={widget.id} />;
     case 'sun': return <SunWidget config={widgetConfig.config} style={style} />;
     case 'faaDelays': return <FAADelaysWidget config={widgetConfig.config} style={style} />;
     case 'predictionMarkets': return <PredictionMarketsWidget config={widgetConfig.config} style={style} />;
@@ -77,7 +77,7 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
     case 'feeds': return <FeedsWidget config={widgetConfig.config} style={style} />;
     default: {
       // Safety net for removed/unknown widget types
-      return <PlaceholderWidget name="Unknown" icon="cpu" color="#64748b" />;
+      return <PlaceholderWidget name="Unknown widget" icon="cpu" />;
     }
   }
 }

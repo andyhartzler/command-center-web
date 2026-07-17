@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { TrendingUp } from 'lucide-react';
+import { WidgetShell, Freshness } from './WidgetShell';
+import { usePolledData } from '@/hooks/usePolledData';
+import { TickingNumber } from '@/components/motion/TickingNumber';
 import type { PredictionMarketsConfig, WidgetStyle } from '@/types/widget';
 
 interface PredictionOutcome {
@@ -20,94 +23,110 @@ interface PredictionMarketsWidgetProps {
   style: WidgetStyle;
 }
 
-export function PredictionMarketsWidget({ config }: PredictionMarketsWidgetProps) {
-  const [predictions, setPredictions] = useState<PredictionData[]>([]);
+const POLL_INTERVAL = 120_000;
 
-  const fetchPredictions = useCallback(async () => {
-    try {
-      const limit = config.maxEvents || 8;
-      const res = await fetch(`/api/predictions?limit=${limit}`);
-      if (!res.ok) return;
-      const data: PredictionData[] = await res.json();
-      if (Array.isArray(data)) {
-        setPredictions(data);
-      }
-    } catch (err) {
-      console.error('[PredictionMarketsWidget] fetch error', err);
-    }
-  }, [config.maxEvents]);
+const formatPercent = (v: number) => `${Math.round(v)}%`;
 
-  useEffect(() => {
-    fetchPredictions();
-    const interval = setInterval(fetchPredictions, 120_000); // 120s - matches Swift
-    return () => clearInterval(interval);
-  }, [fetchPredictions]);
+export function PredictionMarketsWidget({ config, style }: PredictionMarketsWidgetProps) {
+  const limit = config.maxEvents || 8;
+  const { data, phase, isStale, lastUpdated } = usePolledData<PredictionData[]>(
+    `/api/predictions?limit=${limit}`,
+    { interval: POLL_INTERVAL },
+  );
 
-  if (predictions.length === 0) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className="w-4 h-4 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const markets = Array.isArray(data) ? data : [];
 
   return (
-    <div className="w-full h-full flex flex-col p-4 overflow-hidden">
-      {/* Header - matches Swift: "PREDICTIONS" tracking 4 */}
-      <div
-        className="text-[10px] font-bold text-white/30 uppercase mb-3"
-        style={{ letterSpacing: '4px' }}
-      >
-        Predictions
-      </div>
+    <WidgetShell
+      icon={<TrendingUp size={18} />}
+      title="Predictions"
+      status={<Freshness lastUpdated={lastUpdated} interval={POLL_INTERVAL} isStale={isStale} />}
+      style={style}
+    >
+      <div className="w-full h-full overflow-y-auto scrollbar-thin px-3.5 pb-2">
+        {phase === 'loading' && markets.length === 0 && (
+          <div className="flex flex-col gap-2 pt-1">
+            {[...Array(4)].map((_, i) => (
+              <div
+                key={i}
+                className="h-14 rounded-[10px] animate-pulse"
+                style={{ background: 'var(--color-surface-2)', opacity: 0.5 }}
+              />
+            ))}
+          </div>
+        )}
 
-      <div className="flex-1 overflow-y-auto scrollbar-hide">
-        <div className="flex flex-col gap-2.5">
-          {predictions.map((pred, predIdx) => (
-            <div key={pred.id}>
-              <div className="py-1.5">
-                {/* Market title - matches Swift: 11pt medium */}
-                <div className="text-[11px] font-medium text-white/80 leading-tight mb-1.5 line-clamp-2">
-                  {pred.title}
-                </div>
+        {phase !== 'loading' && markets.length === 0 && (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+            <TrendingUp size={20} style={{ color: 'var(--color-text-3)' }} />
+            <span className="type-body" style={{ color: 'var(--color-text-3)' }}>
+              Markets unavailable
+            </span>
+          </div>
+        )}
 
-                {/* Outcome probability bars — blue gradient */}
-                <div className="space-y-1">
-                  {pred.outcomes.slice(0, 3).map((outcome, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      {/* Label */}
-                      <span className="text-[9px] font-medium text-white/50 w-10 text-right truncate shrink-0">
-                        {outcome.name}
-                      </span>
+        {markets.length > 0 && (
+          <div className="flex flex-col pt-1">
+            {markets.map((market, marketIdx) => (
+              <div key={market.id}>
+                <div className="py-1.5">
+                  <div
+                    className="text-[13px] font-medium leading-tight mb-1.5 line-clamp-2"
+                    style={{ color: 'var(--color-text-1)' }}
+                  >
+                    {market.title}
+                  </div>
 
-                      {/* Bar — blue gradient */}
-                      <div className="flex-1 h-1.5 rounded-sm bg-white/[0.06] overflow-hidden">
+                  <div className="space-y-1">
+                    {market.outcomes.slice(0, 3).map(outcome => (
+                      <div key={outcome.name} className="flex items-center gap-2">
+                        <span
+                          className="text-[12px] font-medium w-12 text-right truncate shrink-0"
+                          style={{ color: 'var(--color-text-2)' }}
+                        >
+                          {outcome.name}
+                        </span>
+
+                        {/* Thin probability bar */}
                         <div
-                          className="h-full rounded-sm"
-                          style={{
-                            width: `${Math.max(outcome.probability, 2)}%`,
-                            background: 'linear-gradient(90deg, rgba(59,130,246,0.6), rgba(59,130,246,0.25))',
-                          }}
-                        />
+                          className="flex-1 h-1.5 rounded-sm overflow-hidden"
+                          style={{ background: 'var(--color-surface-2)' }}
+                        >
+                          <div
+                            className="h-full rounded-sm"
+                            style={{
+                              width: `${Math.min(Math.max(outcome.probability, 2), 100)}%`,
+                              background:
+                                'linear-gradient(90deg, var(--color-accent-400), var(--color-accent-600))',
+                              transition: 'width var(--motion-data) var(--ease-out)',
+                            }}
+                          />
+                        </div>
+
+                        <span
+                          className="w-[42px] text-right shrink-0"
+                          style={{ color: 'var(--color-text-2)' }}
+                        >
+                          <TickingNumber
+                            value={outcome.probability}
+                            format={formatPercent}
+                            flash="auto"
+                            className="text-[12px] font-semibold"
+                          />
+                        </span>
                       </div>
-
-                      {/* Percentage - matches Swift: 10pt bold */}
-                      <span className="text-[10px] font-bold text-white/60 tabular-nums w-[30px] text-right shrink-0">
-                        {outcome.probability}%
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Divider - matches Swift: white 4% opacity, 0.5px */}
-              {predIdx < predictions.length - 1 && (
-                <div className="bg-white/[0.04]" style={{ height: '0.5px' }} />
-              )}
-            </div>
-          ))}
-        </div>
+                {marketIdx < markets.length - 1 && (
+                  <div style={{ height: '1px', background: 'var(--border-card)' }} />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </WidgetShell>
   );
 }

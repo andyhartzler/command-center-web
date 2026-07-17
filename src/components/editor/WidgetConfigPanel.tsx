@@ -77,7 +77,7 @@ export function WidgetConfigPanel({ widgetId, onClose }: WidgetConfigPanelProps)
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
-        <h2 className="text-[10px] font-bold text-white/30 uppercase tracking-[2px]">INSPECTOR</h2>
+        <h2 className="text-xs font-bold text-white/30 uppercase tracking-[var(--tracking-caps)]">INSPECTOR</h2>
         <button
           onClick={onClose}
           className="w-5 h-5 rounded-full flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
@@ -98,14 +98,14 @@ export function WidgetConfigPanel({ widgetId, onClose }: WidgetConfigPanelProps)
             </div>
             <div>
               <div className="text-sm font-semibold text-white/90">{meta.displayName}</div>
-              <div className="text-[10px] text-white/30">
+              <div className="text-xs text-white/30">
                 {FAMILY_DISPLAY_NAME[widget.family]} &middot; {FAMILY_GRID_SIZE[widget.family].columns}x{FAMILY_GRID_SIZE[widget.family].rows}
               </div>
             </div>
           </div>
 
           {/* Size selector */}
-          <ConfigSection title="Size Preset">
+          <ConfigSection title="Size Presets">
             <div className="space-y-1">
               {meta.supportedFamilies.map(family => {
                 const isActive = widget.family === family;
@@ -116,12 +116,12 @@ export function WidgetConfigPanel({ widgetId, onClose }: WidgetConfigPanelProps)
                     onClick={() => handleFamilyChange(family)}
                     className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg transition-colors text-xs ${
                       isActive
-                        ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30 text-[#6b8aab]'
+                        ? 'bg-accent-500/15 border border-accent-500/30 text-accent-500'
                         : 'bg-white/[0.02] border border-white/[0.04] text-white/40 hover:bg-white/5 hover:text-white/60'
                     }`}
                   >
                     <span className="font-medium">{FAMILY_DISPLAY_NAME[family]}</span>
-                    <span className="text-[10px] font-mono opacity-60">{gridSize.columns}x{gridSize.rows}</span>
+                    <span className="text-xs font-mono opacity-60">{gridSize.columns}x{gridSize.rows}</span>
                   </button>
                 );
               })}
@@ -145,8 +145,8 @@ export function WidgetConfigPanel({ widgetId, onClose }: WidgetConfigPanelProps)
               {/* Opacity */}
               <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg px-3 py-2">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-white/40">Opacity</span>
-                  <span className="text-[10px] font-mono text-white/50">
+                  <span className="text-xs text-white/40">Opacity</span>
+                  <span className="text-xs font-mono text-white/50">
                     {Math.round(widget.style.opacity * 100)}%
                   </span>
                 </div>
@@ -161,7 +161,30 @@ export function WidgetConfigPanel({ widgetId, onClose }: WidgetConfigPanelProps)
                       style: { ...widget.style, opacity: parseFloat(e.target.value) },
                     })
                   }
-                  className="w-full h-1 rounded-full appearance-none bg-white/10 accent-[#6b8aab]"
+                  className="w-full h-1 rounded-full appearance-none bg-white/10 accent-accent-500"
+                />
+              </div>
+
+              {/* Corner radius */}
+              <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-white/40">Corner Radius</span>
+                  <span className="text-xs font-mono text-white/50">
+                    {Math.round(widget.style.cornerRadius ?? 20)}px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="28"
+                  step="1"
+                  value={widget.style.cornerRadius ?? 20}
+                  onChange={e =>
+                    updateWidget(widget.id, {
+                      style: { ...widget.style, cornerRadius: parseInt(e.target.value, 10) },
+                    })
+                  }
+                  className="w-full h-1 rounded-full appearance-none bg-white/10 accent-accent-500"
                 />
               </div>
 
@@ -171,15 +194,22 @@ export function WidgetConfigPanel({ widgetId, onClose }: WidgetConfigPanelProps)
                 value={widget.style.showTitle}
                 onChange={v => updateWidget(widget.id, { style: { ...widget.style, showTitle: v } })}
               />
+
+              {/* Show Border toggle */}
+              <ToggleRow
+                label="Show Border"
+                value={widget.style.showBorder ?? true}
+                onChange={v => updateWidget(widget.id, { style: { ...widget.style, showBorder: v } })}
+              />
             </div>
           </ConfigSection>
 
           {/* Widget ID */}
           <div>
-            <div className="text-[10px] font-bold text-white/20 uppercase tracking-wider mb-1">
+            <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)] mb-1">
               Widget ID
             </div>
-            <div className="text-[9px] font-mono text-white/15 truncate">
+            <div className="text-xs font-mono text-white/15 truncate">
               {widget.id}
             </div>
           </div>
@@ -205,7 +235,7 @@ export function WidgetConfigPanel({ widgetId, onClose }: WidgetConfigPanelProps)
 function ConfigSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] font-bold text-white/25 uppercase tracking-wider mb-2">
+      <div className="text-xs font-bold text-white/25 uppercase tracking-[var(--tracking-caps)] mb-2">
         {title}
       </div>
       {children}
@@ -216,7 +246,7 @@ function ConfigSection({ title, children }: { title: string; children: React.Rea
 function ConfigField({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg px-3 py-2">
-      <div className="text-[9px] text-white/25 mb-0.5">{label}</div>
+      <div className="text-xs text-white/25 mb-0.5">{label}</div>
       <div className="text-sm font-mono text-white/70">{value}</div>
     </div>
   );
@@ -225,11 +255,11 @@ function ConfigField({ label, value }: { label: string; value: number | string }
 function ToggleRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg px-3 py-2 flex items-center justify-between">
-      <span className="text-[11px] text-white/40">{label}</span>
+      <span className="text-xs text-white/40">{label}</span>
       <button
         onClick={() => onChange(!value)}
         className={`w-8 h-[18px] rounded-full transition-colors relative ${
-          value ? 'bg-[#6b8aab]' : 'bg-white/10'
+          value ? 'bg-accent-500' : 'bg-white/10'
         }`}
       >
         <div
@@ -250,13 +280,13 @@ function ConfigTextField({ label, value, onChange, placeholder }: {
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] text-white/40 shrink-0 w-20">{label}</span>
+      <span className="text-xs text-white/40 shrink-0 w-20">{label}</span>
       <input
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="flex-1 bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-white/15 placeholder:text-white/15"
+        className="flex-1 bg-surface-2 border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-white/15 placeholder:text-white/15"
       />
     </div>
   );
@@ -272,7 +302,7 @@ function ConfigNumberField({ label, value, onChange, min, max, step }: {
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] text-white/40 shrink-0 flex-1">{label}</span>
+      <span className="text-xs text-white/40 shrink-0 flex-1">{label}</span>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onChange(Math.max(min ?? 0, value - (step ?? 1)))}
@@ -303,14 +333,14 @@ function WithingsConnectionStatus() {
   }, []);
 
   if (connected === null) {
-    return <div className="text-[10px] text-white/20">Checking connection...</div>;
+    return <div className="text-xs text-white/20">Checking connection...</div>;
   }
 
   if (connected) {
     return (
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-green-500" />
-        <span className="text-[11px] text-white/50">Withings Connected</span>
+        <span className="text-xs text-white/50">Withings Connected</span>
       </div>
     );
   }
@@ -320,7 +350,7 @@ function WithingsConnectionStatus() {
       <div className="w-2 h-2 rounded-full bg-red-500" />
       <button
         onClick={() => window.open('/api/withings/auth', '_blank')}
-        className="text-[11px] text-[#f472b6] hover:text-[#f472b6]/80"
+        className="text-xs text-accent-500 hover:text-accent-500/80"
       >
         Connect Withings
       </button>
@@ -336,7 +366,7 @@ function EditableList({ label, items, onChange, placeholder }: {
 }) {
   return (
     <div className="space-y-1.5">
-      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">{label}</div>
+      <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">{label}</div>
       {items.map((item, i) => (
         <div key={i} className="flex items-center gap-1">
           <input
@@ -348,7 +378,7 @@ function EditableList({ label, items, onChange, placeholder }: {
               onChange(next);
             }}
             placeholder={placeholder}
-            className="flex-1 bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
+            className="flex-1 bg-surface-2 border border-white/[0.06] rounded px-2 py-1 text-xs text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
           />
           <button
             onClick={() => onChange(items.filter((_, idx) => idx !== i))}
@@ -360,7 +390,7 @@ function EditableList({ label, items, onChange, placeholder }: {
       ))}
       <button
         onClick={() => onChange([...items, ''])}
-        className="flex items-center gap-1 text-[11px] text-[#6b8aab]/70 hover:text-[#6b8aab] transition-colors"
+        className="flex items-center gap-1 text-xs text-accent-500/70 hover:text-accent-500 transition-colors"
       >
         <Plus size={10} /> Add
       </button>
@@ -410,7 +440,7 @@ function CoinPicker({ coins, onChange }: { coins: string[]; onChange: (coins: st
       {/* Selected coins - draggable to reorder */}
       {coins.length > 0 && (
         <div className="space-y-1">
-          <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Selected (drag to reorder)</div>
+          <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Selected (drag to reorder)</div>
           {coins.map((coinId, i) => {
             const entry = COIN_CATALOG[coinId];
             const sym = entry?.[0] || coinId.toUpperCase().slice(0, 4);
@@ -426,12 +456,12 @@ function CoinPicker({ coins, onChange }: { coins: string[]; onChange: (coins: st
                 onDrop={() => handleDrop(i)}
                 onDragEnd={handleDragEnd}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-grab active:cursor-grabbing ${
-                  isDragging ? 'opacity-30' : isOver ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30' : 'bg-white/[0.03] border border-transparent'
+                  isDragging ? 'opacity-30' : isOver ? 'bg-accent-500/15 border border-accent-500/30' : 'bg-white/[0.03] border border-transparent'
                 }`}
               >
                 <GripVertical size={10} className="text-white/15 shrink-0" />
-                <span className="text-[10px] font-bold text-white/50 w-10 shrink-0">{sym}</span>
-                <span className="text-[11px] text-white/70 flex-1 truncate">{name}</span>
+                <span className="text-xs font-bold text-white/50 w-10 shrink-0">{sym}</span>
+                <span className="text-xs text-white/70 flex-1 truncate">{name}</span>
                 <button
                   onClick={() => toggle(coinId)}
                   className="w-4 h-4 rounded-full flex items-center justify-center text-red-400/50 hover:text-red-400 hover:bg-red-500/10 shrink-0"
@@ -446,7 +476,7 @@ function CoinPicker({ coins, onChange }: { coins: string[]; onChange: (coins: st
 
       {/* Search to add */}
       <div className="space-y-1">
-        <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Add Coins</div>
+        <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Add Coins</div>
         <div className="relative">
           <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-white/20" />
           <input
@@ -454,13 +484,13 @@ function CoinPicker({ coins, onChange }: { coins: string[]; onChange: (coins: st
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by name (e.g. Bitcoin, Solana)..."
-            className="w-full bg-[#252528] border border-white/[0.06] rounded-lg pl-6 pr-2 py-1.5 text-[11px] text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
+            className="w-full bg-surface-2 border border-white/[0.06] rounded-lg pl-6 pr-2 py-1.5 text-xs text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
           />
         </div>
         {search && (
           <div className="max-h-[200px] overflow-y-auto scrollbar-hide space-y-px">
             {filtered.length === 0 ? (
-              <div className="text-[10px] text-white/25 py-2 text-center">No coins match &quot;{search}&quot;</div>
+              <div className="text-xs text-white/25 py-2 text-center">No coins match &quot;{search}&quot;</div>
             ) : (
               filtered.slice(0, 30).map(([id, [sym, name]]) => {
                 const selected = coinSet.has(id);
@@ -468,18 +498,18 @@ function CoinPicker({ coins, onChange }: { coins: string[]; onChange: (coins: st
                   <button
                     key={id}
                     onClick={() => { toggle(id); if (!selected) setSearch(''); }}
-                    className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-[11px] transition-colors ${
+                    className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-xs transition-colors ${
                       selected
-                        ? 'bg-[#6b8aab]/15 text-white/90'
+                        ? 'bg-accent-500/15 text-white/90'
                         : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'
                     }`}
                   >
                     <div className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
-                      selected ? 'bg-[#6b8aab] border-[#6b8aab]' : 'border-white/15'
+                      selected ? 'bg-accent-500 border-accent-500' : 'border-white/15'
                     }`}>
-                      {selected && <span className="text-[8px] text-white font-bold">&#10003;</span>}
+                      {selected && <span className="text-xs text-white font-bold">&#10003;</span>}
                     </div>
-                    <span className="text-[10px] font-bold text-white/40 w-10 shrink-0">{sym}</span>
+                    <span className="text-xs font-bold text-white/40 w-10 shrink-0">{sym}</span>
                     <span className="flex-1 truncate">{name}</span>
                   </button>
                 );
@@ -533,7 +563,7 @@ function StockPicker({ symbols, onChange }: { symbols: string[]; onChange: (symb
       {/* Selected stocks - draggable to reorder */}
       {symbols.length > 0 && (
         <div className="space-y-1">
-          <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Selected (drag to reorder)</div>
+          <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Selected (drag to reorder)</div>
           <div className="max-h-[200px] overflow-y-auto scrollbar-hide space-y-px">
             {symbols.map((ticker, i) => {
               const name = STOCK_CATALOG[ticker] || ticker;
@@ -548,12 +578,12 @@ function StockPicker({ symbols, onChange }: { symbols: string[]; onChange: (symb
                   onDrop={() => handleDrop(i)}
                   onDragEnd={handleDragEnd}
                   className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-grab active:cursor-grabbing ${
-                    isDragging ? 'opacity-30' : isOver ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30' : 'bg-white/[0.03] border border-transparent'
+                    isDragging ? 'opacity-30' : isOver ? 'bg-accent-500/15 border border-accent-500/30' : 'bg-white/[0.03] border border-transparent'
                   }`}
                 >
                   <GripVertical size={10} className="text-white/15 shrink-0" />
-                  <span className="text-[10px] font-bold text-white/50 w-10 shrink-0">{ticker}</span>
-                  <span className="text-[11px] text-white/70 flex-1 truncate">{name}</span>
+                  <span className="text-xs font-bold text-white/50 w-10 shrink-0">{ticker}</span>
+                  <span className="text-xs text-white/70 flex-1 truncate">{name}</span>
                   <button
                     onClick={() => toggle(ticker)}
                     className="w-4 h-4 rounded-full flex items-center justify-center text-red-400/50 hover:text-red-400 hover:bg-red-500/10 shrink-0"
@@ -569,7 +599,7 @@ function StockPicker({ symbols, onChange }: { symbols: string[]; onChange: (symb
 
       {/* Search to add */}
       <div className="space-y-1">
-        <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Add Stocks</div>
+        <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Add Stocks</div>
         <div className="relative">
           <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-white/20" />
           <input
@@ -577,13 +607,13 @@ function StockPicker({ symbols, onChange }: { symbols: string[]; onChange: (symb
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by company name (e.g. Apple, Tesla)..."
-            className="w-full bg-[#252528] border border-white/[0.06] rounded-lg pl-6 pr-2 py-1.5 text-[11px] text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
+            className="w-full bg-surface-2 border border-white/[0.06] rounded-lg pl-6 pr-2 py-1.5 text-xs text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
           />
         </div>
         {search && (
           <div className="max-h-[200px] overflow-y-auto scrollbar-hide space-y-px">
             {filtered.length === 0 ? (
-              <div className="text-[10px] text-white/25 py-2 text-center">No stocks match &quot;{search}&quot;</div>
+              <div className="text-xs text-white/25 py-2 text-center">No stocks match &quot;{search}&quot;</div>
             ) : (
               filtered.slice(0, 30).map(([ticker, name]) => {
                 const selected = symSet.has(ticker);
@@ -591,18 +621,18 @@ function StockPicker({ symbols, onChange }: { symbols: string[]; onChange: (symb
                   <button
                     key={ticker}
                     onClick={() => { toggle(ticker); if (!selected) setSearch(''); }}
-                    className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-[11px] transition-colors ${
+                    className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-xs transition-colors ${
                       selected
-                        ? 'bg-[#6b8aab]/15 text-white/90'
+                        ? 'bg-accent-500/15 text-white/90'
                         : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'
                     }`}
                   >
                     <div className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
-                      selected ? 'bg-[#6b8aab] border-[#6b8aab]' : 'border-white/15'
+                      selected ? 'bg-accent-500 border-accent-500' : 'border-white/15'
                     }`}>
-                      {selected && <span className="text-[8px] text-white font-bold">&#10003;</span>}
+                      {selected && <span className="text-xs text-white font-bold">&#10003;</span>}
                     </div>
-                    <span className="text-[10px] font-bold text-white/40 w-10 shrink-0">{ticker}</span>
+                    <span className="text-xs font-bold text-white/40 w-10 shrink-0">{ticker}</span>
                     <span className="flex-1 truncate">{name}</span>
                   </button>
                 );
@@ -761,7 +791,7 @@ function TeamPicker({ favoriteTeams, onChange }: {
 
   return (
     <div className="space-y-2">
-      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Favorite Teams</div>
+      <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Favorite Teams</div>
 
       {/* Selected teams chips */}
       {favoriteTeams.length > 0 && (
@@ -770,7 +800,7 @@ function TeamPicker({ favoriteTeams, onChange }: {
             <button
               key={team}
               onClick={() => toggle(team)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#6b8aab]/20 text-[10px] text-[#6b8aab] hover:bg-red-500/15 hover:text-red-400 transition-colors"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-500/20 text-xs text-accent-500 hover:bg-red-500/15 hover:text-red-400 transition-colors"
             >
               {team} <X size={8} />
             </button>
@@ -786,7 +816,7 @@ function TeamPicker({ favoriteTeams, onChange }: {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search teams..."
-          className="w-full bg-[#252528] border border-white/[0.06] rounded-lg pl-6 pr-2 py-1.5 text-[11px] text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
+          className="w-full bg-surface-2 border border-white/[0.06] rounded-lg pl-6 pr-2 py-1.5 text-xs text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
         />
       </div>
 
@@ -800,7 +830,7 @@ function TeamPicker({ favoriteTeams, onChange }: {
 
           return (
             <div key={league}>
-              <div className="text-[9px] font-bold text-white/30 uppercase tracking-wider mb-1 sticky top-0 bg-[#1c1c1e] py-0.5">
+              <div className="text-xs font-bold text-white/30 uppercase tracking-[var(--tracking-caps)] mb-1 sticky top-0 bg-bg-0 py-0.5">
                 {LEAGUE_LABELS[league] || league}
               </div>
               <div className="space-y-px">
@@ -810,19 +840,19 @@ function TeamPicker({ favoriteTeams, onChange }: {
                     <button
                       key={`${league}-${team.abbr}`}
                       onClick={() => toggle(team.name)}
-                      className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-[11px] transition-colors ${
+                      className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left text-xs transition-colors ${
                         selected
-                          ? 'bg-[#6b8aab]/15 text-white/90'
+                          ? 'bg-accent-500/15 text-white/90'
                           : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'
                       }`}
                     >
                       <div className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
-                        selected ? 'bg-[#6b8aab] border-[#6b8aab]' : 'border-white/15'
+                        selected ? 'bg-accent-500 border-accent-500' : 'border-white/15'
                       }`}>
-                        {selected && <span className="text-[8px] text-white font-bold">&#10003;</span>}
+                        {selected && <span className="text-xs text-white font-bold">&#10003;</span>}
                       </div>
                       <span className="flex-1 truncate">{team.name}</span>
-                      <span className="text-[9px] text-white/25 font-mono">{team.abbr}</span>
+                      <span className="text-xs text-white/25 font-mono">{team.abbr}</span>
                     </button>
                   );
                 })}
@@ -910,7 +940,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
               min={5} max={50}
             />
             <div className="space-y-1.5">
-              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Categories</div>
+              <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Categories</div>
               {['local', 'crime', 'politics', 'world', 'us', 'tech', 'finance'].map(cat => {
                 const cats = (cfg.categories as string[]) || [];
                 const isOn = cats.includes(cat);
@@ -928,7 +958,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
               })}
             </div>
             <div className="space-y-1.5">
-              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Custom RSS Feeds</div>
+              <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Custom RSS Feeds</div>
               {((cfg.feeds as { name: string; url: string }[]) || []).map((feed, i) => (
                 <div key={i} className="space-y-1 bg-white/[0.02] border border-white/[0.04] rounded-lg p-2">
                   <input
@@ -940,7 +970,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                       updateConfig({ feeds });
                     }}
                     placeholder="Source name"
-                    className="w-full bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-white/15 placeholder:text-white/15"
+                    className="w-full bg-surface-2 border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-white/15 placeholder:text-white/15"
                   />
                   <div className="flex items-center gap-1">
                     <input
@@ -952,7 +982,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                         updateConfig({ feeds });
                       }}
                       placeholder="https://...rss"
-                      className="flex-1 bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-[10px] text-white/60 outline-none focus:border-white/15 placeholder:text-white/15 font-mono"
+                      className="flex-1 bg-surface-2 border border-white/[0.06] rounded px-2 py-1 text-xs text-white/60 outline-none focus:border-white/15 placeholder:text-white/15 font-mono"
                     />
                     <button
                       onClick={() => {
@@ -971,7 +1001,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                   const feeds = [...((cfg.feeds as { name: string; url: string }[]) || []), { name: '', url: '' }];
                   updateConfig({ feeds });
                 }}
-                className="flex items-center gap-1 text-[11px] text-[#6b8aab]/70 hover:text-[#6b8aab] transition-colors"
+                className="flex items-center gap-1 text-xs text-accent-500/70 hover:text-accent-500 transition-colors"
               >
                 <Plus size={10} /> Add RSS Feed
               </button>
@@ -991,7 +1021,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
               min={5} max={100}
             />
             <div className="space-y-1.5">
-              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Categories</div>
+              <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Categories</div>
               {['world', 'us', 'tech', 'finance'].map(cat => {
                 const cats = (cfg.categories as string[]) || [];
                 const isOn = cats.includes(cat);
@@ -1038,7 +1068,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
           <div className="space-y-3">
             {/* League toggles */}
             <div className="space-y-1.5">
-              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Leagues</div>
+              <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Leagues</div>
               <div className="flex flex-wrap gap-1">
                 {Object.keys(ALL_TEAMS).map(league => {
                   const leagueKey = league.toLowerCase();
@@ -1053,9 +1083,9 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                           : [...leagues, leagueKey];
                         updateConfig({ leagues: next });
                       }}
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${
+                      className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${
                         active
-                          ? 'bg-[#6b8aab]/20 text-[#6b8aab] border border-[#6b8aab]/30'
+                          ? 'bg-accent-500/20 text-accent-500 border border-accent-500/30'
                           : 'bg-white/[0.03] text-white/30 border border-white/[0.06] hover:text-white/50'
                       }`}
                     >
@@ -1099,8 +1129,8 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
           <div className="space-y-2">
             <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg px-3 py-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-white/40">Min Magnitude</span>
-                <span className="text-[10px] font-mono text-white/50">
+                <span className="text-xs text-white/40">Min Magnitude</span>
+                <span className="text-xs font-mono text-white/50">
                   {((cfg.minMagnitude as number) || 2.5).toFixed(1)}
                 </span>
               </div>
@@ -1207,13 +1237,13 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
         <ConfigSection title="Traffic Cam Settings">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-white/60">View Mode</span>
+              <span className="text-xs text-white/60">View Mode</span>
               <div className="flex gap-1">
                 <button
                   onClick={() => updateConfig({ viewMode: 'single' })}
-                  className={`px-2 py-0.5 text-[10px] rounded ${
+                  className={`px-2 py-0.5 text-xs rounded ${
                     (cfg.viewMode as string || 'single') === 'single'
-                      ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
+                      ? 'bg-accent-500/30 text-accent-500 font-medium'
                       : 'bg-white/5 text-white/40 hover:bg-white/10'
                   }`}
                 >
@@ -1221,9 +1251,9 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                 </button>
                 <button
                   onClick={() => updateConfig({ viewMode: 'rotate' })}
-                  className={`px-2 py-0.5 text-[10px] rounded ${
+                  className={`px-2 py-0.5 text-xs rounded ${
                     (cfg.viewMode as string) === 'rotate'
-                      ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
+                      ? 'bg-accent-500/30 text-accent-500 font-medium'
                       : 'bg-white/5 text-white/40 hover:bg-white/10'
                   }`}
                 >
@@ -1326,7 +1356,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
             </div>
             {/* Custom URL fallback */}
             <div className="border-t border-white/[0.04] pt-2">
-              <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider mb-1.5">Custom Stream</div>
+              <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)] mb-1.5">Custom Stream</div>
               <ConfigTextField
                 label="URL"
                 value={(cfg.selectedChannelURL as string) || ''}
@@ -1362,7 +1392,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
       return (
         <ConfigSection title="Calendar Feeds">
           <div className="space-y-2">
-            <p className="text-[9px] text-white/25 leading-relaxed">
+            <p className="text-xs text-white/25 leading-relaxed">
               Add iCloud, Google, or Outlook calendar ICS feed URLs.
             </p>
             {((cfg.feeds as { name: string; url: string }[]) || []).map((feed, i) => (
@@ -1376,7 +1406,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                     updateConfig({ feeds });
                   }}
                   placeholder="Calendar name"
-                  className="w-full bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-white/15 placeholder:text-white/15"
+                  className="w-full bg-surface-2 border border-white/[0.06] rounded px-2 py-1 text-xs text-white/80 outline-none focus:border-white/15 placeholder:text-white/15"
                 />
                 <div className="flex items-center gap-1">
                   <input
@@ -1388,7 +1418,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                       updateConfig({ feeds });
                     }}
                     placeholder="https://...ics"
-                    className="flex-1 bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-[10px] text-white/60 outline-none focus:border-white/15 placeholder:text-white/15 font-mono"
+                    className="flex-1 bg-surface-2 border border-white/[0.06] rounded px-2 py-1 text-xs text-white/60 outline-none focus:border-white/15 placeholder:text-white/15 font-mono"
                   />
                   <button
                     onClick={() => {
@@ -1407,7 +1437,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                 const feeds = [...((cfg.feeds as { name: string; url: string }[]) || []), { name: '', url: '' }];
                 updateConfig({ feeds });
               }}
-              className="flex items-center gap-1 text-[11px] text-[#6b8aab]/70 hover:text-[#6b8aab] transition-colors"
+              className="flex items-center gap-1 text-xs text-accent-500/70 hover:text-accent-500 transition-colors"
             >
               <Plus size={10} /> Add Calendar Feed
             </button>
@@ -1426,13 +1456,13 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
               placeholder="e.g. MCI"
             />
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-white/60">Mode</span>
+              <span className="text-xs text-white/60">Mode</span>
               <div className="flex gap-1">
                 <button
                   onClick={() => updateConfig({ mode: 'arrivals' })}
-                  className={`px-2 py-0.5 text-[10px] rounded ${
+                  className={`px-2 py-0.5 text-xs rounded ${
                     (cfg.mode as string || 'arrivals') === 'arrivals'
-                      ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
+                      ? 'bg-accent-500/30 text-accent-500 font-medium'
                       : 'bg-white/5 text-white/40 hover:bg-white/10'
                   }`}
                 >
@@ -1440,9 +1470,9 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
                 </button>
                 <button
                   onClick={() => updateConfig({ mode: 'departures' })}
-                  className={`px-2 py-0.5 text-[10px] rounded ${
+                  className={`px-2 py-0.5 text-xs rounded ${
                     (cfg.mode as string) === 'departures'
-                      ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
+                      ? 'bg-accent-500/30 text-accent-500 font-medium'
                       : 'bg-white/5 text-white/40 hover:bg-white/10'
                   }`}
                 >
@@ -1475,6 +1505,22 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
               value={(cfg.ownerLabel as string) || ''}
               onChange={v => updateConfig({ ownerLabel: v })}
               placeholder="e.g. Dad's Plane"
+            />
+            <ConfigTextField
+              label="Home Airport"
+              value={(cfg.homeAirport as string) || ''}
+              onChange={v => updateConfig({ homeAirport: v.toUpperCase() })}
+              placeholder="e.g. KLRY"
+            />
+            <ToggleRow
+              label="Show Photo"
+              value={(cfg.showPhoto as boolean) ?? true}
+              onChange={v => updateConfig({ showPhoto: v })}
+            />
+            <ToggleRow
+              label="Jump to this page on departure"
+              value={(cfg.autoJump as boolean) ?? true}
+              onChange={v => updateConfig({ autoJump: v })}
             />
           </div>
         </ConfigSection>
@@ -1526,15 +1572,15 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
           <div className="space-y-3">
             {/* Display mode selector */}
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-white/60">Display Mode</span>
+              <span className="text-xs text-white/60">Display Mode</span>
               <div className="flex gap-1">
                 {(['map', 'pins', 'list'] as const).map(mode => (
                   <button
                     key={mode}
                     onClick={() => updateConfig({ displayMode: mode })}
-                    className={`px-2 py-0.5 text-[10px] rounded ${
+                    className={`px-2 py-0.5 text-xs rounded ${
                       (cfg.displayMode as string || 'map') === mode
-                        ? 'bg-[#6b8aab]/30 text-[#6b8aab] font-medium'
+                        ? 'bg-accent-500/30 text-accent-500 font-medium'
                         : 'bg-white/5 text-white/40 hover:bg-white/10'
                     }`}
                   >
@@ -1567,15 +1613,15 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
           <div className="space-y-3">
             {/* Display mode selector */}
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-white/60">Display Mode</span>
+              <span className="text-xs text-white/60">Display Mode</span>
               <div className="flex gap-1">
                 {(['summary', 'weight', 'sleep', 'activity'] as const).map(mode => (
                   <button
                     key={mode}
                     onClick={() => updateConfig({ displayMode: mode })}
-                    className={`px-2 py-0.5 text-[10px] rounded ${
+                    className={`px-2 py-0.5 text-xs rounded ${
                       (cfg.displayMode as string || 'summary') === mode
-                        ? 'bg-[#f472b6]/30 text-[#f472b6] font-medium'
+                        ? 'bg-accent-500/30 text-accent-500 font-medium'
                         : 'bg-white/5 text-white/40 hover:bg-white/10'
                     }`}
                   >
@@ -1602,7 +1648,7 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
     case 'homeKit':
       return (
         <ConfigSection title="Settings">
-          <p className="text-[11px] text-white/25 italic">No additional settings for this widget type.</p>
+          <p className="text-xs text-white/25 italic">No additional settings for this widget type.</p>
         </ConfigSection>
       );
 
@@ -1664,7 +1710,7 @@ function LiveTVChannelPicker({ selectedName, onSelect }: {
     <div className="space-y-2">
       {Object.entries(categories).map(([cat, channels]) => (
         <div key={cat}>
-          <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider mb-1">{cat}</div>
+          <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)] mb-1">{cat}</div>
           <div className="space-y-1">
             {channels.map(ch => {
               const isActive = selectedName === ch.name;
@@ -1674,7 +1720,7 @@ function LiveTVChannelPicker({ selectedName, onSelect }: {
                   onClick={() => onSelect(ch.name, ch.url)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left ${
                     isActive
-                      ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30'
+                      ? 'bg-accent-500/15 border border-accent-500/30'
                       : 'bg-white/[0.02] border border-white/[0.04] hover:bg-white/5'
                   }`}
                 >
@@ -1687,7 +1733,7 @@ function LiveTVChannelPicker({ selectedName, onSelect }: {
                       {ch.name}
                     </div>
                   </div>
-                  <span className={`text-[9px] font-bold font-mono shrink-0 ${isActive ? 'text-[#6b8aab]' : 'text-white/20'}`}>
+                  <span className={`text-xs font-bold font-mono shrink-0 ${isActive ? 'text-accent-500' : 'text-white/20'}`}>
                     {ch.callsign}
                   </span>
                   {isActive && (
@@ -1762,7 +1808,7 @@ function IPTVChannelBrowser({ selectedName, onSelect }: {
 
   return (
     <div className="space-y-2">
-      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">
+      <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">
         IPTV Channels ({total.toLocaleString()})
       </div>
 
@@ -1770,7 +1816,7 @@ function IPTVChannelBrowser({ selectedName, onSelect }: {
       <select
         value={country}
         onChange={e => { setCountry(e.target.value); setSearch(''); }}
-        className="w-full bg-[#252528] border border-white/[0.06] rounded px-2 py-1 text-[10px] text-white/70 outline-none focus:border-white/15"
+        className="w-full bg-surface-2 border border-white/[0.06] rounded px-2 py-1 text-xs text-white/70 outline-none focus:border-white/15"
       >
         <option value="">All Countries</option>
         {countries.map(c => (
@@ -1786,7 +1832,7 @@ function IPTVChannelBrowser({ selectedName, onSelect }: {
           value={search}
           onChange={e => handleSearchChange(e.target.value)}
           placeholder="Search channels..."
-          className="w-full bg-[#252528] border border-white/[0.06] rounded pl-6 pr-2 py-1 text-[10px] text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
+          className="w-full bg-surface-2 border border-white/[0.06] rounded pl-6 pr-2 py-1 text-xs text-white/70 outline-none focus:border-white/15 placeholder:text-white/15"
         />
       </div>
 
@@ -1797,7 +1843,7 @@ function IPTVChannelBrowser({ selectedName, onSelect }: {
             <div className="w-3 h-3 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
           </div>
         ) : channels.length === 0 ? (
-          <div className="text-[10px] text-white/25 text-center py-3">No channels found</div>
+          <div className="text-xs text-white/25 text-center py-3">No channels found</div>
         ) : (
           channels.map((ch, i) => {
             const isActive = selectedName === ch.name;
@@ -1807,7 +1853,7 @@ function IPTVChannelBrowser({ selectedName, onSelect }: {
                 onClick={() => onSelect(ch.name, ch.url)}
                 className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left ${
                   isActive
-                    ? 'bg-[#6b8aab]/15 border border-[#6b8aab]/30'
+                    ? 'bg-accent-500/15 border border-accent-500/30'
                     : 'bg-white/[0.02] border border-transparent hover:bg-white/5'
                 }`}
               >
@@ -1822,7 +1868,7 @@ function IPTVChannelBrowser({ selectedName, onSelect }: {
                   <Tv size={10} className="text-white/20 shrink-0 w-5" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className={`text-[10px] font-medium truncate ${isActive ? 'text-white/90' : 'text-white/60'}`}>
+                  <div className={`text-xs font-medium truncate ${isActive ? 'text-white/90' : 'text-white/60'}`}>
                     {ch.name}
                   </div>
                 </div>
@@ -1837,7 +1883,7 @@ function IPTVChannelBrowser({ selectedName, onSelect }: {
           })
         )}
         {!loading && total > 200 && (
-          <div className="text-[9px] text-white/20 text-center py-1">
+          <div className="text-xs text-white/20 text-center py-1">
             Showing 200 of {total.toLocaleString()} channels. Search to narrow results.
           </div>
         )}
@@ -1866,7 +1912,7 @@ function FindMyFriendsPicker({ trackedHandles, onChange }: {
   if (loading) {
     return (
       <div className="space-y-1.5">
-        <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Friends</div>
+        <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Friends</div>
         <div className="flex items-center justify-center py-3">
           <div className="w-3 h-3 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
         </div>
@@ -1877,15 +1923,15 @@ function FindMyFriendsPicker({ trackedHandles, onChange }: {
   if (friends.length === 0) {
     return (
       <div className="space-y-1.5">
-        <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">Friends</div>
-        <p className="text-[10px] text-white/25 italic">No friends found. Check BlueBubbles connection.</p>
+        <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">Friends</div>
+        <p className="text-xs text-white/25 italic">No friends found. Check BlueBubbles connection.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-1.5">
-      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider">
+      <div className="text-xs font-bold text-white/20 uppercase tracking-[var(--tracking-caps)]">
         Friends {trackedHandles.length > 0 ? `(${trackedHandles.length} selected)` : '(all)'}
       </div>
       {friends.map(f => {
@@ -1908,7 +1954,7 @@ function FindMyFriendsPicker({ trackedHandles, onChange }: {
       {trackedHandles.length > 0 && (
         <button
           onClick={() => onChange([])}
-          className="text-[10px] text-[#6b8aab]/70 hover:text-[#6b8aab] transition-colors"
+          className="text-xs text-accent-500/70 hover:text-accent-500 transition-colors"
         >
           Show all friends
         </button>
