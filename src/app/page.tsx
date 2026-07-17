@@ -3,6 +3,8 @@ import { AppStateProvider, useAppState } from '@/context/AppState';
 import { DashboardDisplay } from '@/components/display/DashboardDisplay';
 import { DashboardEditor } from '@/components/editor/DashboardEditor';
 import { EOCDisplay } from '@/components/eoc/EOCDisplay';
+import { MomentProvider } from '@/components/display/MomentLayer';
+import { AmbianceProvider } from '@/components/display/AmbianceProvider';
 
 function AppContent() {
   const { isDisplayMode, appMode } = useAppState();
@@ -21,7 +23,10 @@ function AppContent() {
 export default function Home() {
   return (
     <AppStateProvider>
-      <AppContent />
+      <MomentProvider>
+        <AppContent />
+        <AmbianceProvider />
+      </MomentProvider>
     </AppStateProvider>
   );
 }

@@ -3,30 +3,12 @@ import { useRef, useEffect, useState } from 'react';
 import { type DashboardPage } from '@/types/dashboard';
 import { WidgetContainer } from './WidgetContainer';
 import { WidgetFactory } from '../widgets/WidgetFactory';
+import { computeCellRect } from '@/lib/grid';
 
 interface WidgetGridProps {
   page: DashboardPage;
 }
 
-const SPACING = 4; // Finer grid = tighter spacing
-
-/**
- * Faithfully replicates Swift WidgetGridView.
- *
- * Swift computes:
- *   totalHSpacing = spacing * (gridColumns + 1)
- *   totalVSpacing = spacing * (gridRows + 1)
- *   cellWidth  = (containerWidth  - totalHSpacing) / gridColumns
- *   cellHeight = (containerHeight - totalVSpacing) / gridRows
- *
- * Each widget is placed via:
- *   width  = cols * cellWidth  + (cols - 1) * spacing
- *   height = rows * cellHeight + (rows - 1) * spacing
- *   x = spacing + position.column * (cellWidth  + spacing)
- *   y = spacing + position.row    * (cellHeight + spacing)
- *
- * NOTE: Swift positions are 0-indexed. Our demo data also uses 0-indexed positions.
- */
 export function WidgetGrid({ page }: WidgetGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
@@ -45,47 +27,34 @@ export function WidgetGrid({ page }: WidgetGridProps) {
     return () => ro.disconnect();
   }, []);
 
-  const gridCols = page.gridColumns ?? 24;
-  const gridRows = page.gridRows ?? 16;
-
-  let cellW = 0;
-  let cellH = 0;
-
-  if (dims) {
-    const totalHSpacing = SPACING * (gridCols + 1);
-    const totalVSpacing = SPACING * (gridRows + 1);
-    cellW = Math.max(1, (dims.w - totalHSpacing) / gridCols);
-    cellH = Math.max(1, (dims.h - totalVSpacing) / gridRows);
-  }
+  // Row-major order for entrance stagger
+  const ordered = [...page.widgets].sort(
+    (a, b) => a.position.row - b.position.row || a.position.column - b.position.column,
+  );
+  const orderIndex = new Map(ordered.map((w, i) => [w.id, i]));
 
   return (
-    <div ref={containerRef} className="widget-grid">
+    <div ref={containerRef} className="widget-grid burnin-orbit">
       {dims &&
         page.widgets.map((widget) => {
-          const wCols = widget.size?.columns ?? 3;
-          const wRows = widget.size?.rows ?? 2;
-          const col = widget.position.column;
-          const row = widget.position.row;
-
-          const width = wCols * cellW + (wCols - 1) * SPACING;
-          const height = wRows * cellH + (wRows - 1) * SPACING;
-          const x = SPACING + col * (cellW + SPACING);
-          const y = SPACING + row * (cellH + SPACING);
-
+          const rect = computeCellRect(page, widget, { width: dims.w - 32, height: dims.h - 32 });
           return (
-            <WidgetContainer
-              key={widget.id}
-              widget={widget}
+            <div
+              key={`${page.id}-${widget.id}`}
+              className="stagger-enter"
               style={{
                 position: 'absolute',
-                left: x,
-                top: y,
-                width,
-                height,
+                left: rect.x,
+                top: rect.y,
+                width: rect.width,
+                height: rect.height,
+                animationDelay: `${Math.min(orderIndex.get(widget.id) ?? 0, 20) * 40}ms`,
               }}
             >
-              <WidgetFactory widget={widget} />
-            </WidgetContainer>
+              <WidgetContainer widget={widget} style={{ width: '100%', height: '100%' }}>
+                <WidgetFactory widget={widget} />
+              </WidgetContainer>
+            </div>
           );
         })}
     </div>

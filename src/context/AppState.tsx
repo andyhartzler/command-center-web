@@ -58,6 +58,9 @@ interface AppStateContextType {
   moveWidget: (id: string, to: { column: number; row: number }) => void;
   updateWidget: (id: string, updates: Partial<DashboardWidget>) => void;
   resizeWidget: (id: string, family: WidgetFamily) => void;
+  /** freeform resize with the same collision + bounds rules as move; returns false when rejected */
+  resizeWidgetTo: (id: string, size: { columns: number; rows: number }) => boolean;
+  updatePageSettings: (index: number, settings: Partial<Pick<DashboardPage, 'backgroundTheme' | 'autoRotateSeconds'>>) => void;
   hasSpaceForWidget: (size: { columns: number; rows: number }, page: DashboardPage) => boolean;
 }
 
@@ -119,7 +122,7 @@ const DEMO_PAGE: DashboardPage = {
 /**
  * Find the first open position in a 0-indexed grid that can fit `size`.
  */
-function findOpenPosition(widgets: DashboardWidget[], size: { columns: number; rows: number }): { column: number; row: number } | null {
+function findOpenPosition(widgets: DashboardWidget[], size: { columns: number; rows: number }, gridCols = GRID_COLUMNS, gridRows = GRID_ROWS): { column: number; row: number } | null {
   const occupied = new Set<string>();
   for (const w of widgets) {
     const ws = w.size ?? FAMILY_GRID_SIZE[w.family];
@@ -131,8 +134,8 @@ function findOpenPosition(widgets: DashboardWidget[], size: { columns: number; r
   }
 
   // 0-indexed scan
-  for (let r = 0; r <= GRID_ROWS - size.rows; r++) {
-    for (let c = 0; c <= GRID_COLUMNS - size.columns; c++) {
+  for (let r = 0; r <= gridRows - size.rows; r++) {
+    for (let c = 0; c <= gridCols - size.columns; c++) {
       let fits = true;
       for (let dr = 0; dr < size.rows && fits; dr++) {
         for (let dc = 0; dc < size.columns && fits; dc++) {
@@ -184,6 +187,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [eocServerURL, setEocServerURL] = useState('http://192.168.4.21:8080');
   const [loaded, setLoaded] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Monotonic state version so a stale client never clobbers fresher edits:
+  // local mutations bump it; the 30s poll hot-applies anything newer.
+  const versionRef = useRef(0);
+  const applyingRemoteRef = useRef(false);
 
   // Load: try server first, then fall back to localStorage
   useEffect(() => {
@@ -200,6 +207,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             if (parsed.pages?.length) setPages(sanitizePages(parsed.pages));
             if (typeof parsed.currentPageIndex === 'number') setCurrentPageIndex(parsed.currentPageIndex);
             if (parsed.eocServerURL) setEocServerURL(parsed.eocServerURL);
+            versionRef.current = typeof parsed.version === 'number' ? parsed.version : Date.now();
+            applyingRemoteRef.current = true;
             setLoaded(true);
             return;
           }
@@ -225,15 +234,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  // Save to both localStorage and server (debounced)
+  // Save to both localStorage and server (debounced). Remote-applied updates
+  // are persisted locally but never echoed back to the server.
   useEffect(() => {
     if (!loaded) return;
-    const stateObj = { pages, currentPageIndex, eocServerURL };
 
-    // Always save to localStorage immediately
+    const isRemoteApply = applyingRemoteRef.current;
+    applyingRemoteRef.current = false;
+    if (!isRemoteApply) versionRef.current = Date.now();
+
+    const stateObj = { pages, currentPageIndex, eocServerURL, version: versionRef.current };
+
     try {
       localStorage.setItem('commandcenter-state', JSON.stringify(stateObj));
     } catch { /* ignore */ }
+
+    if (isRemoteApply) return;
 
     // Debounce server save (2 seconds)
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -242,9 +258,33 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state: stateObj }),
-      }).catch(() => { /* server save failed silently */ });
+      }).catch(err => {
+        console.error('[state] server save failed', err);
+      });
     }, 2000);
   }, [pages, currentPageIndex, eocServerURL, loaded]);
+
+  // Multi-client sync: poll the server every 30s and hot-apply newer state,
+  // so the wall display picks up laptop edits without a manual reload.
+  useEffect(() => {
+    if (!loaded) return;
+    const t = setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const res = await fetch('/api/state', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const st = data.state;
+        if (st && typeof st.version === 'number' && st.version > versionRef.current && st.pages?.length) {
+          applyingRemoteRef.current = true;
+          versionRef.current = st.version;
+          setPages(sanitizePages(st.pages));
+          if (st.eocServerURL) setEocServerURL(st.eocServerURL);
+        }
+      } catch { /* offline; next poll will retry */ }
+    }, 30_000);
+    return () => clearInterval(t);
+  }, [loaded]);
 
   const addPage = useCallback(() => {
     setPages(prev => {
@@ -254,8 +294,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         widgets: [],
         backgroundTheme: 'deepSpace',
         autoRotateSeconds: null,
-        gridColumns: 12,
-        gridRows: 8,
+        gridColumns: 24,
+        gridRows: 16,
       };
       return [...prev, newPage];
     });
@@ -312,7 +352,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const next = [...prev];
       const page = { ...next[currentPageIndex] };
       const size = FAMILY_GRID_SIZE[family];
-      const pos = findOpenPosition(page.widgets, size);
+      const pos = findOpenPosition(page.widgets, size, page.gridColumns ?? GRID_COLUMNS, page.gridRows ?? GRID_ROWS);
       if (!pos) return prev;
 
       const widget: DashboardWidget = {
@@ -398,6 +438,43 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
   }, [currentPageIndex]);
 
+  const resizeWidgetTo = useCallback((id: string, size: { columns: number; rows: number }): boolean => {
+    let accepted = false;
+    setPages(prev => {
+      const next = [...prev];
+      const page = { ...next[currentPageIndex] };
+      const widget = page.widgets.find(w => w.id === id);
+      if (!widget) return prev;
+
+      const cols = page.gridColumns ?? GRID_COLUMNS;
+      const rows = page.gridRows ?? GRID_ROWS;
+      if (
+        size.columns < 2 || size.rows < 2 ||
+        widget.position.column + size.columns > cols ||
+        widget.position.row + size.rows > rows
+      ) return prev;
+
+      if (checkCollision(page.widgets, id, widget.position, size)) return prev;
+
+      accepted = true;
+      page.widgets = page.widgets.map(w =>
+        w.id === id ? { ...w, size: { columns: size.columns, rows: size.rows } } : w
+      );
+      next[currentPageIndex] = page;
+      return next;
+    });
+    return accepted;
+  }, [currentPageIndex]);
+
+  const updatePageSettings = useCallback((index: number, settings: Partial<Pick<DashboardPage, 'backgroundTheme' | 'autoRotateSeconds'>>) => {
+    setPages(prev => {
+      if (index >= prev.length) return prev;
+      const next = [...prev];
+      next[index] = { ...next[index], ...settings };
+      return next;
+    });
+  }, []);
+
   const updateWidget = useCallback((id: string, updates: Partial<DashboardWidget>) => {
     setPages(prev => {
       const next = [...prev];
@@ -409,7 +486,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [currentPageIndex]);
 
   const hasSpaceForWidget = useCallback((size: { columns: number; rows: number }, page: DashboardPage) => {
-    return findOpenPosition(page.widgets, size) !== null;
+    return findOpenPosition(page.widgets, size, page.gridColumns ?? GRID_COLUMNS, page.gridRows ?? GRID_ROWS) !== null;
   }, []);
 
   return (
@@ -424,6 +501,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       eocScope, setEocScope, eocServerURL, setEocServerURL,
       addPage, deletePage, duplicatePage, movePage, renamePage,
       addWidget, deleteWidget, moveWidget, updateWidget, resizeWidget,
+      resizeWidgetTo, updatePageSettings,
       hasSpaceForWidget,
     }}>
       {children}

@@ -14,7 +14,9 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (err) {
     console.error('Failed to load dashboard state:', err);
-    return NextResponse.json({ state: null, updated_at: null });
+    // A real error, not a silent empty state: clients fall back to
+    // localStorage instead of treating "server unreachable" as "no state".
+    return NextResponse.json({ error: 'State server unreachable' }, { status: 502 });
   }
 }
 

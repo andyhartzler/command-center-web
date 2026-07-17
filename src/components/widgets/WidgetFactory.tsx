@@ -35,7 +35,6 @@ const HueWidget = dynamic(() => import('./HueWidget').then(m => ({ default: m.Hu
 const NestThermostatWidget = dynamic(() => import('./NestThermostatWidget').then(m => ({ default: m.NestThermostatWidget })), { ssr: false });
 const ICloudAlbumWidget = dynamic(() => import('./iCloudAlbumWidget').then(m => ({ default: m.ICloudAlbumWidget })), { ssr: false });
 const FeedsWidget = dynamic(() => import('./FeedsWidget').then(m => ({ default: m.FeedsWidget })), { ssr: false });
-const TwitterTrendingWidget = dynamic(() => import('./TwitterTrendingWidget').then(m => ({ default: m.TwitterTrendingWidget })), { ssr: false });
 
 interface WidgetFactoryProps {
   widget: DashboardWidget;
@@ -76,11 +75,6 @@ export function WidgetFactory({ widget }: WidgetFactoryProps) {
     case 'nestThermostat': return <NestThermostatWidget config={widgetConfig.config} style={style} />;
     case 'icloudAlbum': return <ICloudAlbumWidget config={widgetConfig.config} style={style} />;
     case 'feeds': return <FeedsWidget config={widgetConfig.config} style={style} />;
-    case 'twitterTrending': return <TwitterTrendingWidget config={widgetConfig.config} style={style} />;
-    case 'reminders': {
-      const meta = WIDGET_TYPE_META[widgetConfig.type];
-      return <PlaceholderWidget name={meta.displayName} icon={meta.icon} color={meta.color} />;
-    }
     default: {
       // Safety net for removed/unknown widget types
       return <PlaceholderWidget name="Unknown" icon="cpu" color="#64748b" />;

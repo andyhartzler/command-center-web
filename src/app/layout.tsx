@@ -20,7 +20,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "H",
+  title: "Command Center",
   description: "Observe. Everything is connected.",
   metadataBase: new URL("https://hartzler.app"),
   icons: {
@@ -35,10 +35,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
-      >
+    <html lang="en" className={`dark ${geistSans.variable} ${geistMono.variable}`}>
+      <body className="antialiased">
         {children}
       </body>
     </html>

@@ -1,6 +1,8 @@
 'use client';
 import { type CSSProperties } from 'react';
-import { type DashboardWidget } from '@/types/widget';
+import { type DashboardWidget, WIDGET_TYPE_META } from '@/types/widget';
+import { WidgetErrorBoundary } from './WidgetErrorBoundary';
+import { useActiveMoment } from './MomentLayer';
 
 interface WidgetContainerProps {
   widget: DashboardWidget;
@@ -8,28 +10,35 @@ interface WidgetContainerProps {
   style?: CSSProperties;
 }
 
-const MAP_TYPES = new Set(['earthquakes', 'airTraffic', 'conflict', 'wildfires', 'findMyFriends']);
-const VIDEO_TYPES = new Set(['webcams', 'camera', 'liveTV']);
-
 export function WidgetContainer({ widget, children, style }: WidgetContainerProps) {
-  const widgetType = widget.widgetConfig.type;
-  const isMap = MAP_TYPES.has(widgetType);
-  const isVideo = VIDEO_TYPES.has(widgetType);
+  const meta = WIDGET_TYPE_META[widget.widgetConfig.type];
+  const isAmbient = meta?.tier === 'ambient';
+  const { activeWidgetId } = useActiveMoment();
+  const hasMoment = activeWidgetId === widget.id;
 
-  const radius = isMap || isVideo ? 20 : 24;
+  const radius = widget.style.cornerRadius && widget.style.cornerRadius !== 24
+    ? widget.style.cornerRadius
+    : undefined; // undefined = material default (--radius-card)
 
   const containerStyle: CSSProperties = {
     ...style,
     opacity: widget.style.opacity,
     borderRadius: radius,
+    border: widget.style.showBorder === false ? 'none' : undefined,
+    containerType: 'size',
+    transform: hasMoment ? 'scale(1.015)' : undefined,
+    transition: 'transform 500ms var(--ease-spring)',
   };
 
   return (
     <div
-      className={isMap || isVideo ? 'widget-glass-map' : 'widget-glass'}
+      className={isAmbient ? 'material-well' : 'material-card'}
       style={containerStyle}
     >
-      {children}
+      <WidgetErrorBoundary widgetId={widget.id}>
+        {children}
+      </WidgetErrorBoundary>
+      {hasMoment && <div className="moment-glow" aria-hidden />}
     </div>
   );
 }

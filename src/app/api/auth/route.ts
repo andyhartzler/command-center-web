@@ -1,21 +1,35 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
+import { COOKIE_NAME, SESSION_DAYS, createSessionToken } from '@/lib/session';
+
+function constantTimeMatch(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) {
+    // Compare against self to keep timing flat, then fail
+    timingSafeEqual(ab, ab);
+    return false;
+  }
+  return timingSafeEqual(ab, bb);
+}
 
 export async function POST(request: Request) {
   try {
     const { password } = await request.json();
-    const correctPassword = process.env.AUTH_PASSWORD || 'hope';
+    const correctPassword = process.env.AUTH_PASSWORD;
     const secret = process.env.AUTH_SECRET;
 
-    if (!secret) {
+    if (!secret || !correctPassword) {
       return NextResponse.json({ error: 'Auth not configured' }, { status: 500 });
     }
 
-    if (password !== correctPassword) {
+    if (typeof password !== 'string' || !constantTimeMatch(password, correctPassword)) {
       return NextResponse.json({ error: 'Wrong password' }, { status: 401 });
     }
 
+    const token = await createSessionToken();
     const response = NextResponse.json({ ok: true });
-    response.cookies.set('cc-auth', secret, {
+    response.cookies.set(COOKIE_NAME, token, {
       httpOnly: true,
       // Secure cookies require HTTPS. When self-hosted on the LAN over plain
       // http:// (e.g. the Frame TV pointing at http://192.168.4.21:3001), set
@@ -23,8 +37,7 @@ export async function POST(request: Request) {
       secure: process.env.NODE_ENV === 'production' && process.env.COOKIE_INSECURE !== '1',
       sameSite: 'lax',
       path: '/',
-      // 30 days
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: 60 * 60 * 24 * SESSION_DAYS,
     });
 
     return response;

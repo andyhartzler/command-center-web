@@ -1599,7 +1599,6 @@ function WidgetSpecificConfig({ widget, updateConfig }: {
         </ConfigSection>
       );
 
-    case 'reminders':
     case 'homeKit':
       return (
         <ConfigSection title="Settings">

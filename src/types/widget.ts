@@ -14,7 +14,6 @@ export type WidgetType =
   | 'clock'
   | 'weather'
   | 'calendar'
-  | 'reminders'
   | 'news'
   | 'worldNews'
   | 'webcams'
@@ -42,8 +41,15 @@ export type WidgetType =
   | 'hue'
   | 'nestThermostat'
   | 'icloudAlbum'
-  | 'feeds'
-  | 'twitterTrending';
+  | 'feeds';
+
+/**
+ * Widget presentation tier:
+ * ambient = full-bleed well material, chrome-free, info in glass overlays
+ * glance  = one hero fact readable at 10 feet
+ * alert   = quiet until a state change, then loud
+ */
+export type WidgetTier = 'ambient' | 'glance' | 'alert';
 
 export interface GridSize {
   columns: number;
@@ -170,6 +176,10 @@ export interface FlightStatusConfig {
 export interface AircraftTrackerConfig {
   tailNumber: string;
   ownerLabel: string;
+  homeAirport?: string;
+  showPhoto?: boolean;
+  /** auto-navigate the display to this widget's page on departure/landing */
+  autoJump?: boolean;
 }
 
 export interface AirQualityConfig {
@@ -208,11 +218,7 @@ export interface ICloudAlbumConfig {
 export interface FeedsConfig {
   feedUrls: string[];
   maxItems: number;
-}
-
-export interface TwitterTrendingConfig {
-  woeid: number;
-  maxTrends: number;
+  title?: string;
 }
 
 export interface FindMyFriendsConfig {
@@ -243,7 +249,6 @@ export type WidgetConfig =
   | { type: 'flightStatus'; config: FlightStatusConfig }
   | { type: 'aircraftTracker'; config: AircraftTrackerConfig }
   | { type: 'calendar'; config: { feeds?: { name: string; url: string }[] } }
-  | { type: 'reminders'; config: Record<string, never> }
   | { type: 'health'; config: HealthConfig }
   | { type: 'homeKit'; config: Record<string, never> }
   | { type: 'airQuality'; config: AirQualityConfig }
@@ -253,8 +258,7 @@ export type WidgetConfig =
   | { type: 'hue'; config: HueConfig }
   | { type: 'nestThermostat'; config: NestThermostatConfig }
   | { type: 'icloudAlbum'; config: ICloudAlbumConfig }
-  | { type: 'feeds'; config: FeedsConfig }
-  | { type: 'twitterTrending'; config: TwitterTrendingConfig };
+  | { type: 'feeds'; config: FeedsConfig };
 
 export interface DashboardWidget {
   id: string;
@@ -290,40 +294,39 @@ export const WIDGET_TYPE_META: Record<WidgetType, {
   color: string;
   defaultFamily: WidgetFamily;
   supportedFamilies: WidgetFamily[];
+  tier: WidgetTier;
 }> = {
-  clock: { displayName: 'Clock', category: 'Time & Location', icon: 'clock', color: '#60a5fa', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'large'] },
-  weather: { displayName: 'Weather', category: 'Time & Location', icon: 'cloud-sun', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide'] },
-  sun: { displayName: 'Sun & Moon', category: 'Time & Location', icon: 'sun', color: '#fbbf24', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
-  calendar: { displayName: 'Calendar', category: 'Productivity', icon: 'calendar', color: '#f87171', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  reminders: { displayName: 'Reminders', category: 'Productivity', icon: 'list-checks', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  news: { displayName: 'KC News', category: 'Media', icon: 'newspaper', color: '#6b8aab', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
-  worldNews: { displayName: 'World News', category: 'Media', icon: 'globe', color: '#06b6d4', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide'] },
-  webcams: { displayName: 'Traffic Cams', category: 'Media', icon: 'video', color: '#64748b', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  camera: { displayName: 'Camera', category: 'Media', icon: 'camera', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
-  liveTV: { displayName: 'Live TV', category: 'Media', icon: 'tv', color: '#6b8aab', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
-  sports: { displayName: 'Sports', category: 'Media', icon: 'trophy', color: '#eab308', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
-  stocks: { displayName: 'Markets', category: 'Finance', icon: 'trending-up', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
-  crypto: { displayName: 'Crypto', category: 'Finance', icon: 'bitcoin', color: '#fbbf24', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'] },
-  predictionMarkets: { displayName: 'Predictions', category: 'Finance', icon: 'bar-chart-3', color: '#6b8aab', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  earthquakes: { displayName: 'Earthquakes', category: 'World Monitor', icon: 'activity', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  airTraffic: { displayName: 'Air Traffic', category: 'World Monitor', icon: 'plane', color: '#38bdf8', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  conflict: { displayName: 'Conflict', category: 'World Monitor', icon: 'alert-triangle', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  moonPhase: { displayName: 'Moon Phase', category: 'Time & Location', icon: 'moon', color: '#94a3b8', defaultFamily: 'small', supportedFamilies: ['small'] },
-  flightStatus: { displayName: 'Flight Status', category: 'World Monitor', icon: 'plane-takeoff', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
-  aircraftTracker: { displayName: 'Aircraft Tracker', category: 'World Monitor', icon: 'radar', color: '#a78bfa', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
-  faaDelays: { displayName: 'FAA Delays', category: 'World Monitor', icon: 'plane-landing', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
-  wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#fb923c', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  health: { displayName: 'Health', category: 'Productivity', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
-  homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
-  airQuality: { displayName: 'Air Quality', category: 'Time & Location', icon: 'wind', color: '#34d399', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'] },
-  appleMusic: { displayName: 'Top Charts', category: 'Media', icon: 'music', color: '#fa2d48', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'] },
-  findMyFriends: { displayName: 'Find My', category: 'Productivity', icon: 'map-pin', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide'] },
-  uvIndex: { displayName: 'UV Index', category: 'Time & Location', icon: 'sun', color: '#f59e0b', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'] },
-  hue: { displayName: 'Philips Hue', category: 'System', icon: 'lightbulb', color: '#facc15', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'] },
-  nestThermostat: { displayName: 'Nest', category: 'System', icon: 'thermometer', color: '#38bdf8', defaultFamily: 'small', supportedFamilies: ['small', 'medium'] },
-  icloudAlbum: { displayName: 'iCloud Album', category: 'Media', icon: 'image', color: '#a78bfa', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'] },
-  feeds: { displayName: 'Global Alerts', category: 'Media', icon: 'rss', color: '#10b981', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'] },
-  twitterTrending: { displayName: 'Twitter Trends', category: 'Media', icon: 'trending-up', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'] },
+  clock: { displayName: 'Clock', category: 'Time & Location', icon: 'clock', color: '#60a5fa', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'large'], tier: 'glance' },
+  weather: { displayName: 'Weather', category: 'Time & Location', icon: 'cloud-sun', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide'], tier: 'glance' },
+  sun: { displayName: 'Sun & Moon', category: 'Time & Location', icon: 'sun', color: '#fbbf24', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'], tier: 'glance' },
+  calendar: { displayName: 'Calendar', category: 'Productivity', icon: 'calendar', color: '#f87171', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'], tier: 'glance' },
+  news: { displayName: 'KC News', category: 'Media', icon: 'newspaper', color: '#6b8aab', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'], tier: 'glance' },
+  worldNews: { displayName: 'World News', category: 'Media', icon: 'globe', color: '#06b6d4', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide'], tier: 'glance' },
+  webcams: { displayName: 'Traffic Cams', category: 'Media', icon: 'video', color: '#64748b', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'extraLarge'], tier: 'ambient' },
+  camera: { displayName: 'Camera', category: 'Media', icon: 'camera', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'], tier: 'ambient' },
+  liveTV: { displayName: 'Live TV', category: 'Media', icon: 'tv', color: '#6b8aab', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'], tier: 'ambient' },
+  sports: { displayName: 'Sports', category: 'Media', icon: 'trophy', color: '#eab308', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'], tier: 'alert' },
+  stocks: { displayName: 'Markets', category: 'Finance', icon: 'trending-up', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'], tier: 'glance' },
+  crypto: { displayName: 'Crypto', category: 'Finance', icon: 'bitcoin', color: '#fbbf24', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large'], tier: 'glance' },
+  predictionMarkets: { displayName: 'Predictions', category: 'Finance', icon: 'bar-chart-3', color: '#6b8aab', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'], tier: 'glance' },
+  earthquakes: { displayName: 'Earthquakes', category: 'World Monitor', icon: 'activity', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'], tier: 'alert' },
+  airTraffic: { displayName: 'Air Traffic', category: 'World Monitor', icon: 'plane', color: '#38bdf8', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'], tier: 'ambient' },
+  conflict: { displayName: 'Conflict', category: 'World Monitor', icon: 'alert-triangle', color: '#ef4444', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'], tier: 'alert' },
+  moonPhase: { displayName: 'Moon Phase', category: 'Time & Location', icon: 'moon', color: '#94a3b8', defaultFamily: 'small', supportedFamilies: ['small'], tier: 'ambient' },
+  flightStatus: { displayName: 'Flight Status', category: 'World Monitor', icon: 'plane-takeoff', color: '#38bdf8', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'], tier: 'glance' },
+  aircraftTracker: { displayName: 'Aircraft Tracker', category: 'World Monitor', icon: 'radar', color: '#a78bfa', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'], tier: 'alert' },
+  faaDelays: { displayName: 'FAA Delays', category: 'World Monitor', icon: 'plane-landing', color: '#fb923c', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'], tier: 'alert' },
+  wildfires: { displayName: 'Wildfires', category: 'World Monitor', icon: 'flame', color: '#fb923c', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'], tier: 'alert' },
+  health: { displayName: 'Health', category: 'Productivity', icon: 'heart', color: '#f472b6', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'], tier: 'glance' },
+  homeKit: { displayName: 'HomeKit', category: 'System', icon: 'home', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['medium', 'large'], tier: 'glance' },
+  airQuality: { displayName: 'Air Quality', category: 'Time & Location', icon: 'wind', color: '#34d399', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'], tier: 'glance' },
+  appleMusic: { displayName: 'Top Charts', category: 'Media', icon: 'music', color: '#fa2d48', defaultFamily: 'medium', supportedFamilies: ['medium', 'large', 'wide'], tier: 'glance' },
+  findMyFriends: { displayName: 'Find My', category: 'Productivity', icon: 'map-pin', color: '#34d399', defaultFamily: 'medium', supportedFamilies: ['small', 'medium', 'large', 'wide'], tier: 'ambient' },
+  uvIndex: { displayName: 'UV Index', category: 'Time & Location', icon: 'sun', color: '#f59e0b', defaultFamily: 'small', supportedFamilies: ['small', 'medium', 'wide'], tier: 'glance' },
+  hue: { displayName: 'Philips Hue', category: 'System', icon: 'lightbulb', color: '#facc15', defaultFamily: 'medium', supportedFamilies: ['small', 'medium'], tier: 'glance' },
+  nestThermostat: { displayName: 'Nest', category: 'System', icon: 'thermometer', color: '#38bdf8', defaultFamily: 'small', supportedFamilies: ['small', 'medium'], tier: 'glance' },
+  icloudAlbum: { displayName: 'iCloud Album', category: 'Media', icon: 'image', color: '#a78bfa', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'extraLarge'], tier: 'ambient' },
+  feeds: { displayName: 'Global Alerts', category: 'Media', icon: 'rss', color: '#10b981', defaultFamily: 'large', supportedFamilies: ['medium', 'large', 'wide', 'extraLarge'], tier: 'alert' },
 };
 
 export function defaultConfig(type: WidgetType): WidgetConfig {
@@ -344,12 +347,11 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'predictionMarkets': return { type: 'predictionMarkets', config: { maxEvents: 8 } };
     case 'moonPhase': return { type: 'moonPhase', config: { latitude: 39.0997, longitude: -94.5786 } };
     case 'flightStatus': return { type: 'flightStatus', config: { airport: 'MCI', mode: 'arrivals', limit: 20 } };
-    case 'aircraftTracker': return { type: 'aircraftTracker', config: { tailNumber: 'N233AB', ownerLabel: "Dad's Plane" } };
+    case 'aircraftTracker': return { type: 'aircraftTracker', config: { tailNumber: 'N233AB', ownerLabel: "Dad's Plane", homeAirport: 'KLRY', showPhoto: true, autoJump: true } };
     case 'webcams': return { type: 'webcams', config: { cameraIds: [], cameraNames: [], corridorFilter: [], loadAllCameras: false, rotateIntervalSeconds: 15, viewMode: 'single' } };
     case 'camera': return { type: 'camera', config: { url: '', label: 'Camera', isMuted: true } };
     case 'liveTV': return { type: 'liveTV', config: { selectedChannelURL: '', selectedChannelName: '', isMuted: true, showIPTV: false } };
     case 'calendar': return { type: 'calendar', config: { feeds: [] } };
-    case 'reminders': return { type: 'reminders', config: {} };
     case 'health': return { type: 'health', config: { displayMode: 'summary', refreshInterval: 300 } };
     case 'homeKit': return { type: 'homeKit', config: {} };
     case 'airQuality': return { type: 'airQuality', config: { latitude: 39.0997, longitude: -94.5786 } };
@@ -360,6 +362,5 @@ export function defaultConfig(type: WidgetType): WidgetConfig {
     case 'nestThermostat': return { type: 'nestThermostat', config: { projectId: '', clientId: '', clientSecret: '', refreshToken: '' } };
     case 'icloudAlbum': return { type: 'icloudAlbum', config: { albumUrl: '', cycleIntervalSeconds: 30, transitionEffect: 'fade' } };
     case 'feeds': return { type: 'feeds', config: { feedUrls: ['https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'], maxItems: 10 } };
-    case 'twitterTrending': return { type: 'twitterTrending', config: { woeid: 23424977, maxTrends: 10 } };
   }
 }

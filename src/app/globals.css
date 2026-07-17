@@ -1,141 +1,348 @@
 @import "tailwindcss";
 
-/* MapLibre popup overrides for global view */
-.global-map-popup .maplibregl-popup-content {
-  background: rgba(28, 28, 30, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 8px !important;
-  padding: 8px 12px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
-}
-.global-map-popup .maplibregl-popup-close-button {
-  color: rgba(255, 255, 255, 0.4) !important;
-  font-size: 16px !important;
-  right: 4px !important;
-  top: 2px !important;
-}
-.global-map-popup .maplibregl-popup-close-button:hover {
-  color: rgba(255, 255, 255, 0.8) !important;
-  background: transparent !important;
-}
-.global-map-popup .maplibregl-popup-tip {
-  border-top-color: rgba(28, 28, 30, 0.95) !important;
-}
-.maplibregl-ctrl-attrib { display: none !important; }
+/* ============================================================
+   Command Center design tokens
+   The only file (with tokens.ts and dataviz-ramps.ts) allowed
+   to contain raw color literals.
+   ============================================================ */
 
-/* Smooth position interpolation for flight/satellite markers */
-.maplibregl-marker {
-  transition: transform 2s ease-out !important;
-}
+@theme {
+  /* Surfaces */
+  --color-bg-0: #131316;
+  --color-bg-1: #1a1a1e;
+  --color-well: #141416;
+  --color-surface-2: #2a2a30;
+  --color-surface-3: #34343b;
 
-/* Custom scrollbar for panels */
-.styled-scrollbar::-webkit-scrollbar { width: 4px; }
-.styled-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.styled-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-.styled-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+  /* Text tiers */
+  --color-text-1: #f0f0ee;
+  --color-text-2: rgba(235, 235, 235, 0.64);
+  --color-text-3: rgba(235, 235, 235, 0.42);
+
+  /* Accent ramp */
+  --color-accent-300: #a9c1d9;
+  --color-accent-400: #8aa7c3;
+  --color-accent-500: #6b8aab;
+  --color-accent-600: #54708e;
+
+  /* Semantic status */
+  --color-ok: #5fce8f;
+  --color-warn: #e6b455;
+  --color-critical: #e0564d;
+  --color-info: #5cb8c9;
+  --color-live: #ff5f57;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
 
 :root {
-  --background: #1c1c1e;
-  --surface: #252528;
-  --surface-hover: #2c2c30;
-  --foreground: #ebebeb;
-  --foreground-secondary: rgba(235, 235, 235, 0.5);
-  --foreground-tertiary: rgba(235, 235, 235, 0.3);
-  --accent: #6b8aab;
-  --accent-hover: #7d9bbc;
+  /* Legacy aliases kept so unswept call sites keep working */
+  --background: var(--color-bg-0);
+  --surface: #232329;
+  --surface-hover: var(--color-surface-2);
+  --foreground: var(--color-text-1);
+  --foreground-secondary: var(--color-text-2);
+  --foreground-tertiary: var(--color-text-3);
+  --accent: var(--color-accent-500);
+  --accent-hover: var(--color-accent-400);
   --border: rgba(255, 255, 255, 0.06);
   --border-hover: rgba(255, 255, 255, 0.1);
+
+  --accent-glow: rgba(107, 138, 171, 0.3);
+
+  /* Materials */
+  --grad-card: linear-gradient(180deg, #232329 0%, #1c1c20 100%);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --inset-card: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --inset-well: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+  --border-card: rgba(255, 255, 255, 0.06);
+  --border-well: rgba(255, 255, 255, 0.03);
+  --glass-bg: rgba(19, 19, 22, 0.72);
+
+  /* Radii */
+  --radius-card: 20px;
+  --radius-chip: 14px;
+  --radius-inner: 10px;
+
+  /* Motion */
+  --motion-instant: 120ms;
+  --motion-standard: 300ms;
+  --motion-data: 600ms;
+  --motion-scene: 400ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.7%, 0.968 43.2%, 0.99 49.4%, 1.003 58.9%, 1 100%);
+
+  /* Typography: container-query fluid scale (WidgetContainer sets container-type) */
+  --type-label: clamp(12px, 2.4cqi, 15px);
+  --type-body: clamp(13px, 2.8cqi, 17px);
+  --type-value: clamp(18px, 6cqi, 44px);
+  --type-hero: clamp(40px, 16cqi, 120px);
+  --tracking-caps: 0.14em;
+
+  /* Scene (driven by AmbianceProvider) */
+  --scene-dim: 0;
+  --scene-saturation: 1;
+
+  --tv-scale: 1;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html.display-mode {
+  --tv-scale: 1.15;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  background: var(--color-bg-0);
+  color: var(--color-text-1);
+  font-family: var(--font-sans);
+  font-size: calc(100% * var(--tv-scale));
+  overflow: hidden;
+}
+
+/* Numerals are always tabular in mono contexts */
+.font-mono,
+code,
+kbd {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Type utilities */
+.type-label {
+  font-size: var(--type-label);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--color-text-3);
+}
+.type-body {
+  font-size: var(--type-body);
+}
+.type-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--type-value);
+  font-weight: 500;
+}
+.type-hero {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--type-hero);
+  font-weight: 200;
+}
+
+/* ============================================================
+   Materials
+   ============================================================ */
+
+.material-card {
+  position: relative;
+  background: var(--grad-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--inset-card), var(--shadow-card);
+  overflow: hidden;
+}
+
+.material-well {
+  position: relative;
+  background: var(--color-well);
+  border: 1px solid var(--border-well);
+  border-radius: var(--radius-card);
+  box-shadow: var(--inset-well);
+  overflow: hidden;
+}
+
+.glass-chip {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-chip);
+}
+
+/* Legacy class names mapped onto the new materials */
+.widget-glass {
+  position: relative;
+  background: var(--grad-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--inset-card), var(--shadow-card);
+  overflow: hidden;
+}
+.widget-glass-map {
+  position: relative;
+  background: var(--color-well);
+  border: 1px solid var(--border-well);
+  border-radius: var(--radius-card);
+  box-shadow: var(--inset-well);
   overflow: hidden;
 }
 
 /* ============================================================
-   Background themes — warm muted variations
+   Background themes: distinct ambient washes over bg-0
    ============================================================ */
 
 .bg-theme-deep-space {
-  background: #1c1c1e;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(107, 138, 171, 0.06), transparent 60%),
+    var(--color-bg-0);
 }
-
 .bg-theme-midnight {
-  background: #1a1a1e;
+  background:
+    radial-gradient(100% 80% at 80% 100%, rgba(99, 102, 241, 0.05), transparent 65%),
+    #101014;
 }
-
 .bg-theme-aurora {
-  background: #1c1e1c;
+  background:
+    radial-gradient(110% 85% at 0% 100%, rgba(45, 212, 191, 0.05), transparent 60%),
+    var(--color-bg-0);
 }
-
 .bg-theme-ember {
-  background: #1e1c1a;
+  background:
+    radial-gradient(120% 70% at 50% 100%, rgba(224, 122, 72, 0.05), transparent 60%),
+    var(--color-bg-0);
 }
-
 .bg-theme-ocean {
-  background: #1a1c1e;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(56, 130, 180, 0.06), transparent 65%),
+    var(--color-bg-0);
 }
-
 .bg-theme-slate {
-  background: #1e1e1e;
+  background: var(--color-bg-0);
 }
 
-/* ============================================================
-   Widget card container — solid dark surface, no glass
-   ============================================================ */
-.widget-glass {
-  position: relative;
-  background: var(--surface);
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-/* Map and video containers — darker surface, tighter radius */
-.widget-glass-map {
-  position: relative;
-  background: #1a1a1c;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-}
-
-/* ============================================================
-   Widget grid — absolute positioning like Swift ZStack+offset
-   ============================================================ */
-.widget-grid {
+/* Film grain overlay to prevent flat-black banding on the TV */
+.grain-overlay {
   position: absolute;
   inset: 0;
-  padding: 16px;
-  z-index: 1;
-  touch-action: pan-x pan-y;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ============================================================
-   Display toolbar
+   Ambient + transactional motion
    ============================================================ */
-.display-toolbar {
+
+@keyframes cc-breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-ok);
+  animation: cc-breathe 2.4s var(--ease-in-out) infinite;
+}
+.live-dot--live {
+  background: var(--color-live);
+}
+
+@keyframes cc-data-pulse {
+  0% { filter: brightness(1); }
+  30% { filter: brightness(1.18); }
+  100% { filter: brightness(1); }
+}
+.data-pulse {
+  animation: cc-data-pulse 500ms var(--ease-out) 1;
+}
+
+@keyframes cc-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-enter {
+  animation: cc-enter 450ms var(--ease-out) both;
+}
+
+@keyframes cc-list-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.list-enter {
+  animation: cc-list-in 350ms var(--ease-out) both;
+}
+
+@keyframes cc-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.shake {
+  animation: cc-shake 240ms var(--ease-in-out) 2;
+}
+
+@keyframes cc-ring-pulse {
+  from { transform: scale(0.5); opacity: 0.8; }
+  to { transform: scale(2.2); opacity: 0; }
+}
+.ring-pulse {
+  animation: cc-ring-pulse 1.2s var(--ease-out) 3;
+}
+
+@keyframes cc-glow-sweep {
+  from { --cc-glow-angle: 0deg; }
+  to { --cc-glow-angle: 360deg; }
+}
+@property --cc-glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.moment-glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--cc-glow-angle),
+    transparent 0deg,
+    var(--color-accent-300) 40deg,
+    transparent 90deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: cc-glow-sweep 2.5s linear 1;
+}
+
+/* Auto-rotate progress hairline along the top edge */
+@keyframes cc-rotate-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.rotate-hairline {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
+  height: 3px;
+  z-index: 40;
+  background: var(--color-accent-500);
+  opacity: 0.5;
+  transform-origin: left;
+  animation: cc-rotate-progress linear 1 both;
+}
+
+/* ============================================================
+   Display shell
+   ============================================================ */
+
+.display-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 52;
   opacity: 0;
-  transition: opacity 0.25s ease-in-out;
+  transition: opacity 0.25s var(--ease-in-out);
 }
 @media (hover: hover) {
-  .display-toolbar-zone:hover + .display-toolbar,
+  .display-toolbar-zone:hover ~ .display-toolbar,
   .display-toolbar:hover {
     opacity: 1;
   }
@@ -149,16 +356,65 @@ body {
   z-index: 51;
 }
 
+.night-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  background: #000;
+  opacity: var(--scene-dim);
+  transition: opacity 60s linear;
+}
+
+/* Burn-in orbit: the grid root receives 2px offsets, tweened slowly */
+.burnin-orbit {
+  transition: transform 60s linear;
+  will-change: transform;
+}
+
+/* View-transition page crossfade */
+@keyframes cc-page-out {
+  to { opacity: 0; transform: translateX(-24px); }
+}
+@keyframes cc-page-in {
+  from { opacity: 0; transform: translateX(24px); }
+}
+::view-transition-old(cc-page) {
+  animation: cc-page-out 350ms var(--ease-in-out) both;
+}
+::view-transition-new(cc-page) {
+  animation: cc-page-in 350ms var(--ease-in-out) both;
+}
+
 /* ============================================================
-   Page indicator pill
+   Widget grid
    ============================================================ */
+.widget-grid {
+  position: absolute;
+  inset: 0;
+  padding: 16px;
+  z-index: 1;
+  touch-action: pan-x pan-y;
+}
+
+/* Page indicator dots */
 .page-indicator {
   display: flex;
   gap: 8px;
-  padding: 8px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  align-items: center;
+}
+.page-dot {
+  width: 6px;
+  height: 6px;
   border-radius: 9999px;
+  background: var(--color-text-3);
+  opacity: 0.5;
+  transition: all var(--motion-standard) var(--ease-out);
+}
+.page-dot--active {
+  background: var(--color-accent-400);
+  opacity: 1;
+  transform: scale(1.25);
 }
 
 /* ============================================================
@@ -166,15 +422,45 @@ body {
    ============================================================ */
 @keyframes eocFlash {
   0%, 100% { border-color: transparent; }
-  50% { border-color: rgba(239, 68, 68, 0.6); }
+  50% { border-color: rgba(224, 86, 77, 0.6); }
 }
-
 .eoc-flash {
-  animation: eocFlash 0.5s ease-in-out 3;
+  animation: eocFlash 0.5s var(--ease-in-out) 3;
 }
 
 /* ============================================================
-   Hide scrollbar utility
+   MapLibre chrome
+   ============================================================ */
+.global-map-popup .maplibregl-popup-content {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-card) !important;
+  border-radius: var(--radius-inner) !important;
+  padding: 8px 12px !important;
+  box-shadow: var(--shadow-card) !important;
+}
+.global-map-popup .maplibregl-popup-close-button {
+  color: var(--color-text-3) !important;
+  font-size: 16px !important;
+  right: 4px !important;
+  top: 2px !important;
+}
+.global-map-popup .maplibregl-popup-close-button:hover {
+  color: var(--color-text-1) !important;
+  background: transparent !important;
+}
+.global-map-popup .maplibregl-popup-tip {
+  border-top-color: var(--glass-bg) !important;
+}
+.maplibregl-ctrl-attrib { display: none !important; }
+
+/* Smooth position interpolation for flight/satellite markers */
+.maplibregl-marker {
+  transition: transform 2s ease-out !important;
+}
+
+/* ============================================================
+   Scrollbars: one treatment
    ============================================================ */
 .scrollbar-hide {
   -ms-overflow-style: none;
@@ -184,64 +470,38 @@ body {
   display: none;
 }
 
-.scrollbar-thin {
+.scrollbar-thin,
+.styled-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.06) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
 }
-.scrollbar-thin::-webkit-scrollbar {
-  width: 3px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-/* ============================================================
-   Scrollbar styling — warm neutral
-   ============================================================ */
-::-webkit-scrollbar {
+.scrollbar-thin::-webkit-scrollbar,
+.styled-scrollbar::-webkit-scrollbar {
   width: 4px;
-  height: 4px;
 }
-
-::-webkit-scrollbar-track {
+.scrollbar-thin::-webkit-scrollbar-track,
+.styled-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.06);
+.scrollbar-thin::-webkit-scrollbar-thumb,
+.styled-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 2px;
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.12);
+.scrollbar-thin::-webkit-scrollbar-thumb:hover,
+.styled-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 /* ============================================================
-   Leaflet dark mode overrides
+   Reduced motion: collapse everything to instant
    ============================================================ */
-.leaflet-container {
-  background: #1c1c1e !important;
-}
-
-.leaflet-control-attribution {
-  display: none !important;
-}
-
-/* ============================================================
-   Ticker animation
-   ============================================================ */
-@keyframes ticker {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
-}
-
-.animate-ticker {
-  animation: ticker 30s linear infinite;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

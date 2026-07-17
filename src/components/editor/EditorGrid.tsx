@@ -14,11 +14,12 @@ interface EditorGridProps {
 type DragMode = 'move' | 'resize';
 
 export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps) {
-  const { pages, currentPageIndex, deleteWidget, moveWidget, updateWidget } = useAppState();
+  const { pages, currentPageIndex, deleteWidget, moveWidget, resizeWidgetTo } = useAppState();
   const currentPage = pages[currentPageIndex];
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Drag state
+  const [rejectedWidgetId, setRejectedWidgetId] = useState<string | null>(null);
   const [dragWidgetId, setDragWidgetId] = useState<string | null>(null);
   const [dragMode, setDragMode] = useState<DragMode>('move');
   const [dragTarget, setDragTarget] = useState<{ col: number; row: number } | null>(null);
@@ -111,9 +112,16 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
       if (dragMode === 'move' && dragTarget) {
         moveWidget(dragWidgetId, { column: dragTarget.col, row: dragTarget.row });
       } else if (dragMode === 'resize' && resizePreview) {
-        updateWidget(dragWidgetId, {
-          size: { columns: resizePreview.cols, rows: resizePreview.rows },
+        // Same collision + bounds rules as move; shake on rejection
+        const ok = resizeWidgetTo(dragWidgetId, {
+          columns: resizePreview.cols,
+          rows: resizePreview.rows,
         });
+        if (!ok) {
+          const id = dragWidgetId;
+          setRejectedWidgetId(id);
+          setTimeout(() => setRejectedWidgetId(prev => (prev === id ? null : prev)), 500);
+        }
       }
     }
     setDragWidgetId(null);
@@ -121,7 +129,7 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
     setResizePreview(null);
     dragStartPos.current = null;
     setTimeout(() => { isDragging.current = false; }, 0);
-  }, [dragWidgetId, dragMode, dragTarget, resizePreview, moveWidget, updateWidget]);
+  }, [dragWidgetId, dragMode, dragTarget, resizePreview, moveWidget, resizeWidgetTo]);
 
   if (!currentPage) return null;
 
@@ -211,7 +219,7 @@ export function EditorGrid({ selectedWidgetId, onSelectWidget }: EditorGridProps
                 isSelected
                   ? 'ring-2 ring-[#6b8aab] ring-offset-1 ring-offset-transparent'
                   : 'hover:ring-1 hover:ring-white/20'
-              } ${isBeingDragged ? 'opacity-40' : 'opacity-100'}`}
+              } ${isBeingDragged ? 'opacity-40' : 'opacity-100'} ${widget.id === rejectedWidgetId ? 'shake' : ''}`}
               style={{
                 gridColumn: `${widget.position.column + 1} / span ${displayCols}`,
                 gridRow: `${widget.position.row + 1} / span ${displayRows}`,
