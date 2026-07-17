@@ -121,6 +121,11 @@ def parse_kcpd_record(record: dict) -> dict | None:
             "longitude": lng,
             "address": address,
             "detected_at": detected_at,
+            # KCPD records are historical crime reports published days after
+            # the fact; they are never operationally active. Setting
+            # resolved_at at insert also prevents the reopen-on-upsert flap
+            # every poll cycle.
+            "resolved_at": detected_at,
             "raw_data": record,
         }
     except Exception:
