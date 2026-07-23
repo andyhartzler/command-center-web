@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAllowedProxyHost } from './channels';
 
-// In-memory cache for resolved URLs
+// In-memory cache for resolved URLs.
 const urlCache: Record<string, { url: string; ts: number }> = {};
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+// Per-channel cache TTL. KSHB/KMBC resolve to stable uplynk URLs, so a long
+// cache is fine. WDAF (Nexstar/Anvato via lura) hands back a MASTER manifest
+// whose token expires in ~90s: caching it for 10 min served a dead token on
+// every play (and the widget's re-resolve-on-error kept getting the same
+// stale cache), which is why FOX 4 sat "Offline". Keep WDAF well under the
+// token window so every resolve — initial and self-heal — yields a live token.
+const CACHE_TTL_BY_CHANNEL: Record<string, number> = {
+  wdaf: 45 * 1000,        // under the ~90s lura token window
+  kshb: 10 * 60 * 1000,
+  kmbc: 10 * 60 * 1000,
+};
+const DEFAULT_CACHE_TTL = 10 * 60 * 1000;
 
 // Known stable channel IDs (hardcoded fallbacks)
 const KMBC_CHANNEL_ID = '47d92d1bd8e44e2383563530c2a305fd';
@@ -104,9 +115,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing channel param' }, { status: 400 });
   }
 
-  // Return cached URL if fresh
+  // Return cached URL if fresh (per-channel TTL: WDAF's token dies in ~90s)
+  const ttl = CACHE_TTL_BY_CHANNEL[channel] ?? DEFAULT_CACHE_TTL;
   const cached = urlCache[channel];
-  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+  if (cached && Date.now() - cached.ts < ttl) {
     return NextResponse.json({ url: cached.url, cached: true });
   }
 

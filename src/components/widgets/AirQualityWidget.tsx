@@ -27,15 +27,18 @@ const POLL_MS = 300_000;
 
 function PollutantBox({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="min-w-0 flex flex-col items-center gap-0.5 rounded-[var(--radius-inner)] bg-white/[0.04] px-1.5 py-1.5">
+    <div className="min-w-0 flex flex-col items-center justify-center gap-1 rounded-[var(--radius-inner)] bg-white/[0.04] px-1 py-2">
       <span
-        className="text-[12px] uppercase leading-none"
-        style={{ color: 'var(--color-text-3)', letterSpacing: 'var(--tracking-caps)' }}
+        className="text-[11px] uppercase leading-none whitespace-nowrap"
+        style={{ color: 'var(--color-text-3)', letterSpacing: '0.04em' }}
       >
         {label}
       </span>
-      <span className="font-mono text-[13px] leading-none" style={{ color: 'var(--color-text-2)' }}>
-        {value !== null ? value.toFixed(1) : '--'}
+      <span className="font-mono text-[15px] font-medium leading-none" style={{ color: 'var(--color-text-1)' }}>
+        {value !== null ? Math.round(value) : '--'}
+      </span>
+      <span className="text-[9px] leading-none" style={{ color: 'var(--color-text-3)' }}>
+        µg/m³
       </span>
     </div>
   );
@@ -104,17 +107,14 @@ export function AirQualityWidget({ config, style }: Props) {
               </span>
             </div>
           </DataPulse>
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <div
-              className="grid gap-1.5"
-              style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))' }}
-            >
+          <div className="flex-1 min-h-0 flex items-center">
+            {/* Four key pollutants, always in one clean row of readable values.
+                (NO₂/SO₂ dropped: they clipped and are rarely the AQI driver.) */}
+            <div className="w-full grid grid-cols-4 gap-1.5">
               <PollutantBox label="PM2.5" value={data.pm2_5} />
               <PollutantBox label="PM10" value={data.pm10} />
               <PollutantBox label="O₃" value={data.ozone} />
               <PollutantBox label="CO" value={data.co} />
-              <PollutantBox label="NO₂" value={data.no2} />
-              <PollutantBox label="SO₂" value={data.so2} />
             </div>
           </div>
         </div>
