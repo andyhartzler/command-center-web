@@ -36,14 +36,17 @@ const toF = (c: number) => (c * 9) / 5 + 32;
 
 function FooterStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 flex flex-col items-center gap-0.5">
+    <div className="min-w-0 flex flex-col items-center gap-1">
       <span
-        className="text-[12px] uppercase leading-none"
-        style={{ color: 'var(--color-text-3)', letterSpacing: 'var(--tracking-caps)' }}
+        className="uppercase leading-none truncate max-w-full"
+        style={{ fontSize: 10, color: 'var(--color-text-3)', letterSpacing: '0.02em' }}
       >
         {label}
       </span>
-      <span className="font-mono text-[13px] leading-none truncate" style={{ color: 'var(--color-text-2)' }}>
+      <span
+        className="font-mono leading-none truncate max-w-full"
+        style={{ fontSize: 14, color: 'var(--color-text-1)' }}
+      >
         {value}
       </span>
     </div>
@@ -122,7 +125,7 @@ export function NestThermostatWidget({ config: _config, style }: Props) {
 
     body =
       ambientC !== null ? (
-        <div className="w-full h-full px-3 pb-1 overflow-hidden">
+        <div className="w-full h-full px-2 py-1 overflow-hidden">
           <ArcGauge
             value={toF(ambientC)}
             min={GAUGE_MIN_F}

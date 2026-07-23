@@ -56,6 +56,29 @@ export function AmbianceProvider() {
     };
   }, [isDisplayMode]);
 
+  // Deploy watchdog: poll the running build id and reload when it changes, so
+  // long-open tabs (the 24/7 wall AND any browser tab) pick up new deploys
+  // within ~30s instead of running stale cached code. Runs in every mode.
+  useEffect(() => {
+    let initial: string | null = null;
+    let done = false;
+    const check = async () => {
+      try {
+        const r = await fetch('/api/version', { cache: 'no-store' });
+        if (!r.ok) return;
+        const { version } = await r.json();
+        if (!version) return;
+        if (initial === null) { initial = version; return; }
+        if (version !== initial && !done) { done = true; location.reload(); }
+      } catch {
+        /* transient network error; retry next tick */
+      }
+    };
+    check();
+    const t = setInterval(check, 30_000);
+    return () => { done = true; clearInterval(t); };
+  }, []);
+
   // Watchdog: 4:30 AM reload in display mode clears any slow leak
   useEffect(() => {
     if (!isDisplayMode) return;

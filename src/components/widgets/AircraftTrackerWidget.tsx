@@ -320,35 +320,35 @@ function TrackerMap({ data, phase, homeAirport }: {
     if (origin) airportDot(origin, false);
     if (dest) airportDot(dest, true);
 
-    // Route arc: flown solid + remaining dotted
+    // Route line ANCHORED to the plane's real position, so the drawn line
+    // always passes through the aircraft. A straight origin->dest split by
+    // percentage floats off the marker because GPS never rides the exact
+    // rhumb line. Flown = origin -> [breadcrumb trail] -> plane (solid);
+    // remaining = plane -> dest (dashed).
     if (flying && origin && dest) {
       const toCoord = ([lat, lon]: [number, number]) => new mapkit.Coordinate(lat, lon);
-      // dynamic import would be overkill; the arc math lives server-side too,
-      // so approximate client-side with a flat interpolation for short GA legs
-      const steps = 48;
-      const arc: Array<[number, number]> = [];
-      for (let i = 0; i <= steps; i++) {
-        const f = i / steps;
-        arc.push([origin.lat + (dest.lat - origin.lat) * f, origin.lon + (dest.lon - origin.lon) * f]);
-      }
-      const progress = (route?.progressPct ?? 0) / 100;
-      const split = Math.round(arc.length * progress);
-      if (split > 1) {
-        m.addOverlay(new mapkit.PolylineOverlay(arc.slice(0, split + 1).map(toCoord), {
+      if (fix) {
+        const trail: Array<[number, number]> =
+          data?.trail && data.trail.length > 1
+            ? data.trail.slice(-30).map(([lat, lon]) => [lat, lon])
+            : [];
+        const flown: Array<[number, number]> = [
+          [origin.lat, origin.lon],
+          ...trail,
+          [fix.lat, fix.lon],
+        ];
+        m.addOverlay(new mapkit.PolylineOverlay(flown.map(toCoord), {
           style: new mapkit.Style({ lineWidth: 2, strokeColor: tokens.accent400, strokeOpacity: 0.9 }),
         }));
+        m.addOverlay(new mapkit.PolylineOverlay([[fix.lat, fix.lon], [dest.lat, dest.lon]].map(toCoord), {
+          style: new mapkit.Style({ lineWidth: 2, strokeColor: tokens.accent400, strokeOpacity: 0.35, lineDash: [4, 6] }),
+        }));
+      } else {
+        // No live fix yet: a faint straight origin->dest guide.
+        m.addOverlay(new mapkit.PolylineOverlay([[origin.lat, origin.lon], [dest.lat, dest.lon]].map(toCoord), {
+          style: new mapkit.Style({ lineWidth: 2, strokeColor: tokens.accent400, strokeOpacity: 0.35, lineDash: [4, 6] }),
+        }));
       }
-      m.addOverlay(new mapkit.PolylineOverlay(arc.slice(Math.max(0, split)).map(toCoord), {
-        style: new mapkit.Style({ lineWidth: 2, strokeColor: tokens.accent400, strokeOpacity: 0.35, lineDash: [4, 6] }),
-      }));
-    }
-
-    // Breadcrumb trail
-    if (flying && data?.trail && data.trail.length > 1) {
-      const pts = data.trail.slice(-20).map(([lat, lon]) => new mapkit.Coordinate(lat, lon));
-      m.addOverlay(new mapkit.PolylineOverlay(pts, {
-        style: new mapkit.Style({ lineWidth: 1.5, strokeColor: tokens.accent300, strokeOpacity: 0.4 }),
-      }));
     }
 
     // The plane
@@ -371,12 +371,16 @@ function TrackerMap({ data, phase, homeAirport }: {
       planeAnnotationRef.current = annotation;
     }
 
-    // Camera framing
+    // Camera framing: include the plane's real position so it is always in
+    // view even when it sits off the straight origin-dest line.
     if (flying && origin && dest) {
-      const latMid = (origin.lat + dest.lat) / 2;
-      const lonMid = (origin.lon + dest.lon) / 2;
-      const latSpan = Math.max(0.4, Math.abs(origin.lat - dest.lat) * 1.7);
-      const lonSpan = Math.max(0.4, Math.abs(origin.lon - dest.lon) * 1.7);
+      const lats = [origin.lat, dest.lat];
+      const lons = [origin.lon, dest.lon];
+      if (fix) { lats.push(fix.lat); lons.push(fix.lon); }
+      const latMid = (Math.min(...lats) + Math.max(...lats)) / 2;
+      const lonMid = (Math.min(...lons) + Math.max(...lons)) / 2;
+      const latSpan = Math.max(0.4, (Math.max(...lats) - Math.min(...lats)) * 1.5);
+      const lonSpan = Math.max(0.4, (Math.max(...lons) - Math.min(...lons)) * 1.5);
       m.setRegionAnimated(
         new mapkit.CoordinateRegion(
           new mapkit.Coordinate(latMid, lonMid),
