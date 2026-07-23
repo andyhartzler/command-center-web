@@ -326,13 +326,13 @@ function TrackerMap({ data, phase, homeAirport }: {
     // rhumb line. Flown = origin -> [breadcrumb trail] -> plane (solid);
     // remaining = plane -> dest (dashed).
     if (flying && origin && dest) {
-      const toCoord = ([lat, lon]: [number, number]) => new mapkit.Coordinate(lat, lon);
+      const toCoord = (c: number[]) => new mapkit.Coordinate(c[0], c[1]);
       if (fix) {
-        const trail: Array<[number, number]> =
+        const trail: number[][] =
           data?.trail && data.trail.length > 1
             ? data.trail.slice(-30).map(([lat, lon]) => [lat, lon])
             : [];
-        const flown: Array<[number, number]> = [
+        const flown: number[][] = [
           [origin.lat, origin.lon],
           ...trail,
           [fix.lat, fix.lon],
