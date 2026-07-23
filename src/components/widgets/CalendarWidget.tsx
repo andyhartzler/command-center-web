@@ -22,10 +22,14 @@ interface CalendarResponse {
   errors?: string[];
   error?: string;
   message?: string;
+  calendarCount?: number;
 }
 
 interface CalendarConfig {
   feeds?: { name: string; url: string }[];
+  /** When true, pull every calendar (owned + shared) from the connected
+   *  Google Workspace account via /api/calendar/google instead of ICS feeds. */
+  googleWorkspace?: boolean;
 }
 
 interface CalendarWidgetProps {
@@ -125,6 +129,7 @@ function EventRow({ event, past }: { event: CalendarEvent; past: boolean }) {
 export function CalendarWidget({ config, style }: CalendarWidgetProps) {
   const now = useSharedClock();
 
+  const googleMode = !!config.googleWorkspace;
   const feeds = config.feeds || [];
   const validFeeds = useMemo(() => feeds.filter(f => f.url && f.url.trim().length > 5), [feeds]);
   const hasFeeds = validFeeds.length > 0;
@@ -141,7 +146,12 @@ export function CalendarWidget({ config, style }: CalendarWidgetProps) {
     return () => clearTimeout(t);
   }, [feedsKey, hasFeeds]);
 
-  const url = debouncedKey ? `/api/calendar?feeds=${encodeURIComponent(debouncedKey)}` : null;
+  // Google Workspace mode pulls every calendar server-side; ICS mode uses feeds.
+  const url = googleMode
+    ? '/api/calendar/google'
+    : debouncedKey
+      ? `/api/calendar?feeds=${encodeURIComponent(debouncedKey)}`
+      : null;
   const { data, phase, isStale, lastUpdated } = usePolledData<CalendarResponse>(url, {
     interval: POLL_INTERVAL,
   });
@@ -173,7 +183,7 @@ export function CalendarWidget({ config, style }: CalendarWidgetProps) {
 
   const nowDate = new Date(now);
 
-  if (!hasFeeds) {
+  if (!hasFeeds && !googleMode) {
     const hasPartialFeeds = feeds.length > 0;
     return (
       <WidgetShell icon={<Calendar size={18} />} title="Calendars" style={style}>
@@ -225,7 +235,9 @@ export function CalendarWidget({ config, style }: CalendarWidgetProps) {
           style={{ borderColor: 'var(--border-card)', borderTopColor: 'var(--color-text-3)' }}
         />
         <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
-          Loading {validFeeds.length} {validFeeds.length === 1 ? 'feed' : 'feeds'}
+          {googleMode
+            ? 'Loading calendars'
+            : `Loading ${validFeeds.length} ${validFeeds.length === 1 ? 'feed' : 'feeds'}`}
         </span>
       </div>
     );
@@ -246,7 +258,9 @@ export function CalendarWidget({ config, style }: CalendarWidgetProps) {
         <Calendar size={20} style={{ color: 'var(--color-text-3)' }} />
         <span className="text-[12px]" style={{ color: 'var(--color-text-3)' }}>No upcoming events</span>
         <span className="font-mono text-[12px]" style={{ color: 'var(--color-text-3)' }}>
-          {validFeeds.length} {validFeeds.length === 1 ? 'feed' : 'feeds'} connected
+          {googleMode
+            ? `${data?.calendarCount ?? ''} calendars connected`.trim()
+            : `${validFeeds.length} ${validFeeds.length === 1 ? 'feed' : 'feeds'} connected`}
         </span>
       </div>
     );
