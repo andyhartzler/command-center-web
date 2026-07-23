@@ -5,8 +5,13 @@ import { useEffect, useState } from 'react';
 // every video widget on the wall (camera, live TV, webcams). Over-budget
 // widgets hold a frozen last-frame / poster state with a PAUSED chip until
 // a slot frees up.
-
-const MAX_ATTACHED_HLS = 2;
+//
+// Only the current page's widgets are mounted (DashboardDisplay renders one
+// page at a time), so the real ceiling is "video tiles on the busiest page."
+// A cap of 2 froze 11 of 13 tiles on the camera page as "Paused"; the wall is
+// a live-video dashboard, so the budget is set high enough that every tile on
+// a page streams continuously and the PAUSED state never engages in practice.
+const MAX_ATTACHED_HLS = 64;
 
 let active = 0;
 const waiters = new Set<() => void>();
