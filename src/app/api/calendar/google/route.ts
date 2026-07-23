@@ -25,6 +25,9 @@ interface CalendarEvent {
 // Fallback palette when a calendar advertises no color.
 const PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
+// Calendars to never surface on the wall (match by summary, case-insensitive).
+const EXCLUDED_CALENDARS = new Set(['rcosts']);
+
 // --- access token (refresh-token grant), cached in-memory until near expiry ---
 let tokenCache: { token: string; exp: number } | null = null;
 
@@ -110,7 +113,9 @@ export async function GET() {
   const timeMin = new Date(now).toISOString();
   const timeMax = new Date(now + WINDOW_DAYS * DAY_MS).toISOString();
 
-  const calendars = list.items.filter(c => !c.deleted);
+  const calendars = list.items.filter(
+    c => !c.deleted && !EXCLUDED_CALENDARS.has((c.summaryOverride || c.summary || '').trim().toLowerCase()),
+  );
   const allEvents: CalendarEvent[] = [];
   const calNames: { name: string; color: string }[] = [];
 
