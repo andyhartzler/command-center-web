@@ -160,26 +160,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// True when an uplynk manifest URL is live-playable (200 + real variants).
-// The `ext` nowcast assets 403 once the newscast ends / the asset expires,
-// which is why FOX-style "prefer ext" made KMBC unreliable.
-async function uplynkPlayable(url: string): Promise<boolean> {
-  try {
-    const r = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
-    });
-    if (!r.ok) return false;
-    const body = await r.text();
-    return body.includes('#EXTM3U');
-  } catch {
-    return false;
-  }
-}
-
-// KMBC 9 (ABC) - Uplynk. The stable CHANNEL feed is KMBC's reliable 24/7
-// stream (always 200); the `ext` nowcast URL is only up during a live
-// newscast and 403s otherwise. Prefer the channel feed; only use ext when it
-// is actually playable right now.
+// KMBC 9 (ABC) - Uplynk. Use the stable 24/7 CHANNEL feed only. The `ext`
+// nowcast asset is only up during a live newscast and 403s the moment it
+// ends — "prefer ext" is exactly what made KMBC flap Offline. The channel
+// feed is the station's continuous simulcast and is always live-playable.
+// We still read the page to pick up whatever channel id it currently
+// advertises, falling back to the known-good id.
 async function resolveKMBC(): Promise<{ url: string } | null> {
   const channelUrl = `https://content.uplynk.com/channel/${KMBC_CHANNEL_ID}.m3u8`;
   try {
@@ -188,24 +174,14 @@ async function resolveKMBC(): Promise<{ url: string } | null> {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
       },
     });
-
     if (res.ok) {
       const html = await res.text();
-      // A live-newscast ext asset is higher quality when it's actually up —
-      // use it only if it validates, otherwise fall through to the channel.
-      const extMatch = html.match(/https:\/\/content\.uplynk\.com\/ext\/[^"'\s]+\.m3u8[^"'\s]*/);
-      if (extMatch) {
-        const extUrl = extMatch[0].replace(/&amp;/g, '&').replace(/\\u0026/g, '&');
-        if (await uplynkPlayable(extUrl)) return { url: extUrl };
-      }
-      // Prefer whatever channel URL the page advertises, else the known-good ID.
       const channelMatch = html.match(/https:\/\/content\.uplynk\.com\/channel\/[^"'\s]+\.m3u8/);
       if (channelMatch) return { url: channelMatch[0].replace(/&amp;/g, '&') };
     }
   } catch (err) {
     console.error('[LiveTV] KMBC scrape error', err);
   }
-
   return { url: channelUrl };
 }
 
