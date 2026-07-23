@@ -191,7 +191,9 @@ export function CameraWidget({ config }: CameraWidgetProps) {
   }
 
   const paused = !slotGranted;
-  const showConnecting = !paused && playback === 'connecting' && !hasPlayed;
+  // Transient connecting/reconnecting overlays are gone: the <video> fades in
+  // when it starts and holds its last frame while rebuffering, so no status
+  // text spams the wall. Only a genuinely dead feed (never played) shows one.
   const showOffline = !paused && playback === 'offline' && !hasPlayed;
 
   return (
@@ -209,21 +211,14 @@ export function CameraWidget({ config }: CameraWidgetProps) {
         autoPlay
       />
 
-      {/* Connecting / offline overlays instead of a silent black rectangle */}
-      {(showConnecting || showOffline || paused) && (
+      {/* Only a genuinely offline feed shows a chip; no connecting spam */}
+      {showOffline && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span
             className="glass-chip px-3 py-1.5 font-mono text-[12px] uppercase"
-            style={{
-              letterSpacing: 'var(--tracking-caps)',
-              color: paused
-                ? 'var(--color-text-3)'
-                : showOffline
-                  ? 'var(--color-critical)'
-                  : 'var(--color-text-2)',
-            }}
+            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-critical)' }}
           >
-            {paused ? 'Paused' : showOffline ? 'Offline, retrying' : 'Connecting'}
+            Offline
           </span>
         </div>
       )}
@@ -241,14 +236,6 @@ export function CameraWidget({ config }: CameraWidgetProps) {
             {config.label || 'Camera'}
           </span>
         </div>
-        {playback === 'reconnecting' && !paused && (
-          <span
-            className="glass-chip px-2.5 py-1.5 font-mono text-[12px] uppercase"
-            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-warn)' }}
-          >
-            Reconnecting
-          </span>
-        )}
       </div>
     </div>
   );

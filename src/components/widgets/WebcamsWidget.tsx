@@ -273,16 +273,8 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
   };
 
   if (!list.data && list.phase === 'loading') {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-black">
-        <span
-          className="glass-chip px-3 py-1.5 font-mono text-[12px] uppercase"
-          style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-text-2)' }}
-        >
-          Connecting
-        </span>
-      </div>
-    );
+    // Loading the camera list: plain black, no "Connecting" text spam.
+    return <div className="w-full h-full bg-black" />;
   }
 
   if (!list.data) {
@@ -294,7 +286,7 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
           className="glass-chip px-3 py-1.5 font-mono text-[12px] uppercase"
           style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-critical)' }}
         >
-          Offline, retrying
+          Offline
         </span>
       </div>
     );
@@ -310,9 +302,9 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
   }
 
   const paused = !slotGranted;
-  const showConnecting = !paused && playback === 'connecting' && !hasPlayedRef.current;
+  // Connecting/reconnecting overlays removed to keep the wall clean; only a
+  // genuinely offline cam (never played) shows a chip.
   const showOffline = !paused && playback === 'offline' && !hasPlayedRef.current;
-  const retrying = !paused && (playback === 'reconnecting' || stream.isStale);
 
   // Check if this is a KC Scout camera (has corridorFilter or known scout IDs)
   const isScout = config.corridorFilter.length > 0 || cameras.some(c => c.streamFile.includes('customInstance'));
@@ -350,21 +342,14 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
         </>
       )}
 
-      {/* Connecting / offline / paused overlays instead of silent black */}
-      {(showConnecting || showOffline || paused) && (
+      {/* Only a genuinely offline cam shows a chip; no connecting spam */}
+      {showOffline && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span
             className="glass-chip px-3 py-1.5 font-mono text-[12px] uppercase"
-            style={{
-              letterSpacing: 'var(--tracking-caps)',
-              color: paused
-                ? 'var(--color-text-3)'
-                : showOffline
-                  ? 'var(--color-critical)'
-                  : 'var(--color-text-2)',
-            }}
+            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-critical)' }}
           >
-            {paused ? 'Paused' : showOffline ? 'Offline, retrying' : 'Connecting'}
+            Offline
           </span>
         </div>
       )}
@@ -415,14 +400,6 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
             {camera?.name || 'Camera'}
           </span>
         </div>
-        {retrying && !showOffline && (
-          <span
-            className="glass-chip px-2.5 py-1.5 font-mono text-[12px] uppercase shrink-0"
-            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-warn)' }}
-          >
-            Reconnecting
-          </span>
-        )}
       </div>
 
       {/* Bottom-right: rotation + position */}

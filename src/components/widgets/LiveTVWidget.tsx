@@ -264,7 +264,8 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
 
   const paused = !slotGranted;
   const isResolving = !!currentChannel.resolver && !currentUrl;
-  const showConnecting = !paused && (isResolving || playback === 'connecting');
+  // Connecting/reconnecting overlays removed to keep the wall clean; only a
+  // genuinely offline channel shows a chip.
   const showOffline = !paused && !isResolving && playback === 'offline';
 
   return (
@@ -280,21 +281,14 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
         autoPlay
       />
 
-      {/* Connecting / offline overlays instead of a silent black rectangle */}
-      {(showConnecting || showOffline || paused) && (
+      {/* Only a genuinely offline channel shows a chip; no connecting spam */}
+      {showOffline && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span
             className="glass-chip px-3 py-1.5 font-mono text-[12px] uppercase"
-            style={{
-              letterSpacing: 'var(--tracking-caps)',
-              color: paused
-                ? 'var(--color-text-3)'
-                : showOffline
-                  ? 'var(--color-critical)'
-                  : 'var(--color-text-2)',
-            }}
+            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-critical)' }}
           >
-            {paused ? 'Paused' : showOffline ? 'Offline, retrying' : 'Connecting'}
+            Offline
           </span>
         </div>
       )}
@@ -320,14 +314,6 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
             style={{ color: 'var(--color-text-3)' }}
           />
         </button>
-        {playback === 'reconnecting' && !paused && (
-          <span
-            className="glass-chip px-2.5 py-1.5 font-mono text-[12px] uppercase"
-            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-warn)' }}
-          >
-            Reconnecting
-          </span>
-        )}
       </div>
 
       {/* Bottom-right: mute toggle on hover */}
