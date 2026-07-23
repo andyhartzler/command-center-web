@@ -1,10 +1,10 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { Wind } from 'lucide-react';
 import type { AirQualityConfig, WidgetStyle } from '@/types/widget';
 import { usePolledData } from '@/hooks/usePolledData';
 import { WidgetShell, Freshness } from './WidgetShell';
-import { TickingNumber } from '@/components/motion/TickingNumber';
 import { DataPulse } from '@/components/motion/DataPulse';
 import { AQI_RAMP, rampColor, rampLabel } from '@/lib/dataviz-ramps';
 
@@ -25,19 +25,72 @@ interface Props {
 
 const POLL_MS = 300_000;
 
+// Scale-to-fit wrapper: the content is laid out once at a fixed natural size,
+// then uniformly scaled (contain) to whatever the widget cell is. This is the
+// pre-overhaul guarantee — nothing ever overlaps, clips, or squishes onto
+// itself no matter how the tile is resized; it just gets bigger or smaller.
+function FitBox({ children }: { children: React.ReactNode }) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0);
+
+  useEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+    const measure = () => {
+      // offsetWidth/Height are the untransformed natural size, so measuring
+      // the inner block never fights the transform we apply to it.
+      const nw = inner.offsetWidth;
+      const nh = inner.offsetHeight;
+      const ow = outer.clientWidth;
+      const oh = outer.clientHeight;
+      if (!nw || !nh || !ow || !oh) return;
+      // Small negative inset so it never kisses the edges; cap upscale so a
+      // huge tile stays tasteful rather than cartoonishly large.
+      const s = Math.min(ow / nw, oh / nh) * 0.98;
+      setScale(Math.max(0.2, Math.min(s, 2.4)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(outer);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={outerRef} className="w-full h-full flex items-center justify-center overflow-hidden">
+      <div
+        ref={innerRef}
+        style={{
+          transform: `scale(${scale || 1})`,
+          transformOrigin: 'center',
+          opacity: scale ? 1 : 0,
+          transition: 'opacity 200ms var(--ease-out)',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function PollutantBox({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="min-w-0 flex flex-col items-center justify-center gap-1 rounded-[var(--radius-inner)] bg-white/[0.04] px-1 py-2">
+    <div
+      className="flex flex-col items-center justify-center gap-1 rounded-[var(--radius-inner)] bg-white/[0.04]"
+      style={{ width: 52, paddingTop: 8, paddingBottom: 8 }}
+    >
       <span
         className="text-[11px] uppercase leading-none whitespace-nowrap"
-        style={{ color: 'var(--color-text-3)', letterSpacing: '0.04em' }}
+        style={{ color: 'var(--color-text-3)', letterSpacing: '0.03em' }}
       >
         {label}
       </span>
-      <span className="font-mono text-[15px] font-medium leading-none" style={{ color: 'var(--color-text-1)' }}>
+      <span className="font-mono text-[16px] font-medium leading-none" style={{ color: 'var(--color-text-1)' }}>
         {value !== null ? Math.round(value) : '--'}
       </span>
-      <span className="text-[9px] leading-none" style={{ color: 'var(--color-text-3)' }}>
+      <span className="text-[9px] leading-none whitespace-nowrap" style={{ color: 'var(--color-text-3)' }}>
         µg/m³
       </span>
     </div>
@@ -86,39 +139,47 @@ export function AirQualityWidget({ config, style }: Props) {
           : 'var(--border-card)';
 
     body = (
-      <div className="w-full h-full px-3.5 pb-2.5 pt-0.5 overflow-hidden">
+      <FitBox>
         <div
-          className="w-full h-full flex flex-col gap-2 rounded-[var(--radius-inner)] p-2.5 overflow-hidden"
-          style={{ border: `1px solid ${borderTint}`, transition: 'border-color 400ms var(--ease-out)' }}
+          className="rounded-[var(--radius-inner)] p-3.5"
+          style={{
+            width: 236,
+            border: `1px solid ${borderTint}`,
+            transition: 'border-color 400ms var(--ease-out)',
+          }}
         >
-          <DataPulse signature={lastUpdated} className="flex items-center gap-3 shrink-0 min-h-0">
-            <span style={{ color }}>
-              <TickingNumber value={aqi} className="type-value leading-none" />
-            </span>
-            <div className="min-w-0 flex flex-col gap-0.5">
+          <DataPulse signature={lastUpdated} className="flex flex-col gap-3">
+            {/* AQI headline: big number + category */}
+            <div className="flex items-center gap-3">
               <span
-                className="text-[12px] uppercase leading-none"
-                style={{ color: 'var(--color-text-3)', letterSpacing: 'var(--tracking-caps)' }}
+                className="font-semibold leading-none tabular-nums"
+                style={{ color, fontSize: 46 }}
               >
-                AQI
+                {aqi}
               </span>
-              <span className="text-[13px] leading-snug" style={{ color }}>
-                {category}
-              </span>
+              <div className="flex flex-col gap-1">
+                <span
+                  className="text-[11px] uppercase leading-none"
+                  style={{ color: 'var(--color-text-3)', letterSpacing: '0.06em' }}
+                >
+                  AQI
+                </span>
+                <span className="text-[14px] font-medium leading-tight" style={{ color }}>
+                  {category}
+                </span>
+              </div>
             </div>
-          </DataPulse>
-          <div className="flex-1 min-h-0 flex items-center">
-            {/* Four key pollutants, always in one clean row of readable values.
-                (NO₂/SO₂ dropped: they clipped and are rarely the AQI driver.) */}
-            <div className="w-full grid grid-cols-4 gap-1.5">
+
+            {/* Four key pollutants in one fixed row (scaled as a unit above). */}
+            <div className="flex gap-1.5 justify-between">
               <PollutantBox label="PM2.5" value={data.pm2_5} />
               <PollutantBox label="PM10" value={data.pm10} />
               <PollutantBox label="O₃" value={data.ozone} />
               <PollutantBox label="CO" value={data.co} />
             </div>
-          </div>
+          </DataPulse>
         </div>
-      </div>
+      </FitBox>
     );
   }
 
