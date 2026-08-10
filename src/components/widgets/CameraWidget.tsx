@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { useHlsSlot } from '@/lib/hlsBudget';
+import { useStreamGuard } from '@/lib/streamGuard';
 import type { CameraConfig, WidgetStyle } from '@/types/widget';
 
 interface CameraWidgetProps {
@@ -9,21 +10,15 @@ interface CameraWidgetProps {
   style: WidgetStyle;
 }
 
-type PlaybackState = 'connecting' | 'playing' | 'reconnecting' | 'offline';
-
 export function CameraWidget({ config }: CameraWidgetProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const stallTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTimeRef = useRef(0);
-  const stallCountRef = useRef(0);
-  const hasPlayedRef = useRef(false);
+  const driftTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // State-based remount: bumping the counter re-keys the <video> element and
   // re-runs the attach effect, replacing the old hlsrestart custom-event hack.
   const [instance, setInstance] = useState(0);
-  const [playback, setPlayback] = useState<PlaybackState>('connecting');
   // Drives the 400ms fade-from-black on the first playing event per URL
   const [hasPlayed, setHasPlayed] = useState(false);
 
@@ -32,8 +27,6 @@ export function CameraWidget({ config }: CameraWidgetProps) {
   // Reset the first-frame fade whenever the source changes
   useEffect(() => {
     setHasPlayed(false);
-    hasPlayedRef.current = false;
-    setPlayback('connecting');
   }, [config.url]);
 
   const scheduleRestart = useCallback((delayMs: number) => {
@@ -54,29 +47,13 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     video.play().catch(() => {});
   }, []);
 
-  // Bind playback truth to the actual video element
+  // First-frame fade trigger
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !config.url || !slotGranted) return;
-
-    const onPlaying = () => {
-      hasPlayedRef.current = true;
-      setHasPlayed(true);
-      setPlayback('playing');
-    };
-    const onBuffering = () => {
-      setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
-    };
-
+    const onPlaying = () => setHasPlayed(true);
     video.addEventListener('playing', onPlaying);
-    video.addEventListener('waiting', onBuffering);
-    video.addEventListener('stalled', onBuffering);
-
-    return () => {
-      video.removeEventListener('playing', onPlaying);
-      video.removeEventListener('waiting', onBuffering);
-      video.removeEventListener('stalled', onBuffering);
-    };
+    return () => video.removeEventListener('playing', onPlaying);
   }, [config.url, slotGranted, instance]);
 
   useEffect(() => {
@@ -113,48 +90,31 @@ export function CameraWidget({ config }: CameraWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            setPlayback(hasPlayedRef.current ? 'reconnecting' : 'offline');
+            // Fast path: retry in place; the stream guard escalates to a
+            // full remount (with backoff) if frames still don't advance.
             setTimeout(() => {
               hls.startLoad();
               seekToLive();
             }, 3000);
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
             hls.recoverMediaError();
           } else {
             // Unrecoverable: destroy and remount the player via key counter
             hls.destroy();
             hlsRef.current = null;
-            setPlayback('offline');
             scheduleRestart(5000);
           }
         }
       });
       hlsRef.current = hls;
 
-      // Stall detection: every 5 seconds, check if playback is advancing
-      stallCountRef.current = 0;
-      lastTimeRef.current = 0;
-      stallTimerRef.current = setInterval(() => {
+      // Live-edge drift check (frame-advance stalls are the stream guard's
+      // job; drift while playing is HLS-specific and stays here)
+      driftTimerRef.current = setInterval(() => {
         if (!video || video.paused) return;
-        const currentTime = video.currentTime;
-        if (currentTime === lastTimeRef.current && currentTime > 0) {
-          stallCountRef.current++;
-          setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
-          if (stallCountRef.current >= 2) {
-            // Stalled for 10+ seconds, seek to live edge
-            seekToLive();
-            stallCountRef.current = 0;
-          }
-        } else {
-          stallCountRef.current = 0;
-        }
-        lastTimeRef.current = currentTime;
-
-        // Also check if we've drifted too far behind the live edge
         if (video.buffered.length > 0) {
           const liveEdge = video.buffered.end(video.buffered.length - 1);
-          if (liveEdge - currentTime > 15) {
+          if (liveEdge - video.currentTime > 15) {
             seekToLive();
           }
         }
@@ -167,9 +127,9 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     }
 
     return () => {
-      if (stallTimerRef.current) {
-        clearInterval(stallTimerRef.current);
-        stallTimerRef.current = null;
+      if (driftTimerRef.current) {
+        clearInterval(driftTimerRef.current);
+        driftTimerRef.current = null;
       }
       if (restartTimerRef.current) {
         clearTimeout(restartTimerRef.current);
@@ -182,6 +142,19 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     };
   }, [config.url, config.isMuted, slotGranted, instance, seekToLive, scheduleRestart]);
 
+  // Liveness authority: OFFLINE only after sustained frame-advance failure;
+  // hard recovery remounts the player and retries forever with backoff.
+  const guardStatus = useStreamGuard({
+    active: !!config.url && slotGranted,
+    sourceKey: config.url || '',
+    videoRef,
+    softRecover: () => {
+      hlsRef.current?.startLoad();
+      seekToLive();
+    },
+    hardRecover: () => setInstance(i => i + 1),
+  });
+
   if (!config.url) {
     return (
       <div className="w-full h-full flex items-center justify-center">
@@ -193,8 +166,10 @@ export function CameraWidget({ config }: CameraWidgetProps) {
   const paused = !slotGranted;
   // Transient connecting/reconnecting overlays are gone: the <video> fades in
   // when it starts and holds its last frame while rebuffering, so no status
-  // text spams the wall. Only a genuinely dead feed (never played) shows one.
-  const showOffline = !paused && playback === 'offline' && !hasPlayed;
+  // text spams the wall. OFFLINE comes only from the stream guard after
+  // sustained frame-advance failure, including a feed that played and then
+  // died for good; its stale frame is dimmed so it cannot masquerade as live.
+  const showOffline = !paused && guardStatus === 'down';
 
   return (
     <div className="relative w-full h-full bg-black">
@@ -203,8 +178,9 @@ export function CameraWidget({ config }: CameraWidgetProps) {
         ref={videoRef}
         className="w-full h-full object-cover"
         style={{
-          opacity: hasPlayed ? 1 : 0,
-          transition: 'opacity 400ms var(--ease-out)',
+          opacity: !hasPlayed ? 0 : showOffline ? 0.25 : 1,
+          filter: showOffline ? 'grayscale(1)' : 'none',
+          transition: 'opacity 400ms var(--ease-out), filter 400ms var(--ease-out)',
         }}
         playsInline
         muted={config.isMuted}
@@ -226,7 +202,7 @@ export function CameraWidget({ config }: CameraWidgetProps) {
       {/* Bottom-left mono label chip; live dot binds to actual playback */}
       <div className="absolute bottom-3 left-3 flex items-center gap-2">
         <div className="glass-chip flex items-center gap-2 px-2.5 py-1.5">
-          {playback === 'playing' && !paused && (
+          {guardStatus === 'live' && !paused && (
             <span className="live-dot live-dot--live shrink-0" aria-hidden />
           )}
           <span

@@ -2,8 +2,9 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import Hls from 'hls.js';
 import { Volume2, VolumeX, Search, X, Radio, ChevronDown } from 'lucide-react';
-import { ALL_CHANNELS, CORS_SAFE_DOMAINS, type Channel } from '@/app/api/livetv/channels';
+import { ALL_CHANNELS, CORS_SAFE_DOMAINS, RETIRED_CHANNELS, type Channel } from '@/app/api/livetv/channels';
 import { useHlsSlot } from '@/lib/hlsBudget';
+import { useStreamGuard } from '@/lib/streamGuard';
 import { useAppState } from '@/context/AppState';
 import type { LiveTVConfig, WidgetStyle } from '@/types/widget';
 
@@ -14,8 +15,6 @@ function proxyUrl(url: string): string {
   } catch { /* invalid URL, proxy it */ }
   return `/api/livetv?proxy=${encodeURIComponent(url)}`;
 }
-
-type PlaybackState = 'connecting' | 'playing' | 'reconnecting' | 'offline';
 
 interface LiveTVWidgetProps {
   config: LiveTVConfig;
@@ -29,12 +28,13 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
-  const [playback, setPlayback] = useState<PlaybackState>('connecting');
+  // Bumping forces a full destroy/recreate of the HLS player on the same URL
+  // (the stream guard's hard-recovery path).
+  const [attachNonce, setAttachNonce] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<Channel | null>(null);
-  const hasPlayedRef = useRef(false);
   channelRef.current = currentChannel;
 
   const slotGranted = useHlsSlot(true);
@@ -91,9 +91,15 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
     return url ? proxyUrl(url) : '';
   }, [resolvedUrls]);
 
-  // Select initial channel from persisted config
+  // Select initial channel from persisted config. A persisted selection whose
+  // channel was retired (dead free stream, e.g. CNN) migrates to its mapped
+  // replacement instead of resurrecting the dead URL as a Custom channel.
   useEffect(() => {
-    if (config.selectedChannelURL) {
+    const retiredTo = config.selectedChannelName && RETIRED_CHANNELS[config.selectedChannelName];
+    if (retiredTo) {
+      const replacement = ALL_CHANNELS.find(c => c.name === retiredTo);
+      setCurrentChannel(replacement || ALL_CHANNELS[0]);
+    } else if (config.selectedChannelURL) {
       const found = ALL_CHANNELS.find(c => c.url === config.selectedChannelURL || c.name === config.selectedChannelName);
       setCurrentChannel(found || { name: config.selectedChannelName || 'Custom', url: config.selectedChannelURL, category: 'Custom' });
     } else if (config.selectedChannelName) {
@@ -106,36 +112,6 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
   }, [config.selectedChannelURL, config.selectedChannelName]);
 
   const currentUrl = currentChannel ? getChannelUrl(currentChannel) : '';
-
-  // Reset playback truth whenever the source changes
-  useEffect(() => {
-    hasPlayedRef.current = false;
-    setPlayback('connecting');
-  }, [currentUrl]);
-
-  // Bind LIVE state to actual video element playback
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const onPlaying = () => {
-      hasPlayedRef.current = true;
-      setPlayback('playing');
-    };
-    const onBuffering = () => {
-      setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
-    };
-
-    video.addEventListener('playing', onPlaying);
-    video.addEventListener('waiting', onBuffering);
-    video.addEventListener('stalled', onBuffering);
-
-    return () => {
-      video.removeEventListener('playing', onPlaying);
-      video.removeEventListener('waiting', onBuffering);
-      video.removeEventListener('stalled', onBuffering);
-    };
-  }, []);
 
   // Attach HLS player
   useEffect(() => {
@@ -179,7 +155,8 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            setPlayback(hasPlayedRef.current ? 'reconnecting' : 'offline');
+            // Fast path: retry in place. The stream guard escalates to a
+            // full recreate (with backoff) if frames still don't advance.
             const channel = channelRef.current;
             if (channel?.resolver) {
               // Stale resolved URL: re-resolve and let the effect re-attach
@@ -195,7 +172,6 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
               setTimeout(() => hls.startLoad(), 3000);
             }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
             hls.recoverMediaError();
           }
         }
@@ -213,7 +189,37 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
         hlsRef.current = null;
       }
     };
-  }, [currentUrl, slotGranted]);
+  }, [currentUrl, slotGranted, attachNonce]);
+
+  // Liveness authority: recovers frozen/zombie streams (stale manifests keep
+  // returning 200 while segments 404, which never surfaces as a fatal error)
+  // and drives the OFFLINE state from actual frame advancement.
+  const hardRecover = useCallback(() => {
+    const channel = channelRef.current;
+    if (channel?.resolver) {
+      // Refresh the resolved URL first so the recreate attaches fresh tokens;
+      // bump the nonce either way so a same-URL result still recreates.
+      fetch(`/api/livetv?channel=${channel.resolver}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.url) {
+            setResolvedUrls(prev => ({ ...prev, [channel.resolver!]: d.url }));
+          }
+        })
+        .catch(() => {})
+        .finally(() => setAttachNonce(n => n + 1));
+    } else {
+      setAttachNonce(n => n + 1);
+    }
+  }, []);
+
+  const guardStatus = useStreamGuard({
+    active: !!currentUrl && slotGranted,
+    sourceKey: currentUrl,
+    videoRef,
+    softRecover: () => hlsRef.current?.startLoad(),
+    hardRecover,
+  });
 
   // Update mute state
   useEffect(() => {
@@ -264,9 +270,10 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
 
   const paused = !slotGranted;
   const isResolving = !!currentChannel.resolver && !currentUrl;
-  // Connecting/reconnecting overlays removed to keep the wall clean; only a
-  // genuinely offline channel shows a chip.
-  const showOffline = !paused && !isResolving && playback === 'offline';
+  // Connecting/reconnecting overlays stay removed; OFFLINE comes only from
+  // the stream guard after sustained frame-advance failure, and the stale
+  // last frame is dimmed so it cannot masquerade as live.
+  const showOffline = !paused && !isResolving && guardStatus === 'down';
 
   return (
     <div
@@ -276,12 +283,17 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
+        style={{
+          opacity: showOffline ? 0.25 : 1,
+          filter: showOffline ? 'grayscale(1)' : 'none',
+          transition: 'opacity 400ms var(--ease-out), filter 400ms var(--ease-out)',
+        }}
         playsInline
         muted={isMuted}
         autoPlay
       />
 
-      {/* Only a genuinely offline channel shows a chip; no connecting spam */}
+      {/* Only a genuinely dead channel shows a chip; no connecting spam */}
       {showOffline && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span
@@ -299,7 +311,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
           onClick={() => setShowGuide(!showGuide)}
           className="glass-chip flex items-center gap-2 px-2.5 py-1.5 hover:brightness-125 transition-[filter]"
         >
-          {playback === 'playing' && !paused && (
+          {guardStatus === 'live' && !paused && (
             <span className="live-dot live-dot--live shrink-0" aria-hidden />
           )}
           <span
@@ -396,7 +408,7 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
                       >
                         {channel.name}
                       </span>
-                      {isActive && playback === 'playing' && (
+                      {isActive && guardStatus === 'live' && (
                         <span className="live-dot live-dot--live shrink-0" aria-hidden />
                       )}
                       {isUnavailable && (

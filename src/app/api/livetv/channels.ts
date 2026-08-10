@@ -21,50 +21,75 @@ export const ALL_CHANNELS: Channel[] = [
   { name: 'WDAF FOX 4', url: '', category: 'KC Local', resolver: 'wdaf' },
   { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'KC Local' },
 
-  // US News - all confirmed working direct streams
-  { name: 'CNN', url: 'https://turnerlive.warnermediacdn.com/hls/live/586495/cnngo/cnn_slate/VIDEO_2_1964000.m3u8', category: 'US News' },
+  // US News - every URL re-verified 2026-08-10 (master -> variant -> segment)
+  // CNN removed 2026-08-10: the free cnngo slate feed died 2026-07-20 (zombie
+  // manifest: 200 with EXT-X-PUBLISHED-TIME frozen at Jul 20, segments 404).
+  // No legitimate free CNN stream exists anymore (iptv-org carries none);
+  // RETIRED_CHANNELS migrates tiles tuned to it.
   { name: 'Fox News', url: 'https://jmp2.uk/plu-63d025db4e83e700086eaa96.m3u8', category: 'US News' },
   // Flagged: this entry was previously labeled "MSNBC" but the URL is Fox
   // News Radio's video simulcast (radiovid.foxnews.com). No free MSNBC
   // stream exists, so it is labeled for what it actually is.
   { name: 'Fox News Radio', url: 'https://radiovid.foxnews.com/hls/live/661547/RADIOVID/index.m3u8', category: 'US News' },
-  { name: 'ABC News Live', url: 'https://abcnews-streams.akamaized.net/hls/live/2023560/abcnewshudson1/master_4000.m3u8', category: 'US News' },
-  { name: 'CBS News', url: 'https://cbsnews.akamaized.net/hls/live/2020607/cbsnlineup_8/master.m3u8', category: 'US News' },
+  // Replaced 2026-08-10: old abcnewshudson1/master_4000 path went dead;
+  // this is ABC's DMD distribution endpoint (segment-verified).
+  { name: 'ABC News Live', url: 'https://abc-news-dmd-streams-1.akamaized.net/out/v1/701126012d044971b3fa89406a440133/index.m3u8', category: 'US News' },
+  // Replaced 2026-08-10: cbsnews.akamaized cbsnlineup_8 segments 404; this is
+  // the official CBS News 24/7 FAST channel via Pluto.
+  { name: 'CBS News', url: 'https://jmp2.uk/plu-6350fdd266e9ea0007bedec5.m3u8', category: 'US News' },
   { name: 'NBC News NOW', url: 'https://xumo-drct-nbcnn-ir8ze.fast.nbcuni.com/live/master.m3u8', category: 'US News' },
   { name: 'Bloomberg', url: 'https://bloomberg.com/media-manifest/streams/us.m3u8', category: 'US News' },
   { name: 'Fox Weather', url: 'https://247wlive.foxweather.com/stream/index.m3u8', category: 'US News' },
   { name: 'Scripps News', url: 'https://content.uplynk.com/channel/4bb4901b934c4e029fd4c1abfc766c37.m3u8', category: 'US News' },
   { name: 'Newsmax', url: 'https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8', category: 'US News' },
-  { name: 'CNBC', url: 'https://stream.livenewsplay.com:9443/hls/cnbc/cnbcsd.m3u8', category: 'US News' },
+  // Replaced 2026-08-10: livenewsplay.com host dead; CNBC International FAST
+  // feed (Samsung UK, amagi).
+  { name: 'CNBC', url: 'https://amg01079-nbcuuk-amg01079c2-samsung-gb-1258.playouts.now.amagi.tv/playlist.m3u8', category: 'US News' },
   { name: 'Court TV', url: 'https://jmp2.uk/plu-64dab1f835425100080e1e7b.m3u8', category: 'US News' },
-  { name: 'Reuters', url: 'https://ythls.armelin.one/channel/UChqUTb7kYRX8-EiaN3XFrSQ.m3u8', category: 'US News' },
+  // Replaced 2026-08-10: the ythls.armelin.one YouTube-HLS proxy service died
+  // entirely (took out 6 channels); Reuters FAST feed via Rakuten (amagi).
+  { name: 'Reuters', url: 'https://amg00453-reuters-amg00453c1-rakuten-uk-2110.playouts.now.amagi.tv/playlist/amg00453-reuters-reuters-rakutenuk/playlist.m3u8', category: 'US News' },
   { name: 'USA Today', url: 'https://live.enhdtv.com:8081/8192/index.m3u8', category: 'US News' },
   { name: 'AccuWeather', url: 'https://cdn-ue1-prod.tsv2.amagi.tv/linear/amg00684-accuweather-accuweather-plex/playlist.m3u8', category: 'US News' },
 
-  // World News
+  // World News - every URL re-verified 2026-08-10; the six ythls.armelin.one
+  // entries were replaced when that proxy service died.
   { name: 'BBC News', url: 'https://pb-iiczlgfysam0q.akamaized.net/v1/amcnetworks_bbcnews_1/samsungheadend_us/latest/main/hls/playlist.m3u8', category: 'World News' },
-  { name: 'Sky News UK', url: 'https://ythls.armelin.one/channel/UCoMdktPbSTixAyNGwb-UYkQ.m3u8', category: 'World News' },
+  { name: 'Sky News UK', url: 'https://jmp2.uk/plu-55b285cd2665de274553d66f.m3u8', category: 'World News' },
   { name: 'Al Jazeera', url: 'https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8', category: 'World News' },
-  { name: 'France 24', url: 'https://ythls.armelin.one/channel/UCQfwfsi5VrQ8yKZ-UWmAEFg.m3u8', category: 'World News' },
+  { name: 'France 24', url: 'https://live.france24.com/hls/live/2037218-b/F24_EN_HI_HLS/master_5000.m3u8', category: 'World News' },
   { name: 'DW News', url: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', category: 'World News' },
-  { name: 'Euronews', url: 'https://ythls.armelin.one/channel/UCW2QcKZiU8aUGg4yxCIditg.m3u8', category: 'World News' },
-  { name: 'CGTN', url: 'https://news.cgtn.com/resource/live/english/cgtn-news.m3u8', category: 'World News' },
+  { name: 'Euronews', url: 'https://jmp2.uk/plu-61de96114757070008d33cae.m3u8', category: 'World News' },
+  // CGTN removed 2026-08-10: news.cgtn.com feed dead and the Rakuten FAST
+  // mirror's variant playlists 404; no working English feed found.
   { name: 'India Today', url: 'https://indiatodaylive.akamaized.net/hls/live/2014320/indiatoday/indiatodaylive/playlist.m3u8', category: 'World News' },
-  { name: 'CBC News', url: 'https://ythls.armelin.one/channel/UCuFFtHWoLl5fauMMD5Ww2jA.m3u8', category: 'World News' },
+  { name: 'CBC News', url: 'https://d2ny9lo79ujali.cloudfront.net/CBC_News_International.m3u8', category: 'World News' },
   { name: 'RT', url: 'https://rt-glb.rttv.com/live/rtnews/playlist.m3u8', category: 'World News' },
-  { name: 'GB News', url: 'https://ythls.armelin.one/channel/UC0vn8ISa4LKMunLbzaXLnOQ.m3u8', category: 'World News' },
+  { name: 'GB News', url: 'https://amg01076-lightningintern-gbnewsau-samsungau-et7fz.amagi.tv/playlist/amg01076-lightningintern-gbnewsau-samsungau/playlist.m3u8', category: 'World News' },
 
   // Sports - confirmed working free streams only
   { name: 'NFL Channel', url: 'https://jmp2.uk/plu-5a4d3a00ad95e4718ae8d8db.m3u8', category: 'Sports' },
-  { name: 'beIN SPORTS XTRA', url: 'https://jmp2.uk/plu-5d8d180092e97a5e107638d3.m3u8', category: 'Sports' },
+  // Replaced 2026-08-10: old Pluto id dead; beIN's own amagi endpoint.
+  { name: 'beIN SPORTS XTRA', url: 'https://bein-xtra-bein.amagi.tv/playlist.m3u8', category: 'Sports' },
 
   // Public / Government
   // "PBS" duplicate removed 2026-07-16: it pointed at the exact same
   // pbs.lls.cdn.pbs.org URL as KCPT PBS in KC Local.
   { name: 'NASA TV', url: 'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8', category: 'Public' },
-  { name: 'Univision', url: 'https://streaming-live-fcdn.api.prd.univisionnow.com/kuvn/kuvn.isml/hls/kuvn.m3u8', category: 'Public' },
+  // Replaced 2026-08-10: KUVN feed segments 404; KMEX (same Univision
+  // network feed) verified working.
+  { name: 'Univision', url: 'https://streaming-live-fcdn.api.prd.univisionnow.com/kmex/kmex.isml/hls/kmex.m3u8', category: 'Public' },
   { name: 'Telemundo', url: 'https://cdn.igocast.com/wkrp_channel1_hls/wkrp_channel1_master.m3u8', category: 'Public' },
 ];
+
+// Channels that no longer have any working free stream. A tile whose
+// persisted selection matches one of these gets migrated to the mapped
+// replacement instead of resurrecting a dead URL as a "Custom" channel.
+export const RETIRED_CHANNELS: Record<string, string> = {
+  'CNN': 'NBC News NOW',
+  'CGTN': 'DW News',
+  'KCTV5 (CBS)': 'CBS News',
+};
 
 // URLs from these domains have proper CORS headers and can be played directly
 export const CORS_SAFE_DOMAINS = [

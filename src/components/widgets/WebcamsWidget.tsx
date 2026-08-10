@@ -5,6 +5,7 @@ import { Video, ChevronLeft, ChevronRight, RotateCw, Lock } from 'lucide-react';
 import { useInterval } from '@/hooks/useInterval';
 import { usePolledData } from '@/hooks/usePolledData';
 import { useHlsSlot } from '@/lib/hlsBudget';
+import { useStreamGuard } from '@/lib/streamGuard';
 import type { WebcamConfig, WidgetStyle } from '@/types/widget';
 
 interface Camera {
@@ -21,25 +22,19 @@ interface WebcamsWidgetProps {
   style: WidgetStyle;
 }
 
-type PlaybackState = 'connecting' | 'playing' | 'reconnecting' | 'offline';
-
 const LIST_INTERVAL = 10 * 60 * 1000;
 const TOKEN_INTERVAL = 60 * 1000;
 
 export function WebcamsWidget({ config }: WebcamsWidgetProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRotating, setIsRotating] = useState((config.viewMode || 'single') === 'rotate');
-  const [playback, setPlayback] = useState<PlaybackState>('connecting');
   // Crossfade freeze frame between rotation switches
   const [freeze, setFreeze] = useState<'hidden' | 'hold' | 'fading'>('hidden');
   const videoRef = useRef<HTMLVideoElement>(null);
   const freezeCanvasRef = useRef<HTMLCanvasElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const retryCountRef = useRef(0);
-  const stalledTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const needRecreateRef = useRef(true);
   const attachedFileRef = useRef<string | null>(null);
-  const hasPlayedRef = useRef(false);
 
   const slotGranted = useHlsSlot(true);
 
@@ -126,57 +121,23 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
     return () => clearTimeout(timer);
   }, [freeze]);
 
-  // Bind playback truth to the actual video element
+  // The freeze frame is a stale image of the PREVIOUS camera; if the next
+  // stream never starts, holding it forever masquerades as a live feed. Time
+  // the hold out so the tile reveals its true state.
+  useEffect(() => {
+    if (freeze !== 'hold') return;
+    const timer = setTimeout(() => setFreeze('fading'), 5000);
+    return () => clearTimeout(timer);
+  }, [freeze]);
+
+  // Release the freeze frame as soon as the next stream actually plays
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-
-    const onPlaying = () => {
-      hasPlayedRef.current = true;
-      retryCountRef.current = 0;
-      setPlayback('playing');
-      setFreeze(f => (f === 'hold' ? 'fading' : f));
-      if (stalledTimerRef.current) {
-        clearTimeout(stalledTimerRef.current);
-        stalledTimerRef.current = null;
-      }
-    };
-    const onBuffering = () => {
-      setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
-      // If the stall lasts 8 seconds, force a fresh stream token + player
-      if (stalledTimerRef.current) clearTimeout(stalledTimerRef.current);
-      stalledTimerRef.current = setTimeout(() => {
-        needRecreateRef.current = true;
-        refreshStream();
-      }, 8000);
-    };
-    const onTimeUpdate = () => {
-      if (stalledTimerRef.current) {
-        clearTimeout(stalledTimerRef.current);
-        stalledTimerRef.current = null;
-      }
-    };
-
+    const onPlaying = () => setFreeze(f => (f === 'hold' ? 'fading' : f));
     video.addEventListener('playing', onPlaying);
-    video.addEventListener('waiting', onBuffering);
-    video.addEventListener('stalled', onBuffering);
-    video.addEventListener('timeupdate', onTimeUpdate);
-
-    return () => {
-      video.removeEventListener('playing', onPlaying);
-      video.removeEventListener('waiting', onBuffering);
-      video.removeEventListener('stalled', onBuffering);
-      video.removeEventListener('timeupdate', onTimeUpdate);
-      if (stalledTimerRef.current) clearTimeout(stalledTimerRef.current);
-    };
-  }, [refreshStream]);
-
-  // Reset playback truth when the camera changes
-  useEffect(() => {
-    hasPlayedRef.current = false;
-    retryCountRef.current = 0;
-    setPlayback('connecting');
-  }, [camera?.streamFile]);
+    return () => video.removeEventListener('playing', onPlaying);
+  }, []);
 
   // Attach / refresh the HLS player from polled stream tokens
   useEffect(() => {
@@ -216,19 +177,12 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
       hls.on(Hls.Events.ERROR, (_event, errData) => {
         if (errData.fatal) {
           if (errData.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            // Token likely expired: visibly reconnect with a fresh URL
-            if (retryCountRef.current < 5) {
-              retryCountRef.current++;
-              needRecreateRef.current = true;
-              setPlayback(hasPlayedRef.current ? 'reconnecting' : 'offline');
-              refreshStream();
-            } else {
-              // Let the 60s token poll keep retrying in the background
-              setPlayback('offline');
-              needRecreateRef.current = true;
-            }
+            // Token likely expired: fetch a fresh URL and recreate. The
+            // stream guard escalates with backoff if this never succeeds;
+            // no retry cap, no premature OFFLINE.
+            needRecreateRef.current = true;
+            refreshStream();
           } else if (errData.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            setPlayback(hasPlayedRef.current ? 'reconnecting' : 'connecting');
             hls.recoverMediaError();
           }
         }
@@ -250,6 +204,19 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
       }
     };
   }, []);
+
+  // Liveness authority: OFFLINE only after sustained frame-advance failure,
+  // recovery (fresh token + recreate) retries forever with backoff.
+  const guardStatus = useStreamGuard({
+    active: !!camera && slotGranted,
+    sourceKey: camera?.streamFile || '',
+    videoRef,
+    softRecover: () => hlsRef.current?.startLoad(),
+    hardRecover: () => {
+      needRecreateRef.current = true;
+      refreshStream();
+    },
+  });
 
   // Auto-rotate cameras (only when in rotate mode)
   const rotateNext = useCallback(() => {
@@ -302,9 +269,9 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
   }
 
   const paused = !slotGranted;
-  // Connecting/reconnecting overlays removed to keep the wall clean; only a
-  // genuinely offline cam (never played) shows a chip.
-  const showOffline = !paused && playback === 'offline' && !hasPlayedRef.current;
+  // Connecting/reconnecting overlays stay removed; OFFLINE comes only from
+  // the stream guard after sustained frame-advance failure.
+  const showOffline = !paused && guardStatus === 'down';
 
   // Check if this is a KC Scout camera (has corridorFilter or known scout IDs)
   const isScout = config.corridorFilter.length > 0 || cameras.some(c => c.streamFile.includes('customInstance'));
@@ -317,7 +284,12 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
-        style={scoutTransform}
+        style={{
+          ...scoutTransform,
+          opacity: showOffline ? 0.25 : 1,
+          filter: showOffline ? 'grayscale(1)' : 'none',
+          transition: 'opacity 400ms var(--ease-out), filter 400ms var(--ease-out)',
+        }}
         playsInline
         muted
         autoPlay
@@ -390,7 +362,7 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
       {/* Bottom-left mono label chip; live dot binds to actual playback */}
       <div className="absolute bottom-3 left-3 flex items-center gap-2 max-w-[80%]">
         <div className="glass-chip flex items-center gap-2 px-2.5 py-1.5 min-w-0">
-          {playback === 'playing' && !paused && (
+          {guardStatus === 'live' && !paused && (
             <span className="live-dot live-dot--live shrink-0" aria-hidden />
           )}
           <span
