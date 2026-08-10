@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAllowedProxyHost } from './channels';
+import { isAllowedProxyHost, CHANNEL_POOLS } from './channels';
 
 // In-memory cache for resolved URLs.
 const urlCache: Record<string, { url: string; ts: number }> = {};
@@ -13,6 +13,10 @@ const CACHE_TTL_BY_CHANNEL: Record<string, number> = {
   wdaf: 45 * 1000,        // under the ~90s lura token window
   kshb: 10 * 60 * 1000,
   kmbc: 10 * 60 * 1000,
+  // Grey-market relays flap; re-pick a live mirror often so a dead one is
+  // abandoned quickly rather than served from cache for 10 minutes.
+  cnn: 30 * 1000,
+  msnow: 30 * 1000,
 };
 const DEFAULT_CACHE_TTL = 10 * 60 * 1000;
 
@@ -135,6 +139,12 @@ export async function GET(request: NextRequest) {
       case 'wdaf':
         result = await resolveWDAF();
         break;
+      case 'cnn':
+        result = await resolvePool('cnn');
+        break;
+      case 'msnow':
+        result = await resolvePool('msnow');
+        break;
       default:
         return NextResponse.json({ error: `Unknown channel: ${channel}` }, { status: 400 });
     }
@@ -158,6 +168,77 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ error: 'Failed to resolve channel URL' }, { status: 502 });
   }
+}
+
+// Pooled failover resolver for CNN / MS NOW. Their only free feeds are
+// unstable grey-market relays, so instead of one hardcoded URL we health-check
+// the whole pool in parallel and return the FIRST live one. "Live" means: the
+// manifest parses AND a real media segment returns bytes (a frozen/zombie
+// manifest that 200s with dead segments is treated as down). Order in the pool
+// is the preference order; ties go to whoever answers first.
+async function isSegmentLive(manifestUrl: string): Promise<boolean> {
+  try {
+    const mRes = await fetch(manifestUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!mRes.ok) return false;
+    const text = await mRes.text();
+    if (!text.startsWith('#EXTM3U')) return false;
+
+    const finalUrl = mRes.url || manifestUrl;
+    const base = finalUrl.substring(0, finalUrl.lastIndexOf('/') + 1);
+    const abs = (line: string) =>
+      /^https?:\/\//.test(line)
+        ? line
+        : line.startsWith('/')
+          ? new URL(line, finalUrl).href
+          : base + line;
+
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+    if (lines.length === 0) return false;
+
+    // If this is a multivariant playlist, descend into the first variant.
+    let segParent = finalUrl;
+    let segList = lines;
+    if (/EXT-X-STREAM-INF/.test(text)) {
+      const vRes = await fetch(abs(lines[0]), {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!vRes.ok) return false;
+      const vText = await vRes.text();
+      if (!vText.startsWith('#EXTM3U')) return false;
+      segParent = vRes.url || abs(lines[0]);
+      segList = vText.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+      if (segList.length === 0) return false;
+    }
+
+    const segBase = segParent.substring(0, segParent.lastIndexOf('/') + 1);
+    const segUrl = /^https?:\/\//.test(segList[segList.length - 1])
+      ? segList[segList.length - 1]
+      : segList[segList.length - 1].startsWith('/')
+        ? new URL(segList[segList.length - 1], segParent).href
+        : segBase + segList[segList.length - 1];
+
+    const sRes = await fetch(segUrl, {
+      method: 'GET',
+      headers: { 'User-Agent': 'Mozilla/5.0', Range: 'bytes=0-1' },
+      signal: AbortSignal.timeout(6000),
+    });
+    return sRes.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function resolvePool(pool: 'cnn' | 'msnow'): Promise<{ url: string } | null> {
+  const candidates = CHANNEL_POOLS[pool];
+  // Check all in parallel, but honor pool order: resolve to the earliest-listed
+  // candidate that passed, not merely the fastest to answer.
+  const results = await Promise.all(candidates.map(u => isSegmentLive(u)));
+  const idx = results.findIndex(ok => ok);
+  return idx === -1 ? null : { url: candidates[idx] };
 }
 
 // KMBC 9 (ABC) - Uplynk. Use the stable 24/7 CHANNEL feed only. The `ext`

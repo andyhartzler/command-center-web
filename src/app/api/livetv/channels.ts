@@ -6,8 +6,31 @@ export interface Channel {
   name: string;
   url: string;
   category: string;
-  resolver?: 'kmbc' | 'kshb' | 'wdaf'; // dynamic URL resolution
+  // Dynamic URL resolution. kmbc/kshb/wdaf scrape a single station page;
+  // cnn/msnow health-check a POOL of mirrors and return whichever is live.
+  resolver?: 'kmbc' | 'kshb' | 'wdaf' | 'cnn' | 'msnow';
 }
+
+// Failover pools for channels whose only free feeds are unstable grey-market
+// relays (CNN and MSNBC pulled their free direct streams in 2026). The
+// resolver health-checks every URL here in parallel and hands the widget the
+// first one that is genuinely live (manifest + advancing/fresh segments), so
+// a mirror dying just fails over to the next. Add a better source (including a
+// paid one) by dropping its URL at the TOP of the relevant list — no other
+// code changes needed. These hosts are also allowlisted for the proxy below.
+export const CHANNEL_POOLS: Record<'cnn' | 'msnow', string[]> = {
+  // CNN (US). All are HTTP IP relays; the proxy fetches them server-side and
+  // re-serves over HTTPS, so the wall never loads mixed content directly.
+  cnn: [
+    'http://88.212.15.19/live/test_cnn_pirma_news/playlist.m3u8',
+  ],
+  // MS NOW (formerly MSNBC, rebranded 2026). 40.160.24.53 carries a clean,
+  // consistently-live feed; the pirma relay is a secondary.
+  msnow: [
+    'http://40.160.24.53/MSNBC/index.m3u8',
+    'http://88.212.15.19/live/test_msnbc_pirma_news/playlist.m3u8',
+  ],
+};
 
 // All channels - KC Local + National + Free-TV IPTV
 // Sources: direct CDN, jmp2.uk (Samsung TV Plus proxy), YouTube HLS proxy
@@ -22,14 +45,15 @@ export const ALL_CHANNELS: Channel[] = [
   { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'KC Local' },
 
   // US News - every URL re-verified 2026-08-10 (master -> variant -> segment)
-  // CNN removed 2026-08-10: the free cnngo slate feed died 2026-07-20 (zombie
-  // manifest: 200 with EXT-X-PUBLISHED-TIME frozen at Jul 20, segments 404).
-  // No legitimate free CNN stream exists anymore (iptv-org carries none);
-  // RETIRED_CHANNELS migrates tiles tuned to it.
+  // CNN's free cnngo slate feed died 2026-07-20 (zombie manifest). It now
+  // resolves through a health-checked failover pool (CHANNEL_POOLS.cnn)
+  // instead of one hardcoded URL, so a dead mirror fails over automatically.
+  { name: 'CNN', url: '', category: 'US News', resolver: 'cnn' },
+  // MS NOW (formerly MSNBC). Same pooled-failover approach. The old entry
+  // here was mislabeled "MSNBC" but actually pointed at Fox News Radio's
+  // simulcast; that is now correctly named below, and this is the real thing.
+  { name: 'MS NOW', url: '', category: 'US News', resolver: 'msnow' },
   { name: 'Fox News', url: 'https://jmp2.uk/plu-63d025db4e83e700086eaa96.m3u8', category: 'US News' },
-  // Flagged: this entry was previously labeled "MSNBC" but the URL is Fox
-  // News Radio's video simulcast (radiovid.foxnews.com). No free MSNBC
-  // stream exists, so it is labeled for what it actually is.
   { name: 'Fox News Radio', url: 'https://radiovid.foxnews.com/hls/live/661547/RADIOVID/index.m3u8', category: 'US News' },
   // Replaced 2026-08-10: old abcnewshudson1/master_4000 path went dead;
   // this is ABC's DMD distribution endpoint (segment-verified).
@@ -85,10 +109,12 @@ export const ALL_CHANNELS: Channel[] = [
 // Channels that no longer have any working free stream. A tile whose
 // persisted selection matches one of these gets migrated to the mapped
 // replacement instead of resurrecting a dead URL as a "Custom" channel.
+// CNN is NOT here — it lives on via the failover pool (CHANNEL_POOLS.cnn).
 export const RETIRED_CHANNELS: Record<string, string> = {
-  'CNN': 'NBC News NOW',
   'CGTN': 'DW News',
   'KCTV5 (CBS)': 'CBS News',
+  // Old tiles tuned to "MSNBC" migrate to its rebrand + pooled feed.
+  'MSNBC': 'MS NOW',
 };
 
 // URLs from these domains have proper CORS headers and can be played directly
@@ -121,6 +147,18 @@ const COMPANION_SUFFIXES = [
   'samsungtvplus.com',
 ];
 
+// Exact hosts allowlisted for the proxy that never appear as a catalog URL:
+// the CNN/MS NOW failover pools are bare-IP relays, and baseDomain() cannot
+// derive a usable suffix from an IP, so they are allowlisted verbatim.
+const POOL_HOSTS: ReadonlySet<string> = new Set(
+  Object.values(CHANNEL_POOLS)
+    .flat()
+    .map(u => {
+      try { return new URL(u).hostname.toLowerCase(); } catch { return ''; }
+    })
+    .filter(Boolean)
+);
+
 /**
  * Proxy host allowlist derived from the channel catalog: the registrable
  * domain of every catalog URL plus the companion CDN suffixes above.
@@ -135,6 +173,7 @@ export const ALLOWED_PROXY_SUFFIXES: ReadonlySet<string> = new Set([
 /** True when `host` matches an allowlisted suffix (exact or subdomain). */
 export function isAllowedProxyHost(host: string): boolean {
   const h = host.toLowerCase();
+  if (POOL_HOSTS.has(h)) return true;
   for (const suffix of ALLOWED_PROXY_SUFFIXES) {
     if (h === suffix || h.endsWith(`.${suffix}`)) return true;
   }
