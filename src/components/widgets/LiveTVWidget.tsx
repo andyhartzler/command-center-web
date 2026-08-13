@@ -9,6 +9,9 @@ import { useAppState } from '@/context/AppState';
 import type { LiveTVConfig, WidgetStyle } from '@/types/widget';
 
 function proxyUrl(url: string): string {
+  // Same-origin app routes (e.g. the local CNN feed at /api/cnn/…) are already
+  // served by us — play them directly, never wrap in the livetv proxy.
+  if (url.startsWith('/')) return url;
   try {
     const host = new URL(url).hostname;
     if (CORS_SAFE_DOMAINS.some(d => host.endsWith(d))) return url;

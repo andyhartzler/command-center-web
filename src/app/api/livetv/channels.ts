@@ -45,10 +45,10 @@ export const ALL_CHANNELS: Channel[] = [
   { name: 'KCPT PBS', url: 'https://pbs.lls.cdn.pbs.org/est/index.m3u8', category: 'KC Local' },
 
   // US News - every URL re-verified 2026-08-10 (master -> variant -> segment)
-  // CNN's free cnngo slate feed died 2026-07-20 (zombie manifest). It now
-  // resolves through a health-checked failover pool (CHANNEL_POOLS.cnn)
-  // instead of one hardcoded URL, so a dead mirror fails over automatically.
-  { name: 'CNN', url: '', category: 'US News', resolver: 'cnn' },
+  // CNN: real US CNN, live-decrypted on the lenovo from Andrew's YouTube TV /
+  // Max (TV Everywhere) auth via Widevine (cnn-capture.service), served
+  // same-origin. This replaces the dead free feeds — see project memory.
+  { name: 'CNN', url: '/api/cnn/stream.m3u8', category: 'US News' },
   // MS NOW (formerly MSNBC). Same pooled-failover approach. The old entry
   // here was mislabeled "MSNBC" but actually pointed at Fox News Radio's
   // simulcast; that is now correctly named below, and this is the real thing.
@@ -165,7 +165,7 @@ const POOL_HOSTS: ReadonlySet<string> = new Set(
  */
 export const ALLOWED_PROXY_SUFFIXES: ReadonlySet<string> = new Set([
   ...ALL_CHANNELS
-    .filter(c => c.url)
+    .filter(c => c.url && !c.url.startsWith('/'))  // skip same-origin app routes (CNN)
     .map(c => baseDomain(new URL(c.url).hostname.toLowerCase())),
   ...COMPANION_SUFFIXES,
 ]);
