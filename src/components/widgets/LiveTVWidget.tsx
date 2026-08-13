@@ -305,8 +305,9 @@ export function LiveTVWidget({ config }: LiveTVWidgetProps) {
         </div>
       )}
 
-      {/* Bottom-left mono channel chip; live dot binds to actual playback */}
-      <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2">
+      {/* Bottom-left channel chip: hover-only so the wall is clean video at
+          rest, but the channel guide stays reachable on hover. */}
+      <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => setShowGuide(!showGuide)}
           className="glass-chip flex items-center gap-2 px-2.5 py-1.5 hover:brightness-125 transition-[filter]"

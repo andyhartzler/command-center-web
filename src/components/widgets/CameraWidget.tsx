@@ -198,21 +198,6 @@ export function CameraWidget({ config }: CameraWidgetProps) {
           </span>
         </div>
       )}
-
-      {/* Bottom-left mono label chip; live dot binds to actual playback */}
-      <div className="absolute bottom-3 left-3 flex items-center gap-2">
-        <div className="glass-chip flex items-center gap-2 px-2.5 py-1.5">
-          {guardStatus === 'live' && !paused && (
-            <span className="live-dot live-dot--live shrink-0" aria-hidden />
-          )}
-          <span
-            className="font-mono text-[12px] uppercase"
-            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-text-2)' }}
-          >
-            {config.label || 'Camera'}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

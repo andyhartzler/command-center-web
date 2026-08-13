@@ -359,23 +359,8 @@ export function WebcamsWidget({ config }: WebcamsWidgetProps) {
         </button>
       )}
 
-      {/* Bottom-left mono label chip; live dot binds to actual playback */}
-      <div className="absolute bottom-3 left-3 flex items-center gap-2 max-w-[80%]">
-        <div className="glass-chip flex items-center gap-2 px-2.5 py-1.5 min-w-0">
-          {guardStatus === 'live' && !paused && (
-            <span className="live-dot live-dot--live shrink-0" aria-hidden />
-          )}
-          <span
-            className="font-mono text-[12px] uppercase truncate"
-            style={{ letterSpacing: 'var(--tracking-caps)', color: 'var(--color-text-2)' }}
-          >
-            {camera?.name || 'Camera'}
-          </span>
-        </div>
-      </div>
-
-      {/* Bottom-right: rotation + position */}
-      <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
+      {/* Bottom-right: rotation + position, hover-only to keep the wall clean */}
+      <div className="absolute bottom-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {isRotating && (
           <span
             className="glass-chip px-2 py-1 font-mono text-[12px] uppercase"
