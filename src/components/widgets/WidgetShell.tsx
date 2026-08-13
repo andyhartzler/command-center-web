@@ -2,6 +2,7 @@
 import { type ReactNode } from 'react';
 import { useSharedClock, formatAge } from '@/hooks/useSharedClock';
 import { type WidgetStyle } from '@/types/widget';
+import { FitText } from '@/components/motion/FitText';
 
 // The one widget chrome: header row (icon, title, status slot), body, footer.
 // Freshness is ambient across the wall via the status slot contract.
@@ -83,7 +84,7 @@ export function WidgetShell({
             >
               {icon}
             </span>
-            <span className="type-label truncate">{title}</span>
+            <FitText className="type-label">{title}</FitText>
           </div>
           {status && <div className="flex items-center gap-1.5 shrink-0">{status}</div>}
         </div>

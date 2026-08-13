@@ -3,6 +3,7 @@ import { Thermometer, ExternalLink } from 'lucide-react';
 import { type NestThermostatConfig, type WidgetStyle } from '@/types/widget';
 import { usePolledData } from '@/hooks/usePolledData';
 import { WidgetShell, Freshness } from './WidgetShell';
+import { FitText } from '@/components/motion/FitText';
 import { ArcGauge } from './gauges/ArcGauge';
 
 interface NestTraits {
@@ -36,19 +37,21 @@ const toF = (c: number) => (c * 9) / 5 + 32;
 
 function FooterStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 flex flex-col items-center gap-1">
-      <span
-        className="uppercase leading-none truncate max-w-full"
+    <div className="min-w-0 w-full flex flex-col items-center gap-1">
+      <FitText
+        center
+        className="uppercase leading-none w-full"
         style={{ fontSize: 10, color: 'var(--color-text-3)', letterSpacing: '0.02em' }}
       >
         {label}
-      </span>
-      <span
-        className="font-mono leading-none truncate max-w-full"
+      </FitText>
+      <FitText
+        center
+        className="font-mono leading-none w-full"
         style={{ fontSize: 14, color: 'var(--color-text-1)' }}
       >
         {value}
-      </span>
+      </FitText>
     </div>
   );
 }

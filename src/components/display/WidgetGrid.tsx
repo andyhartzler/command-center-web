@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import { type DashboardPage } from '@/types/dashboard';
 import { WidgetContainer } from './WidgetContainer';
 import { WidgetFactory } from '../widgets/WidgetFactory';
-import { computeCellRect } from '@/lib/grid';
+import { computeCellRect, GRID_PADDING } from '@/lib/grid';
 
 interface WidgetGridProps {
   page: DashboardPage;
@@ -37,15 +37,20 @@ export function WidgetGrid({ page }: WidgetGridProps) {
     <div ref={containerRef} className="widget-grid burnin-orbit">
       {dims &&
         page.widgets.map((widget) => {
-          const rect = computeCellRect(page, widget, { width: dims.w - 32, height: dims.h - 32 });
+          const rect = computeCellRect(page, widget, {
+            width: dims.w - GRID_PADDING * 2,
+            height: dims.h - GRID_PADDING * 2,
+          });
           return (
             <div
               key={`${page.id}-${widget.id}`}
               className="stagger-enter"
               style={{
                 position: 'absolute',
-                left: rect.x,
-                top: rect.y,
+                // Offset by the outer padding so the reserved margin sits evenly
+                // on all sides instead of pooling at the bottom/right.
+                left: GRID_PADDING + rect.x,
+                top: GRID_PADDING + rect.y,
                 width: rect.width,
                 height: rect.height,
                 animationDelay: `${Math.min(orderIndex.get(widget.id) ?? 0, 20) * 40}ms`,

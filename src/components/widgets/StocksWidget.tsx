@@ -5,7 +5,6 @@ import { TrendingUp } from 'lucide-react';
 import { WidgetShell, Freshness } from './WidgetShell';
 import { usePolledData } from '@/hooks/usePolledData';
 import { MarketRow } from './market/MarketRow';
-import { STOCK_CATALOG } from '@/data/marketCatalogs';
 import type { StocksConfig, WidgetStyle } from '@/types/widget';
 
 // Re-exported so existing catalog consumers (WidgetConfigPanel) keep working.
@@ -59,7 +58,8 @@ export function StocksWidget({ config, style }: StocksWidgetProps) {
   const useGrid = width > 380 && quotes.length > 4;
   const colWidth = useGrid ? (width - 24) / 2 : width;
   const showSpark = colWidth >= 250;
-  const showName = colWidth >= 200;
+  // Company name intentionally never shown — the ticker is enough, and the
+  // truncated name ("S&…", "Na…") is exactly the "…" Andrew banned.
 
   return (
     <div className="w-full h-full" style={{ opacity: style.opacity }}>
@@ -87,11 +87,10 @@ export function StocksWidget({ config, style }: StocksWidgetProps) {
                 <div key={quote.symbol}>
                   <MarketRow
                     symbol={quote.symbol}
-                    name={STOCK_CATALOG[quote.symbol]}
                     price={quote.price}
                     changePercent={quote.changePercent}
                     spark={quote.spark ?? undefined}
-                    showName={showName}
+                    showName={false}
                     showSpark={showSpark}
                     format={formatPrice}
                   />
