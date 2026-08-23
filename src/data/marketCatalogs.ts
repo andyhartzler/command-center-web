@@ -125,9 +125,20 @@ export const COIN_NAMES: Record<string, string> = Object.fromEntries(
 
 // Default watchlists used by defaultConfig in types/widget.ts
 export const DEFAULT_STOCK_SYMBOLS: string[] = [
-  'SPY', 'QQQ', 'DIA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
-  'TSM', 'AVGO', 'JPM', 'V', 'UNH', 'MA', 'HD', 'COST', 'NFLX', 'CRM',
-  'AMD', 'ORCL', 'ADBE', 'BA', 'DIS', 'GS', 'CAT', 'GE', 'XOM', 'COIN',
+  // Indices / ETFs
+  'SPY', 'QQQ', 'DIA', 'IWM', 'VTI', 'GLD',
+  // Mega-cap tech
+  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AVGO', 'TSM', 'ORCL',
+  'AMD', 'CRM', 'ADBE', 'NFLX', 'INTC', 'QCOM', 'CSCO', 'IBM', 'MU', 'ARM',
+  'PLTR', 'SNOW', 'CRWD', 'PANW', 'NOW', 'UBER', 'SHOP', 'COIN', 'HOOD', 'MSTR',
+  // Finance
+  'JPM', 'BAC', 'WFC', 'GS', 'MS', 'V', 'MA', 'AXP', 'BLK', 'SCHW',
+  // Healthcare
+  'UNH', 'LLY', 'JNJ', 'ABBV', 'MRK', 'PFE', 'TMO',
+  // Consumer
+  'WMT', 'COST', 'HD', 'NKE', 'MCD', 'SBUX', 'PG', 'KO', 'PEP', 'DIS',
+  // Industrial / energy / auto
+  'CAT', 'DE', 'GE', 'BA', 'HON', 'RTX', 'LMT', 'XOM', 'CVX', 'F', 'GM',
 ];
 
 export const DEFAULT_COIN_IDS: string[] = [
