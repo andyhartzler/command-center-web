@@ -11,9 +11,9 @@ import type { StocksConfig, WidgetStyle } from '@/types/widget';
 export { STOCK_CATALOG } from '@/data/marketCatalogs';
 
 const POLL_INTERVAL = 60_000;
-// Continuous ticker speed, pixels per second. Slow enough to read a symbol,
-// price and delta as each row passes; the wall is watched from across the room.
-const SCROLL_SPEED = 26;
+// Continuous ticker speed, pixels per second. Slow and calm — the whole S&P 500
+// drifts by; the wall is watched from across the room, not raced through.
+const SCROLL_SPEED = 9;
 
 interface StockQuote {
   symbol: string;
@@ -60,7 +60,9 @@ export function StocksWidget({ config, style }: StocksWidgetProps) {
     return symbols.map(sym => bySymbol.get(sym) ?? { symbol: sym, price: null, changePercent: null, spark: null });
   }, [data, symbols]);
 
-  const showSpark = width >= 250;
+  // Sparklines are one SVG per row; with hundreds of tickers (rendered twice for
+  // the marquee) that is too many nodes to paint smoothly, so drop them on big lists.
+  const showSpark = width >= 250 && symbols.length <= 80;
 
   // Continuous vertical marquee: the list is rendered twice back-to-back and the
   // track is translated up by exactly one copy's height on an infinite linear

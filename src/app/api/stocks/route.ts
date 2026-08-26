@@ -16,6 +16,9 @@ export interface StockQuote {
 }
 
 const SPARK_POINTS = 40;
+// Yahoo's spark endpoint is fine with a long symbol list, but the whole S&P 500
+// in one URL is fragile; fetch in chunks and merge so hundreds of tickers work.
+const CHUNK = 50;
 
 /** Drop nulls and downsample the intraday close series to a fixed budget. */
 function toSpark(closes: unknown): number[] | null {
@@ -30,81 +33,95 @@ function toSpark(closes: unknown): number[] | null {
   return out;
 }
 
+function chunkList<T>(list: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function parseSpark(data: any, sym: string): StockQuote {
+  // New format: data[SYMBOL] = { close: [...], previousClose, chartPreviousClose }
+  const symData = data?.[sym];
+  if (symData && Array.isArray(symData.close) && symData.close.length > 0) {
+    const spark = toSpark(symData.close);
+    const price = spark?.[spark.length - 1] ?? symData.close[symData.close.length - 1] ?? null;
+    const prevClose = symData.previousClose ?? symData.chartPreviousClose ?? null;
+    const changePercent = price !== null && typeof prevClose === 'number' && prevClose > 0
+      ? ((price - prevClose) / prevClose) * 100
+      : null;
+    return { symbol: sym, price, changePercent, spark };
+  }
+  // Legacy format: data.spark.result[].response[0].meta
+  const legacy = data?.spark?.result?.find((r: { symbol: string }) => r.symbol === sym);
+  const response = legacy?.response?.[0];
+  const meta = response?.meta;
+  if (meta) {
+    const price = meta.regularMarketPrice ?? null;
+    const prevClose = meta.previousClose ?? meta.chartPreviousClose ?? null;
+    const changePercent = typeof price === 'number' && typeof prevClose === 'number' && prevClose > 0
+      ? ((price - prevClose) / prevClose) * 100
+      : null;
+    return { symbol: sym, price, changePercent, spark: toSpark(response?.indicators?.quote?.[0]?.close) };
+  }
+  return { symbol: sym, price: null, changePercent: null, spark: null };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 export async function GET(request: NextRequest) {
   const symbols = request.nextUrl.searchParams.get('symbols') || 'SPY,QQQ,AAPL';
   const symbolList = symbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+  const chunks = chunkList(symbolList, CHUNK);
+  const none = (): StockQuote[] =>
+    symbolList.map(sym => ({ symbol: sym, price: null, changePercent: null, spark: null }));
 
   try {
-    // Use Yahoo Finance v8 spark endpoint (no API key needed)
-    const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${symbolList.join(',')}&range=1d&interval=5m`;
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0',
-      },
-      next: { revalidate: 30 },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const results: StockQuote[] = symbolList.map(sym => {
-        // New format: data[SYMBOL] = { close: [...], previousClose, chartPreviousClose, ... }
-        const symData = data[sym];
-        if (symData && Array.isArray(symData.close) && symData.close.length > 0) {
-          const spark = toSpark(symData.close);
-          const price = spark?.[spark.length - 1] ?? symData.close[symData.close.length - 1] ?? null;
-          const prevClose = symData.previousClose ?? symData.chartPreviousClose ?? null;
-          const changePercent = price !== null && typeof prevClose === 'number' && prevClose > 0
-            ? ((price - prevClose) / prevClose) * 100
-            : null;
-          return { symbol: sym, price, changePercent, spark };
-        }
-        // Legacy format: data.spark.result[].response[0].meta
-        const spark = data.spark?.result?.find((r: { symbol: string }) => r.symbol === sym);
-        const response = spark?.response?.[0];
-        const meta = response?.meta;
-        if (meta) {
-          const price = meta.regularMarketPrice ?? null;
-          const prevClose = meta.previousClose ?? meta.chartPreviousClose ?? null;
-          const changePercent = typeof price === 'number' && typeof prevClose === 'number' && prevClose > 0
-            ? ((price - prevClose) / prevClose) * 100
-            : null;
-          const series = toSpark(response?.indicators?.quote?.[0]?.close);
-          return { symbol: sym, price, changePercent, spark: series };
-        }
-        return { symbol: sym, price: null, changePercent: null, spark: null };
-      });
-
-      // If we got valid data, return it
+    // Primary: Yahoo v8 spark endpoint, batched (no API key needed).
+    const bySymbol = new Map<string, StockQuote>();
+    await Promise.all(chunks.map(async chunk => {
+      const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${chunk.join(',')}&range=1d&interval=5m`;
+      try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 30 } });
+        if (!res.ok) return;
+        const data = await res.json();
+        for (const sym of chunk) bySymbol.set(sym, parseSpark(data, sym));
+      } catch { /* skip this chunk, others still populate */ }
+    }));
+    if (bySymbol.size > 0) {
+      const results = symbolList.map(sym => bySymbol.get(sym) ?? { symbol: sym, price: null, changePercent: null, spark: null });
       if (results.some(r => r.price !== null && r.price > 0)) {
         return NextResponse.json(results);
       }
     }
 
-    // Fallback: try Yahoo v7 quote endpoint (no spark series available)
-    const v7Url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbolList.join(',')}`;
-    const v7Res = await fetch(v7Url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      next: { revalidate: 30 },
-    });
-
-    if (v7Res.ok) {
-      const v7Data = await v7Res.json();
-      const quotes: YahooQuote[] = v7Data.quoteResponse?.result ?? [];
-      const results: StockQuote[] = symbolList.map(sym => {
-        const q = quotes.find(qq => qq.symbol === sym);
-        return {
-          symbol: sym,
-          price: q?.regularMarketPrice ?? null,
-          changePercent: q?.regularMarketChangePercent ?? null,
-          spark: null,
-        };
-      });
+    // Fallback: Yahoo v7 quote endpoint, batched (no spark series available).
+    const v7Map = new Map<string, StockQuote>();
+    await Promise.all(chunks.map(async chunk => {
+      const v7Url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${chunk.join(',')}`;
+      try {
+        const v7Res = await fetch(v7Url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 30 } });
+        if (!v7Res.ok) return;
+        const v7Data = await v7Res.json();
+        const quotes: YahooQuote[] = v7Data.quoteResponse?.result ?? [];
+        for (const sym of chunk) {
+          const q = quotes.find(qq => qq.symbol === sym);
+          v7Map.set(sym, {
+            symbol: sym,
+            price: q?.regularMarketPrice ?? null,
+            changePercent: q?.regularMarketChangePercent ?? null,
+            spark: null,
+          });
+        }
+      } catch { /* skip */ }
+    }));
+    if (v7Map.size > 0) {
+      const results = symbolList.map(sym => v7Map.get(sym) ?? { symbol: sym, price: null, changePercent: null, spark: null });
       if (results.some(r => r.price !== null && r.price > 0)) {
         return NextResponse.json(results);
       }
     }
 
-    // Fallback 2: try Twelve Data if key is set (no spark series available)
+    // Fallback 2: Twelve Data if a key is set (no spark series available).
     const apiKey = process.env.TWELVE_DATA_KEY;
     if (apiKey && apiKey !== 'demo') {
       const tdUrl = `https://api.twelvedata.com/quote?symbol=${symbols}&apikey=${apiKey}`;
@@ -134,10 +151,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // If all sources fail, return explicit no-data rows
-    return NextResponse.json(
-      symbolList.map((sym): StockQuote => ({ symbol: sym, price: null, changePercent: null, spark: null }))
-    );
+    // All sources failed: explicit no-data rows.
+    return NextResponse.json(none());
   } catch (err) {
     console.error('[stocks] fetch error', err);
     return NextResponse.json({ error: 'Failed to fetch stock data' }, { status: 500 });

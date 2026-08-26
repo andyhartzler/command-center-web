@@ -67,6 +67,88 @@ export const STOCK_CATALOG: Record<string, string> = {
   HLT: 'Hilton', LVS: 'Las Vegas Sands', WYNN: 'Wynn Resorts',
   DELL: 'Dell Technologies', HPQ: 'HP Inc', WDC: 'Western Digital', STX: 'Seagate',
   SMCI: 'Super Micro Computer', ARM: 'Arm Holdings', ASML: 'ASML Holding',
+  // --- Rest of the S&P 500 (broad coverage) ---
+  // Tech / semis / software
+  WDAY: 'Workday', TEAM: 'Atlassian', HUBS: 'HubSpot', ZM: 'Zoom', DOCU: 'DocuSign',
+  OKTA: 'Okta', MDB: 'MongoDB', TWLO: 'Twilio', ANET: 'Arista Networks', MPWR: 'Monolithic Power',
+  ON: 'ON Semiconductor', MCHP: 'Microchip', ADI: 'Analog Devices', NXPI: 'NXP Semiconductors',
+  GLW: 'Corning', HPE: 'HP Enterprise', NTAP: 'NetApp', JNPR: 'Juniper', FFIV: 'F5',
+  AKAM: 'Akamai', VRSN: 'VeriSign', GEN: 'Gen Digital', EA: 'Electronic Arts', TTWO: 'Take-Two',
+  PTC: 'PTC', TYL: 'Tyler Technologies', ANSS: 'Ansys', FICO: 'Fair Isaac', BR: 'Broadridge',
+  JKHY: 'Jack Henry', FIS: 'Fidelity Natl Info', GPN: 'Global Payments', PAYX: 'Paychex', ADP: 'ADP',
+  CTSH: 'Cognizant', IT: 'Gartner', EPAM: 'EPAM Systems', KEYS: 'Keysight', TDY: 'Teledyne',
+  TRMB: 'Trimble', ZBRA: 'Zebra Tech', TER: 'Teradyne', SWKS: 'Skyworks', QRVO: 'Qorvo',
+  FSLR: 'First Solar', ENPH: 'Enphase', CDW: 'CDW', GDDY: 'GoDaddy',
+  // Communications / media
+  CHTR: 'Charter', OMC: 'Omnicom', IPG: 'Interpublic', LYV: 'Live Nation', FOXA: 'Fox Corp A',
+  FOX: 'Fox Corp B', PARA: 'Paramount', NWSA: 'News Corp A', NWS: 'News Corp B', MTCH: 'Match Group',
+  GRMN: 'Garmin',
+  // Financials
+  SPGI: 'S&P Global', MCO: "Moody's", MSCI: 'MSCI', ICE: 'Intercontinental Exch', CME: 'CME Group',
+  NDAQ: 'Nasdaq Inc', CBOE: 'Cboe', MKTX: 'MarketAxess', TROW: 'T Rowe Price', BEN: 'Franklin Resources',
+  IVZ: 'Invesco', AMP: 'Ameriprise', RJF: 'Raymond James', NTRS: 'Northern Trust', STT: 'State Street',
+  BK: 'BNY Mellon', CFG: 'Citizens Financial', KEY: 'KeyCorp', RF: 'Regions Financial', HBAN: 'Huntington',
+  FITB: 'Fifth Third', MTB: 'M&T Bank', ZION: 'Zions', CMA: 'Comerica', ALLY: 'Ally Financial',
+  DFS: 'Discover', SYF: 'Synchrony', WRB: 'W.R. Berkley', CB: 'Chubb', TRV: 'Travelers',
+  AIG: 'AIG', MET: 'MetLife', PRU: 'Prudential', AFL: 'Aflac', ALL: 'Allstate',
+  PGR: 'Progressive', HIG: 'Hartford', CINF: 'Cincinnati Financial', L: 'Loews', GL: 'Globe Life',
+  AON: 'Aon', MMC: 'Marsh McLennan', AJG: 'Arthur J Gallagher', BRO: 'Brown & Brown', WTW: 'Willis Towers',
+  ACGL: 'Arch Capital', EG: 'Everest Group', FDS: 'FactSet',
+  // Healthcare
+  A: 'Agilent', IDXX: 'IDEXX', IQV: 'IQVIA', RMD: 'ResMed', WST: 'West Pharma',
+  STE: 'STERIS', HOLX: 'Hologic', ALGN: 'Align Tech', DXCM: 'Dexcom', PODD: 'Insulet',
+  MTD: 'Mettler-Toledo', BIO: 'Bio-Rad', TECH: 'Bio-Techne', WAT: 'Waters', BAX: 'Baxter',
+  BDX: 'Becton Dickinson', EW: 'Edwards Lifesciences', ZBH: 'Zimmer Biomet', COO: 'Cooper Cos', XRAY: 'Dentsply',
+  DGX: 'Quest Diagnostics', LH: 'Labcorp', CNC: 'Centene', MOH: 'Molina', HCA: 'HCA Healthcare',
+  UHS: 'Universal Health', DVA: 'DaVita', VTRS: 'Viatris', CRL: 'Charles River', RVTY: 'Revvity',
+  INCY: 'Incyte', BIIB: 'Biogen', HSIC: 'Henry Schein', COR: 'Cencora', CAH: 'Cardinal Health',
+  // Consumer staples
+  KHC: 'Kraft Heinz', MDLZ: 'Mondelez', HSY: 'Hershey', K: 'Kellanova', STZ: 'Constellation Brands',
+  TAP: 'Molson Coors', BF_B: 'Brown-Forman', KDP: 'Keurig Dr Pepper', CAG: 'Conagra', CPB: 'Campbell',
+  SJM: 'J.M. Smucker', HRL: 'Hormel', MKC: 'McCormick', CHD: 'Church & Dwight', CLX: 'Clorox',
+  KVUE: 'Kenvue', KR: 'Kroger', SYY: 'Sysco', ADM: 'Archer-Daniels', TSN: 'Tyson Foods',
+  // Consumer discretionary / retail
+  BBY: 'Best Buy', ULTA: 'Ulta Beauty', RL: 'Ralph Lauren', TPR: 'Tapestry', DECK: 'Deckers',
+  VFC: 'VF Corp', LEN: 'Lennar', DHI: 'D.R. Horton', PHM: 'PulteGroup', NVR: 'NVR',
+  MHK: 'Mohawk', WHR: 'Whirlpool', POOL: 'Pool Corp', ORLY: "O'Reilly Auto", AZO: 'AutoZone',
+  AAP: 'Advance Auto', GPC: 'Genuine Parts', TSCO: 'Tractor Supply', DKS: "Dick's Sporting", BURL: 'Burlington',
+  ETSY: 'Etsy', EBAY: 'eBay', QSR: 'Restaurant Brands', DRI: 'Darden', TXRH: 'Texas Roadhouse',
+  EXPE: 'Expedia', MGM: 'MGM Resorts', CZR: 'Caesars', NCLH: 'Norwegian Cruise', RCL: 'Royal Caribbean',
+  CCL: 'Carnival', HAS: 'Hasbro', MAT: 'Mattel', NWL: 'Newell Brands',
+  // Industrials
+  PCAR: 'PACCAR', CMI: 'Cummins', ETN: 'Eaton', EMR: 'Emerson', ITW: 'Illinois Tool Works',
+  PH: 'Parker Hannifin', ROK: 'Rockwell Automation', DOV: 'Dover', IR: 'Ingersoll Rand', AME: 'Ametek',
+  FTV: 'Fortive', XYL: 'Xylem', PNR: 'Pentair', GNRC: 'Generac', AOS: 'A.O. Smith',
+  SWK: 'Stanley Black & Decker', SNA: 'Snap-on', GWW: 'W.W. Grainger', FAST: 'Fastenal', URI: 'United Rentals',
+  PWR: 'Quanta Services', EME: 'EMCOR', J: 'Jacobs', ACM: 'AECOM', JCI: 'Johnson Controls',
+  CARR: 'Carrier', OTIS: 'Otis', TT: 'Trane', LII: 'Lennox', ALLE: 'Allegion',
+  MAS: 'Masco', BLDR: 'Builders FirstSource', GD: 'General Dynamics', LHX: 'L3Harris', HII: 'Huntington Ingalls',
+  TXT: 'Textron', HWM: 'Howmet', AXON: 'Axon', TDG: 'TransDigm', CW: 'Curtiss-Wright',
+  ODFL: 'Old Dominion', JBHT: 'J.B. Hunt', CHRW: 'C.H. Robinson', EXPD: 'Expeditors', XPO: 'XPO',
+  // Materials
+  VMC: 'Vulcan Materials', MLM: 'Martin Marietta', NUE: 'Nucor', STLD: 'Steel Dynamics', CLF: 'Cleveland-Cliffs',
+  FCX: 'Freeport-McMoRan', NEM: 'Newmont', SCCO: 'Southern Copper', LYB: 'LyondellBasell', DD: 'DuPont',
+  DOW: 'Dow Inc', PPG: 'PPG Industries', SHW: 'Sherwin-Williams', ECL: 'Ecolab', IFF: 'Intl Flavors',
+  ALB: 'Albemarle', CE: 'Celanese', EMN: 'Eastman Chemical', CF: 'CF Industries', MOS: 'Mosaic',
+  FMC: 'FMC Corp', AVY: 'Avery Dennison', PKG: 'Packaging Corp', IP: 'International Paper', BALL: 'Ball Corp',
+  AMCR: 'Amcor', NDSN: 'Nordson', RPM: 'RPM Intl',
+  // Energy
+  PSX: 'Phillips 66', MPC: 'Marathon Petroleum', VLO: 'Valero', HES: 'Hess', DVN: 'Devon Energy',
+  FANG: 'Diamondback', APA: 'APA Corp', CTRA: 'Coterra', EQT: 'EQT Corp', WMB: 'Williams Cos',
+  KMI: 'Kinder Morgan', OKE: 'ONEOK', LNG: 'Cheniere', TRGP: 'Targa Resources', HAL: 'Halliburton',
+  BKR: 'Baker Hughes', NOV: 'NOV Inc',
+  // Utilities
+  AEP: 'American Electric', EXC: 'Exelon', XEL: 'Xcel Energy', ED: 'Consolidated Edison', WEC: 'WEC Energy',
+  ES: 'Eversource', PEG: 'Public Service Ent', PCG: 'PG&E', EIX: 'Edison Intl', FE: 'FirstEnergy',
+  AEE: 'Ameren', CMS: 'CMS Energy', DTE: 'DTE Energy', ETR: 'Entergy', PPL: 'PPL Corp',
+  CNP: 'CenterPoint', NI: 'NiSource', LNT: 'Alliant Energy', EVRG: 'Evergy', ATO: 'Atmos Energy',
+  NRG: 'NRG Energy', AES: 'AES Corp', PNW: 'Pinnacle West',
+  // REITs
+  PSA: 'Public Storage', DLR: 'Digital Realty', WELL: 'Welltower', AVB: 'AvalonBay', EQR: 'Equity Residential',
+  VTR: 'Ventas', ESS: 'Essex Property', MAA: 'Mid-America Apt', UDR: 'UDR', CPT: 'Camden Property',
+  ARE: 'Alexandria RE', BXP: 'BXP', KIM: 'Kimco Realty', REG: 'Regency Centers', FRT: 'Federal Realty',
+  HST: 'Host Hotels', VICI: 'VICI Properties', IRM: 'Iron Mountain', WY: 'Weyerhaeuser', INVH: 'Invitation Homes',
+  DOC: 'Healthpeak', EXR: 'Extra Space Storage',
 };
 
 // Master coin catalog: { coingeckoId: [ticker, displayName] }
@@ -124,22 +206,9 @@ export const COIN_NAMES: Record<string, string> = Object.fromEntries(
 );
 
 // Default watchlists used by defaultConfig in types/widget.ts
-export const DEFAULT_STOCK_SYMBOLS: string[] = [
-  // Indices / ETFs
-  'SPY', 'QQQ', 'DIA', 'IWM', 'VTI', 'GLD',
-  // Mega-cap tech
-  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AVGO', 'TSM', 'ORCL',
-  'AMD', 'CRM', 'ADBE', 'NFLX', 'INTC', 'QCOM', 'CSCO', 'IBM', 'MU', 'ARM',
-  'PLTR', 'SNOW', 'CRWD', 'PANW', 'NOW', 'UBER', 'SHOP', 'COIN', 'HOOD', 'MSTR',
-  // Finance
-  'JPM', 'BAC', 'WFC', 'GS', 'MS', 'V', 'MA', 'AXP', 'BLK', 'SCHW',
-  // Healthcare
-  'UNH', 'LLY', 'JNJ', 'ABBV', 'MRK', 'PFE', 'TMO',
-  // Consumer
-  'WMT', 'COST', 'HD', 'NKE', 'MCD', 'SBUX', 'PG', 'KO', 'PEP', 'DIS',
-  // Industrial / energy / auto
-  'CAT', 'DE', 'GE', 'BA', 'HON', 'RTX', 'LMT', 'XOM', 'CVX', 'F', 'GM',
-];
+// Default watchlist = the ENTIRE catalog (every ticker above). The Markets tile
+// scrolls the whole list; per-widget customization can still trim it.
+export const DEFAULT_STOCK_SYMBOLS: string[] = Object.keys(STOCK_CATALOG);
 
 export const DEFAULT_COIN_IDS: string[] = [
   'bitcoin', 'ethereum', 'binancecoin', 'ripple', 'solana', 'cardano', 'dogecoin',
