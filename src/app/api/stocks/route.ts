@@ -16,9 +16,9 @@ export interface StockQuote {
 }
 
 const SPARK_POINTS = 40;
-// Yahoo's spark endpoint is fine with a long symbol list, but the whole S&P 500
-// in one URL is fragile; fetch in chunks and merge so hundreds of tickers work.
-const CHUNK = 50;
+// Yahoo's spark endpoint rejects requests with more than ~20 symbols (HTTP 400),
+// so fetch in small chunks and merge; the whole S&P 500 loads fine this way.
+const CHUNK = 20;
 
 /** Drop nulls and downsample the intraday close series to a fixed budget. */
 function toSpark(closes: unknown): number[] | null {
@@ -55,6 +55,14 @@ function parseSpark(data: any, sym: string): StockQuote {
       ? ((price - prevClose) / prevClose) * 100
       : null;
     return { symbol: sym, price, changePercent, spark };
+  }
+  // Market closed / no intraday bars: fall back to the last close so the tile
+  // still shows a price (nights, weekends, holidays) instead of "--".
+  if (symData) {
+    const prev = symData.previousClose ?? symData.chartPreviousClose;
+    if (typeof prev === 'number' && prev > 0) {
+      return { symbol: sym, price: prev, changePercent: null, spark: null };
+    }
   }
   // Legacy format: data.spark.result[].response[0].meta
   const legacy = data?.spark?.result?.find((r: { symbol: string }) => r.symbol === y);
