@@ -39,10 +39,14 @@ function chunkList<T>(list: T[], size: number): T[][] {
   return out;
 }
 
+// Catalog keys use '_' for class shares (BRK_B, BF_B); Yahoo expects '-'.
+const toYahoo = (sym: string) => sym.replace(/_/g, '-');
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function parseSpark(data: any, sym: string): StockQuote {
+  const y = toYahoo(sym);
   // New format: data[SYMBOL] = { close: [...], previousClose, chartPreviousClose }
-  const symData = data?.[sym];
+  const symData = data?.[y];
   if (symData && Array.isArray(symData.close) && symData.close.length > 0) {
     const spark = toSpark(symData.close);
     const price = spark?.[spark.length - 1] ?? symData.close[symData.close.length - 1] ?? null;
@@ -53,7 +57,7 @@ function parseSpark(data: any, sym: string): StockQuote {
     return { symbol: sym, price, changePercent, spark };
   }
   // Legacy format: data.spark.result[].response[0].meta
-  const legacy = data?.spark?.result?.find((r: { symbol: string }) => r.symbol === sym);
+  const legacy = data?.spark?.result?.find((r: { symbol: string }) => r.symbol === y);
   const response = legacy?.response?.[0];
   const meta = response?.meta;
   if (meta) {
@@ -79,7 +83,7 @@ export async function GET(request: NextRequest) {
     // Primary: Yahoo v8 spark endpoint, batched (no API key needed).
     const bySymbol = new Map<string, StockQuote>();
     await Promise.all(chunks.map(async chunk => {
-      const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${chunk.join(',')}&range=1d&interval=5m`;
+      const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${chunk.map(toYahoo).join(',')}&range=1d&interval=5m`;
       try {
         const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 30 } });
         if (!res.ok) return;
@@ -97,14 +101,14 @@ export async function GET(request: NextRequest) {
     // Fallback: Yahoo v7 quote endpoint, batched (no spark series available).
     const v7Map = new Map<string, StockQuote>();
     await Promise.all(chunks.map(async chunk => {
-      const v7Url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${chunk.join(',')}`;
+      const v7Url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${chunk.map(toYahoo).join(',')}`;
       try {
         const v7Res = await fetch(v7Url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 30 } });
         if (!v7Res.ok) return;
         const v7Data = await v7Res.json();
         const quotes: YahooQuote[] = v7Data.quoteResponse?.result ?? [];
         for (const sym of chunk) {
-          const q = quotes.find(qq => qq.symbol === sym);
+          const q = quotes.find(qq => qq.symbol === toYahoo(sym));
           v7Map.set(sym, {
             symbol: sym,
             price: q?.regularMarketPrice ?? null,
