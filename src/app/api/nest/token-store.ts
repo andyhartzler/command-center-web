@@ -45,16 +45,22 @@ export function deleteTokens(response: NextResponse): void {
 }
 
 export async function readTokens(req?: NextRequest): Promise<NestTokens | null> {
-  if (req) {
-    const fromCookie = readTokensFromCookie(req);
-    if (fromCookie) return fromCookie;
-  }
-
+  // The server-side file is the SHARED source of truth across every device (the
+  // wall, phone, laptop). It must be read first: token refreshes write here, so
+  // reading the file keeps all devices in sync. Reading a per-device cookie
+  // first (the old behaviour) let a stale cookie shadow the fresh shared token,
+  // which is why one device would work while the wall stayed "disconnected".
   try {
     const raw = await fs.readFile(tokensPath(), 'utf-8');
     return JSON.parse(raw);
   } catch {
     // fall through
+  }
+
+  // Fallback for stateless hosts (e.g. Vercel) where the file does not persist.
+  if (req) {
+    const fromCookie = readTokensFromCookie(req);
+    if (fromCookie) return fromCookie;
   }
 
   const envTokens = process.env.NEST_TOKENS;
